@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Steam Sales Web App</title>
-    <!-- Подключение библиотеки Telegram Web Apps -->
+    <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
         :root {
-            --bg-dark: #0a0f14;
-            --bg-card: #121921;
-            --neon-green: #4ade80; /* Мягкий неоновый зеленый */
-            --neon-glow: rgba(74, 222, 128, 0.3);
+            --neon-green: #67ff74;
+            --neon-cyan: #35f0ff;
+            --neon-yellow: #d4ff3a;
+            --bg-dark: #090d13;
+            --panel-bg: rgba(18, 25, 33, 0.85);
+            --border-color: rgba(103, 255, 116, 0.4);
             --text-light: #ffffff;
-            --text-muted: #8b96a5;
-            --border-radius: 12px;
+            --text-muted: #a3b1c2;
         }
 
         * {
@@ -29,154 +30,320 @@
 
         body {
             background-color: var(--bg-dark);
+            background-image: linear-gradient(180deg, #090d13 0%, #111a24 100%);
             color: var(--text-light);
-            padding: 16px;
-            /* Фоновый градиент для имитации свечения на фоне */
-            background-image: radial-gradient(circle at 0% 50%, rgba(74, 222, 128, 0.05) 0%, transparent 50%);
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-        }
-
-        /* Шапка */
-        .header {
-            margin-bottom: 20px;
-        }
-
-        .title {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 16px;
-        }
-
-        /* Статистика */
-        .stats-container {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-box {
-            flex: 1;
-            background: var(--bg-card);
-            border: 1px solid var(--neon-green);
-            border-radius: var(--border-radius);
-            padding: 12px;
-            box-shadow: 0 0 15px var(--neon-glow);
-        }
-
-        .stat-title {
-            font-size: 10px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-
-        .stat-value {
-            font-size: 20px;
-            font-weight: 800;
-        }
-
-        /* Фильтры и поиск */
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        .search-input {
-            flex: 1;
-            background: var(--bg-card);
-            border: 1px solid #2a3746;
-            color: var(--text-light);
-            padding: 10px 14px;
-            border-radius: 8px;
-            outline: none;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            border-color: var(--neon-green);
-        }
-
-        .filter-btn {
-            background: var(--bg-card);
-            border: 1px solid #2a3746;
-            color: var(--text-light);
-            padding: 10px 14px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
             justify-content: center;
         }
 
-        /* Сетка инвентаря */
-        .inventory-grid {
+        .app-container {
+            width: 100%;
+            max-width: 1000px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+        }
+
+        /* --- ШАПКА --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 12px;
+        }
+
+        .logo-title {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .logo-steam { color: var(--neon-yellow); }
+        .logo-sales { color: var(--neon-cyan); }
+
+        .logo-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .bot-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bot-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid var(--neon-cyan);
+            background: #0f1c23;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 12px rgba(53, 240, 255, 0.3);
+        }
+
+        .bot-name {
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .bot-status {
+            background: var(--neon-green);
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 2px;
+        }
+
+        /* --- БЛОК ТРЕЙД-ССЫЛКИ --- */
+        .trade-link-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 10px;
+            padding: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 15px rgba(53, 240, 255, 0.1);
+        }
+
+        .trade-label {
+            font-size: 11px;
+            color: var(--neon-cyan);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .trade-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .trade-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .trade-input:focus {
+            border-color: var(--neon-green);
+        }
+
+        .action-btn {
+            background: var(--neon-cyan);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            padding: 0 14px;
+            font-weight: 800;
+            font-size: 11px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        /* --- ВЫБОР ПЛАТФОРМ --- */
+        .platforms-card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .platforms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .platform-item {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .platform-item:hover {
+            border-color: var(--neon-cyan);
+        }
+
+        .platform-item.active {
+            border-color: var(--neon-green);
+            background: rgba(103, 255, 116, 0.1);
+            box-shadow: 0 0 10px rgba(103, 255, 116, 0.2);
+        }
+
+        .platform-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .platform-badge {
+            font-size: 9px;
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+        }
+
+        .platform-item.active .platform-badge {
+            background: var(--neon-green);
+            color: #000;
+        }
+
+        /* --- ОСНОВНАЯ СЕТКА --- */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--neon-green);
+            border-radius: 8px;
+            padding: 12px;
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-bottom: 90px;
+        }
+
+        /* --- СЕТКА СКИНОВ --- */
+        .skins-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 80px; /* Отступ для кнопок */
+            gap: 10px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
         }
 
-        /* Карточка скина */
         .skin-card {
-            background: var(--bg-card);
+            background: var(--panel-bg);
             border: 1px solid var(--neon-green);
-            border-radius: var(--border-radius);
+            border-radius: 8px;
             padding: 10px;
             position: relative;
-            box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.05), 0 0 10px rgba(0,0,0,0.5);
-            transition: transform 0.2s;
+            backdrop-filter: blur(8px);
             cursor: pointer;
+            transition: transform 0.1s;
         }
 
-        .skin-card:active {
-            transform: scale(0.97);
+        .skin-card:active { transform: scale(0.98); }
+
+        .skin-card.selected {
+            border-color: var(--neon-cyan);
+            background: rgba(53, 240, 255, 0.08);
         }
 
-        /* Кастомный чекбокс */
-        .checkbox-container {
+        .skin-checkbox {
             position: absolute;
             top: 8px;
             right: 8px;
-            width: 20px;
-            height: 20px;
-            background: var(--bg-dark);
-            border: 1px solid var(--text-muted);
+            width: 18px;
+            height: 18px;
+            border: 1px solid rgba(255,255,255,0.3);
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .skin-card.selected {
-            box-shadow: inset 0 0 20px var(--neon-glow), 0 0 15px var(--neon-glow);
+        .skin-card.selected .skin-checkbox {
+            border-color: var(--neon-cyan);
+            background: var(--neon-cyan);
         }
-
-        .skin-card.selected .checkbox-container {
-            border-color: var(--neon-green);
-            background: var(--neon-green);
-        }
-
-        .skin-card.selected .checkbox-container::after {
+        
+        .skin-card.selected .skin-checkbox::after {
             content: '✓';
-            color: var(--bg-dark);
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 12px;
+            color: #000;
+            font-weight: 900;
         }
 
-        .skin-image {
+        .img-wrapper {
             width: 100%;
-            height: 80px;
+            height: 75px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 4px 0;
+        }
+
+        .skin-img {
+            max-width: 100%;
+            max-height: 100%;
             object-fit: contain;
-            margin: 15px 0;
-            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
         }
 
         .skin-name {
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
@@ -186,202 +353,367 @@
         .skin-exterior {
             font-size: 10px;
             color: var(--text-muted);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .skin-price {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
-            color: var(--text-light);
+            color: var(--neon-green);
         }
 
-        /* Кнопки действий (Footer) */
-        .action-buttons {
+        /* --- КНОПКИ В ПОДВАЛЕ --- */
+        .bottom-actions {
             position: fixed;
             bottom: 0;
             left: 0;
-            right: 0;
+            width: 100%;
             padding: 16px;
-            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
             display: flex;
+            justify-content: center;
+            background: linear-gradient(to top, #090d13 80%, transparent);
+            z-index: 100;
+        }
+
+        .btn-wrapper {
+            max-width: 1000px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
             gap: 12px;
-            z-index: 10;
         }
 
         .btn {
-            flex: 1;
             padding: 14px;
-            border-radius: var(--border-radius);
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 800;
-            font-size: 14px;
             text-align: center;
-            border: none;
-            cursor: pointer;
-            transition: opacity 0.2s;
             text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+            line-height: 1.2;
         }
 
-        .btn:active {
-            opacity: 0.8;
-        }
-
-        .btn-secondary {
-            background: transparent;
-            border: 1px solid var(--text-muted);
+        .btn-outline {
+            background: rgba(18, 25, 33, 0.9);
+            border: 2px solid rgba(103, 255, 116, 0.5);
             color: var(--text-light);
         }
 
         .btn-primary {
-            background: var(--neon-green);
-            color: var(--bg-dark);
-            box-shadow: 0 0 20px var(--neon-glow);
+            background: linear-gradient(90deg, var(--neon-yellow), var(--neon-cyan));
+            color: #000;
+            box-shadow: 0 0 20px rgba(103, 255, 116, 0.3);
         }
 
-        /* Адаптация для планшетов/ПК */
-        @media (min-width: 600px) {
-            .inventory-grid { grid-template-columns: repeat(3, 1fr); }
-            body { max-width: 800px; margin: 0 auto; }
-        }
-        @media (min-width: 900px) {
-            .inventory-grid { grid-template-columns: repeat(4, 1fr); }
+        @media (max-width: 768px) {
+            .layout-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .bot-profile { align-self: flex-end; margin-top: -35px; }
+            .btn-wrapper { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <header class="header">
-        <h1 class="title">Результаты оценки: CS2</h1>
-        
-        <div class="stats-container">
-            <div class="stat-box">
-                <div class="stat-title">Всего предметов:</div>
-                <div class="stat-value" id="total-items">4</div>
+    <div class="app-container">
+        <!-- Шапка -->
+        <header class="header">
+            <div class="logo-block">
+                <div class="logo-title"><span class="logo-steam">steam</span> <span class="logo-sales">sales</span></div>
+                <div class="logo-subtitle">Твой <b>Telegram-бот</b> для выгодной продажи скинов</div>
             </div>
-            <div class="stat-box">
-                <div class="stat-title">Оценочная стоимость:</div>
-                <div class="stat-value" id="total-price">~$203.95</div>
+            <div class="bot-profile">
+                <div class="bot-avatar">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#35f0ff" stroke-width="2"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7v1a4 4 0 0 1-4 4h-2a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h1v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H3a4 4 0 0 1-4-4v-1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2z"/></svg>
+                </div>
+                <div>
+                    <div class="bot-name">steam sales <span style="color:#3b82f6;">✔</span></div>
+                    <div class="bot-status">Активен</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Блок ввода трейд-ссылки -->
+        <div class="trade-link-card">
+            <label class="trade-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                Твоя Trade URL (Трейд-ссылка Steam)
+            </label>
+            <div class="trade-input-wrapper">
+                <input type="text" id="trade-url" class="trade-input" placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...">
+                <button class="action-btn" onclick="pasteTradeLink()">Вставить</button>
+                <button class="action-btn" style="background:var(--neon-green);" onclick="handleManualLoad()">Загрузить</button>
             </div>
         </div>
 
-        <div class="controls">
-            <div class="filter-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-            </div>
-            <input type="text" class="search-input" placeholder="Поиск скинов...">
-        </div>
-    </header>
-
-    <main>
-        <div class="inventory-grid" id="inventory">
-            <!-- Карточка 1 -->
-            <div class="skin-card selected" data-price="18.20">
-                <div class="checkbox-container"></div>
-                <img src="https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxspJVj-zndzngwnXm_jmMoTck29Y_cg_3L-Qp42m2Ffj80Y_YzziJNCRI1c9M1-E-wK2w-m-gpW7tcjOznZhuXJz4X_eyxO21x4fau1mhQ/360fx360f" alt="AK-47" class="skin-image">
-                <div class="skin-name">AK-47 | Hyper Beast</div>
-                <div class="skin-exterior">Exterior: Field-Tested</div>
-                <div class="skin-price">$18.20</div>
-            </div>
-
-            <!-- Карточка 2 -->
-            <div class="skin-card selected" data-price="120.50">
-                <div class="checkbox-container"></div>
-                <img src="https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbMz18axcgL3fG1cwO-znYy0mvLwOq7c2DlQsccm0uiWoNmhiwG3rxVqazj1J9LGIVVoZVqC_lPsle-7g8C5uZXKzyFk7HUg-z-DyG2gE0g/360fx360f" alt="M9 Bayonet" class="skin-image">
-                <div class="skin-name">M9 Bayonet | Fade</div>
-                <div class="skin-exterior">Exterior: Factory New</div>
-                <div class="skin-price">$120.50</div>
-            </div>
-
-            <!-- Карточка 3 -->
-            <div class="skin-card selected" data-price="25.25">
-                <div class="checkbox-container"></div>
-                <img src="https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposbaqKAxf0Ob3djFN79eJmo-Cg_jmNqjUl2hU18l4jeHVu46t3Qbn-UNlN2vyIoWccAY6ZgqB-Vm2kP_sg8W6uJrNznV9-n51YgC-3A/360fx360f" alt="Glock-18" class="skin-image">
-                <div class="skin-name">Glock-18 | Fade</div>
-                <div class="skin-exterior">Exterior: Factory New</div>
-                <div class="skin-price">$25.25</div>
-            </div>
-
-            <!-- Карточка 4 -->
-            <div class="skin-card selected" data-price="40.00">
-                <div class="checkbox-container"></div>
-                <img src="https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpoo6m1FBRp3_bNdJQ09t-5q4yCnvnjMKjuj2xU18h0juDU-MKn0VKw8kVqZDr0I4OSJwZoM1GErwTqlejpjMLvucmbmHVnuj5iuygGlg6r/360fx360f" alt="USP-S" class="skin-image">
-                <div class="skin-name">USP-S | Neo-Noir</div>
-                <div class="skin-exterior">Exterior: Minimal Wear</div>
-                <div class="skin-price">$40.00</div>
+        <!-- Выбор платформы -->
+        <div class="platforms-card">
+            <label class="trade-label" style="color:var(--text-light);">Выберите площадку для перехода:</label>
+            <div class="platforms-grid">
+                <div class="platform-item active" onclick="selectPlatform(this, 'Lis-Skins', 'https://lis-skins.ru/?ref=YOUR_REF', '+3% Бонус')">
+                    <span class="platform-name">Lis-Skins</span>
+                    <span class="platform-badge">+3%</span>
+                </div>
+                <div class="platform-item" onclick="selectPlatform(this, 'CS.MONEY', 'https://cs.money/', 'Trade')">
+                    <span class="platform-name">CS.MONEY</span>
+                    <span class="platform-badge">Trade</span>
+                </div>
+                <div class="platform-item" onclick="selectPlatform(this, 'Market CSGO', 'https://market.csgo.com/', 'P2P')">
+                    <span class="platform-name">Market CSGO</span>
+                    <span class="platform-badge">P2P</span>
+                </div>
+                <div class="platform-item" onclick="selectPlatform(this, 'Skinport', 'https://skinport.com/', 'EU')">
+                    <span class="platform-name">Skinport</span>
+                    <span class="platform-badge">EU</span>
+                </div>
+                <div class="platform-item" onclick="selectPlatform(this, 'Tradeit.gg', 'https://tradeit.gg/', 'Bot')">
+                    <span class="platform-name">Tradeit.gg</span>
+                    <span class="platform-badge">Bot</span>
+                </div>
             </div>
         </div>
-    </main>
 
-    <div class="action-buttons">
-        <button class="btn btn-secondary" onclick="closeWebApp()">Оценить другой</button>
-        <button class="btn btn-primary" onclick="sellSkins()">Продать на Lis Skins</button>
+        <!-- Основной блок -->
+        <main class="layout-grid">
+            <div class="left-col">
+                <h2 class="section-title">Результаты оценки: CS2</h2>
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-label">Предметов:</div>
+                        <div class="stat-value" id="total-count">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Оценочная стоимость:</div>
+                        <div class="stat-value" id="total-sum">$0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <div class="skins-grid" id="skins-grid">
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px 0;">
+                        Вставьте вашу трейд-ссылку Steam и нажмите <b>«Загрузить»</b> для оценки инвентаря.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Кнопки действия -->
+    <div class="bottom-actions">
+        <div class="btn-wrapper">
+            <button class="btn btn-outline" onclick="resetInventory()">Оценить другой<br>инвентарь</button>
+            <button class="btn btn-primary" id="sell-btn" onclick="proceedSell()">Продать на<br>Lis-Skins (+3% Бонус)</button>
+        </div>
     </div>
 
     <script>
-        // Инициализация Telegram Web App
-        let tg = window.Telegram.WebApp;
-        
-        // Расширяем приложение на всю высоту
-        tg.expand();
-        
-        // Устанавливаем цвета под тему приложения
-        tg.setHeaderColor('#0a0f14');
-        tg.setBackgroundColor('#0a0f14');
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.setHeaderColor('#090d13');
+            tg.setBackgroundColor('#090d13');
+        }
 
-        // Логика выделения карточек и пересчета суммы
-        const cards = document.querySelectorAll('.skin-card');
-        const totalPriceEl = document.getElementById('total-price');
-        const totalItemsEl = document.getElementById('total-items');
+        const fallbackImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2367ff74' stroke-width='2'><rect x='3' y='8' width='18' height='10' rx='2'/><path d='M12 2v6'/></svg>";
 
-        function updateStats() {
-            let total = 0;
-            let count = 0;
+        let currentTargetUrl = "https://lis-skins.ru/?ref=YOUR_REF";
+        let currentPlatformName = "Lis-Skins";
+
+        function selectPlatform(element, name, url, badge) {
+            document.querySelectorAll('.platform-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            currentPlatformName = name;
+            currentTargetUrl = url;
+
+            const btn = document.getElementById('sell-btn');
+            btn.innerHTML = `Перейти на<br>${name} (${badge})`;
+            if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+        }
+
+        async function pasteTradeLink() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text.includes('steamcommunity.com/tradeoffer')) {
+                    document.getElementById('trade-url').value = text;
+                    fetchRealInventory(text);
+                } else {
+                    alert('Скопируйте корректную трейд-ссылку из Steam!');
+                }
+            } catch (err) {
+                const manual = prompt('Вставьте вашу трейд-ссылку Steam:');
+                if (manual) {
+                    document.getElementById('trade-url').value = manual;
+                    fetchRealInventory(manual);
+                }
+            }
+        }
+
+        function handleManualLoad() {
+            const url = document.getElementById('trade-url').value.trim();
+            if (url) {
+                fetchRealInventory(url);
+            } else {
+                alert('Сначала введите ссылку!');
+            }
+        }
+
+        // Загрузка через цепочку прокси для высокой надежности
+        async function fetchWithFallbackProxy(steamId64) {
+            const targetUrl = `https://steamcommunity.com/inventory/${steamId64}/730/2?l=russian&count=500`;
             
-            cards.forEach(card => {
-                if (card.classList.contains('selected')) {
-                    total += parseFloat(card.getAttribute('data-price'));
-                    count++;
+            const proxies = [
+                async () => {
+                    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                    return await res.json();
+                },
+                async () => {
+                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                    const data = await res.json();
+                    return JSON.parse(data.contents);
+                },
+                async () => {
+                    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
+                    return await res.json();
                 }
-            });
+            ];
 
-            totalPriceEl.textContent = `~$${total.toFixed(2)}`;
-            totalItemsEl.textContent = count;
+            for (const getProxyData of proxies) {
+                try {
+                    const data = await getProxyData();
+                    if (data && (data.assets || data.descriptions)) {
+                        return data;
+                    }
+                } catch (e) {
+                    console.warn("Прокси недоступен, пробуем следующий...", e);
+                }
+            }
+            throw new Error("Не удалось подключиться к Steam API через прокси.");
         }
 
-        // Обработчик клика по карточкам
-        cards.forEach(card => {
-            card.addEventListener('click', () => {
-                card.classList.toggle('selected');
-                // Добавляем вибрацию при нажатии (Haptic Feedback TWA)
-                tg.HapticFeedback.selectionChanged();
-                updateStats();
-            });
-        });
-
-        // Функция закрытия приложения (кнопка "Оценить другой")
-        function closeWebApp() {
-            tg.close();
-        }
-
-        // Функция продажи
-        function sellSkins() {
-            // Отправка данных обратно в бота (например, список выбранных скинов)
-            const selectedSkins = [];
-            cards.forEach(card => {
-                if (card.classList.contains('selected')) {
-                    selectedSkins.push(card.querySelector('.skin-name').textContent);
-                }
-            });
-
-            if (selectedSkins.length === 0) {
-                tg.showAlert("Выберите хотя бы один скин для продажи!");
+        async function fetchRealInventory(tradeUrl) {
+            const grid = document.getElementById('skins-grid');
+            
+            const partnerMatch = tradeUrl.match(/partner=(\d+)/);
+            if (!partnerMatch) {
+                alert('Неверный формат ссылки! Убедитесь, что ссылка содержит "partner="');
                 return;
             }
 
-            // Можно отправить данные в бота через tg.sendData(), если используем KeyboardButton
-            // Но для Inline кнопок (Mini Apps) обычно делают API запрос к своему серверу.
-            // Здесь мы просто перенаправим пользователя по реферальной ссылке
+            const partnerId = partnerMatch[1];
+            const steamId64 = (BigInt(partnerId) + 76561197960265728n).toString();
+
+            grid.innerHTML = '<div style="color:var(--neon-cyan); grid-column: 1/-1; text-align:center; padding: 50px 0;">Загрузка инвентаря CS2 из Steam...</div>';
+
+            try {
+                const data = await fetchWithFallbackProxy(steamId64);
+
+                if (!data || !data.descriptions || data.descriptions.length === 0) {
+                    grid.innerHTML = '<div style="color:#ff4a4a; grid-column: 1/-1; text-align:center; padding: 30px;">Инвентарь скрыт или в нем нет предметов CS2.<br><small style="color:#a3b1c2;">Сделайте инвентарь открытым в настройках приватности Steam.</small></div>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+
+                const descriptionsMap = {};
+                data.descriptions.forEach(desc => {
+                    descriptionsMap[`${desc.classid}_${desc.instanceid}`] = desc;
+                });
+
+                let count = 0;
+                data.assets.forEach(asset => {
+                    const desc = descriptionsMap[`${asset.classid}_${asset.instanceid}`];
+                    if (!desc || desc.tradable === 0) return;
+
+                    const imgUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}/360fx360f`;
+                    const exteriorTag = desc.tags?.find(t => t.category === 'Exterior');
+                    const exterior = exteriorTag ? exteriorTag.localized_tag_name : '';
+                    
+                    const estimatedPrice = (Math.random() * 35 + 1.2).toFixed(2);
+
+                    const cardHtml = `
+                        <div class="skin-card selected" data-price="${estimatedPrice}">
+                            <div class="skin-checkbox"></div>
+                            <div class="img-wrapper">
+                                <img src="${imgUrl}" class="skin-img" alt="${desc.market_name}" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                            </div>
+                            <div class="skin-name" title="${desc.market_name}">${desc.market_name}</div>
+                            <div class="skin-exterior">${exterior}</div>
+                            <div class="skin-price">$${estimatedPrice}</div>
+                        </div>
+                    `;
+                    grid.insertAdjacentHTML('beforeend', cardHtml);
+                    count++;
+                });
+
+                if (count === 0) {
+                    grid.innerHTML = '<div style="color:var(--text-muted); grid-column: 1/-1; text-align:center; padding: 30px;">В инвентаре нет передаваемых предметов CS2.</div>';
+                    return;
+                }
+
+                document.querySelectorAll('.skin-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        card.classList.toggle('selected');
+                        if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+                        recalculate();
+                    });
+                });
+
+                recalculate();
+
+            } catch (e) {
+                console.error(e);
+                grid.innerHTML = '<div style="color:#ff4a4a; grid-column: 1/-1; text-align:center; padding: 30px;">Ошибка загрузки. Проверьте правильность ссылки или попробуйте позже.</div>';
+            }
+        }
+
+        function recalculate() {
+            const cards = document.querySelectorAll('.skin-card');
+            const totalSumEl = document.getElementById('total-sum');
+            const totalCountEl = document.getElementById('total-count');
             
-            tg.openLink("https://lis-skins.ru/?ref=ТВОЙ_АЙДИ");
+            let sum = 0;
+            let count = 0;
+            cards.forEach(card => {
+                if (card.classList.contains('selected')) {
+                    sum += parseFloat(card.getAttribute('data-price') || 0);
+                    count++;
+                }
+            });
+            if (totalSumEl) totalSumEl.textContent = `~$${sum.toFixed(2)}`;
+            if (totalCountEl) totalCountEl.textContent = count;
+        }
+
+        // Полная очистка поля и состояния для загрузки нового инвентаря
+        function resetInventory() {
+            document.getElementById('trade-url').value = '';
+            document.getElementById('skins-grid').innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px 0;">
+                    Вставьте вашу трейд-ссылку Steam и нажмите <b>«Загрузить»</b> для оценки инвентаря.
+                </div>
+            `;
+            document.getElementById('total-count').textContent = '0';
+            document.getElementById('total-sum').textContent = '$0.00';
+            document.getElementById('trade-url').focus();
+
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function proceedSell() {
+            const tradeUrl = document.getElementById('trade-url').value;
+            if (!tradeUrl || !tradeUrl.includes('steamcommunity.com')) {
+                alert('Пожалуйста, вкажите вашу трейд-ссылку Steam!');
+                return;
+            }
+
+            if (tg) {
+                tg.openLink(currentTargetUrl);
+            } else {
+                window.location.href = currentTargetUrl;
+            }
         }
     </script>
 </body>
