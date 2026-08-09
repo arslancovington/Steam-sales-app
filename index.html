@@ -1,12 +1,33 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
+<head> 
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Skin Sales — Marketplace</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
+        .steam-login-btn {
+    width: 100%;
+    max-width: 280px;
+    background: linear-gradient(135deg, #171a21 0%, #2a475e 100%);
+    color: #ffffff;
+    border: 1px solid #41739c;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: sans-serif;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    margin: 20px auto;
+}
+.steam-login-btn:hover { border-color: #66c0f4; }
+.steam-icon { fill: #66c0f4; }
+
         :root {
             --bg-color: #0b1110;
             --neon-green: #7cfc00;
@@ -231,6 +252,17 @@
             color: var(--neon-green);
             font-weight: bold;
         }
+        
+<div id="auth-section">
+    <button id="steam-login-btn" class="steam-login-btn" onclick="loginWithSteam()">
+        <svg class="steam-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a10 10 0 0 0-7.5 16.6l3-3.6a4 4 0 1 1 5.7-5.7l3.6-3A10 10 0 0 0 12 2z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        <span>Войти через Steam</span>
+    </button>
+</div>
+        
 
         /* ===== VIP БЕГУЩАЯ СТРОКА ВВЕРХУ ===== */
         .vip-ticker-section {
@@ -948,6 +980,46 @@
     </div>
 
     <script>
+        // 1. Функция для получения SteamID из ссылки после возврата со Steam
+function checkSteamAuth() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const steamId = urlParams.get('steamId');
+
+    if (steamId) {
+        console.log("Успешный вход! SteamID:", steamId);
+        // Скрываем кнопку входа, если она есть
+        const btn = document.getElementById('steam-login-btn');
+        if (btn) btn.style.display = 'none';
+
+        // И сразу запрашиваем инвентарь с нашего сервера
+        loadSteamInventory(steamId);
+    }
+}
+
+// 2. Функция для загрузки скинов (запрос к твоему API)
+async function loadSteamInventory(steamId) {
+    try {
+        const response = await fetch('ССЫЛКА_НА_ТВОЙ_SERVER_REPLIT/api/steam/inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ steamId: steamId })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            renderInventory(data.items, data.descriptions);
+        } else {
+            document.getElementById('inventory-container').innerHTML = "Инвентарь пуст или скрыт";
+        }
+    } catch (err) {
+        console.error("Ошибка загрузки:", err);
+    }
+}
+
+// 3. Вызываем проверку при загрузке страницы
+window.onload = checkSteamAuth;
+
         let userBalance = 1500;
         let selectedTopupType = 'crypto';
         let selectedSellPlatform = 'Our P2P';
