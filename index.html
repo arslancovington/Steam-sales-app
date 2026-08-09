@@ -1507,124 +1507,116 @@ window.onload = checkSteamAuth;
             alert(`Заявка на вывод ${finalAmount.toFixed(2)} ₽ успешно создана!`);
         }
 
-        function saveTradeUrl() {
-            const url = document.getElementById('trade-url-input').value;
-            if (url.includes('tradeoffer/new/')) {
-                alert('Трейд-ссылка успешно сохранена!');
-            } else {
-                alert('Пожалуйста, введите корректную Trade URL ссылку от Steam.');
-            }
-        }
-        // Сохранение трейд-ссылки (уже было у тебя)
-function saveTradeUrl() {
-    const url = document.getElementById('trade-url-input').value;
-    if (url.includes('tradeoffer/new/')) {
-        alert('Трейд-ссылка успешно сохранена!');
-    } else {
-        alert('Пожалуйста, введите корректную Trade URL ссылку');
-    }
-}
-
-// ==========================================
-// ИНТЕГРАЦИЯ STEAM АВТОРИЗАЦИИ И ИНВЕНТАРЯ
-// ==========================================
-
-// 1. Проверяем SteamID в ссылке при загрузке страницы
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const steamId = urlParams.get('steamId');
-
-    if (steamId) {
-        console.log("Успешный вход! SteamID:", steamId);
-        // Скрываем кнопку входа, если пользователь уже авторизован
-        const authSection = document.getElementById('auth-section');
-        if (authSection) authSection.style.display = 'none';
-
-        // Сразу загружаем инвентарь
-        loadSteamInventory(steamId);
-    }
-});
-
-// 2. Функция редиректа на бэкенд для входа через Steam
-function loginWithSteam() {
-    // ВНИМАНИЕ: Замени ссылку ниже на твой реальный URL бэкенда из Replit
-    const backendUrl = 'https://ТВОЙ_ПРОЕКТ.repl.co'; 
-    window.location.href = `${backendUrl}/auth/steam`;
-}
-
-// 3. Запрос к серверу за инвентарем
-async function loadSteamInventory(steamId) {
-    const container = document.getElementById('inventory-container');
-    if (container) container.innerHTML = '<div class="loading-text">Загрузка скинов из Steam...</div>';
-
-    try {
-        // ВНИМАНИЕ: Замени ссылку на твой реальный URL бэкенда из Replit
-        const backendUrl = 'https://ТВОЙ_ПРОЕКТ.repl.co'; 
-
-        const response = await fetch(`${backendUrl}/api/steam/inventory`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steamId: steamId })
-        });
-
-        const data = await response.json();
-        
-        if (data.success && data.items) {
-            renderInventory(data.items, data.descriptions);
+            // Сохранение трейд-ссылки
+    function saveTradeUrl() {
+        const url = document.getElementById('trade-url-input').value;
+        if (url.includes('tradeoffer/new/')) {
+            alert('Трейд-ссылка успешно сохранена!');
         } else {
-            if (container) container.innerHTML = '<div class="empty-inv">Инвентарь пуст или скрыт настройками приватности</div>';
+            alert('Пожалуйста, введите корректную Trade URL ссылку');
         }
-    } catch (err) {
-        console.error("Ошибка загрузки инвентаря:", err);
-        if (container) container.innerHTML = '<div class="error-inv">Ошибка соединения с сервером</div>';
-    }
-}
-
-// 4. Отрисовка карточек скинов
-function renderInventory(items, descriptions) {
-    const container = document.getElementById('inventory-container');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    if (!items || items.length === 0) {
-        container.innerHTML = '<div class="empty-inv">Нет доступных предметов в инвентаре</div>';
-        return;
     }
 
-    // Создаем словарь описаний по classid
-    const descMap = {};
-    if (descriptions) {
-        descriptions.forEach(desc => {
-            descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
+    // ==========================================
+    // ИНТЕГРАЦИЯ STEAM АВТОРИЗАЦИИ И ИНВЕНТАРЯ
+    // ==========================================
+
+    // 1. Проверяем SteamID в ссылке при загрузке страницы
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const steamId = urlParams.get('steamId');
+
+        if (steamId) {
+            console.log("Успешный вход! SteamID:", steamId);
+            // Скрываем кнопку входа, если пользователь уже авторизован
+            const authSection = document.getElementById('auth-section');
+            if (authSection) authSection.style.display = 'none';
+
+            // Сразу загружаем инвентарь
+            loadSteamInventory(steamId);
+        }
+    });
+
+    // 2. Функция редиректа на бэкенд для входа через Steam
+    function loginWithSteam() {
+        // Твоя ссылка на рабочую базу Render
+        const backendUrl = 'https://steam-sales-app.onrender.com'; 
+        window.location.href = `${backendUrl}/auth/steam`;
+    }
+
+    // 3. Запрос к серверу за инвентарем
+    async function loadSteamInventory(steamId) {
+        const container = document.getElementById('inventory-container');
+        if (container) container.innerHTML = '<div class="loading-text">Загрузка скинов из Steam...</div>';
+
+        try {
+            // Твоя ссылка на рабочую базу Render
+            const backendUrl = 'https://steam-sales-app.onrender.com'; 
+
+            const response = await fetch(`${backendUrl}/api/steam/inventory`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ steamId: steamId })
+            });
+
+            const data = await response.json();
+            
+            if (data.success && data.items) {
+                renderInventory(data.items, data.descriptions);
+            } else {
+                if (container) container.innerHTML = '<div class="empty-inv">Инвентарь пуст или скрыт настройками приватности</div>';
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки инвентаря:", err);
+            if (container) container.innerHTML = '<div class="error-inv">Ошибка соединения с сервером</div>';
+        }
+    }
+
+    // 4. Отрисовка карточек скинов
+    function renderInventory(items, descriptions) {
+        const container = document.getElementById('inventory-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div class="empty-inv">Нет доступных предметов в инвентаре</div>';
+            return;
+        }
+
+        // Создаем словарь описаний по classid
+        const descMap = {};
+        if (descriptions) {
+            descriptions.forEach(desc => {
+                descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
+            });
+        }
+
+        // Рисуем каждый предмет
+        items.forEach(item => {
+            const key = item.classid + '_' + (item.instanceid || '0');
+            const desc = descMap[key];
+
+            if (!desc || !desc.marketable) return; // Пропускаем непередаваемые предметы
+
+            const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
+            const name = desc.market_hash_name || desc.name;
+            const color = desc.name_color ? `#${desc.name_color}` : '#d2d2d2';
+
+            const card = document.createElement('div');
+            card.className = 'skin-card';
+            card.innerHTML = `
+                <div class="skin-img-wrap">
+                    <img src="${iconUrl}" alt="${name}" loading="lazy">
+                </div>
+                <div class="skin-info">
+                    <div class="skin-name" style="color: ${color};" title="${name}">${name}</div>
+                    <button class="sell-btn" onclick="openSellModal('${item.assetid}', '${name}', '${iconUrl}')">Выставить</button>
+                </div>
+            `;
+            container.appendChild(card);
         });
     }
-
-    // Рисуем каждый предмет
-    items.forEach(item => {
-        const key = item.classid + '_' + (item.instanceid || '0');
-        const desc = descMap[key];
-
-        if (!desc || !desc.marketable) return; // Пропускаем непередаваемые предметы
-
-        const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
-        const name = desc.market_hash_name || desc.name;
-        const color = desc.name_color ? `#${desc.name_color}` : '#d2d2d2';
-
-        const card = document.createElement('div');
-        card.className = 'skin-card';
-        card.innerHTML = `
-            <div class="skin-img-wrap">
-                <img src="${iconUrl}" alt="${name}" loading="lazy">
-            </div>
-            <div class="skin-info">
-                <div class="skin-name" style="color: ${color};" title="${name}">${name}</div>
-                <button class="sell-btn" onclick="openSellModal('${item.assetid}', '${name}', '${iconUrl}')">Выставить</button>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-        }
     </script>
 </body>
 </html>
