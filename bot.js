@@ -45,3 +45,7 @@ bot.onText(/\/start/, async (msg) => {
         },
       },
     );
+  } catch (error) {
+    logger.error(error);
+  }
+});
