@@ -1,6 +1,6 @@
 import "dotenv/config";
 import TelegramBot from "node-telegram-bot-api";
-import User from "./models/User.js";
+import mongoose from "mongoose";
 import { logger } from "./lib/logger.js";
 
 const botToken = process.env.BOT_TOKEN;
@@ -8,6 +8,18 @@ const botToken = process.env.BOT_TOKEN;
 if (!botToken) {
   throw new Error("BOT_TOKEN environment variable is required.");
 }
+
+// Создаем модель пользователя прямо здесь, чтобы не плодить файлы и папки
+const userSchema = new mongoose.Schema(
+  {
+    tgId: { type: Number, required: true, unique: true },
+    username: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+// Защита от повторной компиляции модели, если файл перезагрузится
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 const bot = new TelegramBot(botToken, { polling: true });
 
@@ -20,6 +32,7 @@ bot.onText(/\/start/, async (msg) => {
       return;
     }
 
+    // Сохраняем или находим пользователя в базе данных
     let user = await User.findOne({ tgId: from.id });
 
     if (!user) {
