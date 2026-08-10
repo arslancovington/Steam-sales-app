@@ -1013,10 +1013,27 @@
             checkSteamAuth();
         });
 
+        // Загрузка всех товаров с бэкенда
+        async function fetchMarketItems() {
+            try {
+                const response = await fetch('https://steam-sales-app.onrender.com/api/market/items');
+                const data = await response.json();
+                if (data.success) {
+                    marketItems = data.items;
+                    renderMarket();
+                }
+            } catch (err) {
+                console.error("Ошибка загрузки маркетплейса:", err);
+            }
+        }
+
         async function initApp() {
             updateBalanceUI();
-            renderMarket();
+            await fetchMarketItems();
             renderTradeHistory();
+            
+            // Автоматическое обновление маркета каждые 10 секунд
+            setInterval(fetchMarketItems, 10000);
         }
 
         function loginWithSteam() {
@@ -1117,6 +1134,69 @@
             `).join('');
         }
 
+        // Отправка выставленного скина на бэкенд
+        async function confirmSellItem() {
+            if (selectedSellPlatform !== 'Our P2P') {
+                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
+                closeModal('modal-sell');
+                window.open(targetUrl, '_blank');
+                return;
+            }
+
+            const price = parseFloat(document.getElementById('sale-price-input').value);
+            const isVip = document.getElementById('vip-checkbox').checked;
+
+            if (!price || price <= 0) {
+                alert('Введите корректную цену!');
+                return;
+            }
+
+            if (isVip) {
+                const vipCostRub = 245;
+                if (userBalance < vipCostRub) {
+                    alert(`Недостаточно средств для оплаты VIP-статуса (требуется ${vipCostRub} ₽).`);
+                    return;
+                }
+                userBalance -= vipCostRub;
+            }
+
+            const newListingData = {
+                name: currentSelectedItem.name,
+                type: currentSelectedItem.type || "rifle",
+                price: price,
+                wear: "Float: 0.12",
+                image: currentSelectedItem.icon_url || "",
+                seller: window.Telegram?.WebApp?.initDataUnsafe?.user?.username || "Игрок",
+                rating: "5.0",
+                isVip: isVip,
+                platform: selectedSellPlatform
+            };
+
+            try {
+                const response = await fetch('https://steam-sales-app.onrender.com/api/market/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newListingData)
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    myInventory = myInventory.filter(i => i.assetid !== currentSelectedItem.assetid);
+                    closeModal('modal-sell');
+                    renderInventory(); 
+                    await fetchMarketItems();
+                    updateBalanceUI();
+                    addNotification(`Предмет "${currentSelectedItem.name}" успешно выставлен на продажу!`, 'deal');
+                    alert(`Предмет успешно выставлен на площадку!`);
+                } else {
+                    alert('Ошибка при публикации товара');
+                }
+            } catch (err) {
+                console.error("Ошибка сети:", err);
+                alert('Ошибка соединения с сервером');
+            }
+        }
+
         function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value;
             if (!url.includes('tradeoffer/new/')) {
@@ -1211,7 +1291,7 @@
             } else {
                 document.querySelector('.vip-ticker-section').style.display = 'block';
                 vipContainer.innerHTML = vipItems.map(item => `
-                    <div class="vip-mini-card" onclick="buyItem(${item.id}, ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">
+                    <div class="vip-mini-card" onclick="buyItem('${item._id}', ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">
                         <div class="vip-badge" style="margin:0 0 4px 0; font-size:8px;">🔥 VIP</div>
                         <div class="vip-mini-img">
                             ${item.image ? `<img src="${item.image}">` : `<span style="font-size:24px;">🎯</span>`}
@@ -1250,7 +1330,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
                             <div class="price">${item.price} ₽</div>
                         </div>
-                        <button class="btn-green-glow" onclick="buyItem(${item.id}, ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить</button>
+                        <button class="btn-green-glow" onclick="buyItem('${item._id}', ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить</button>
                     </div>
                 `;
             }).join('');
@@ -1312,63 +1392,6 @@
             document.getElementById('modal-sell').classList.add('active');
         }
 
-        function confirmSellItem() {
-            if (selectedSellPlatform !== 'Our P2P') {
-                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
-                closeModal('modal-sell');
-                window.open(targetUrl, '_blank');
-                return;
-            }
-
-            const price = parseFloat(document.getElementById('sale-price-input').value);
-            const isVip = document.getElementById('vip-checkbox').checked;
-
-            if (!price || price <= 0) {
-                alert('Введите корректную цену!');
-                return;
-            }
-
-            if (isVip) {
-                const vipCostRub = 245;
-                if (userBalance < vipCostRub) {
-                    alert(`Недостаточно средств для оплаты VIP-статуса (требуется ${vipCostRub} ₽).`);
-                    return;
-                }
-                userBalance -= vipCostRub;
-            }
-
-            myListings.push({
-                ...currentSelectedItem,
-                price: price,
-                isVip: isVip,
-                platform: selectedSellPlatform
-            });
-
-            marketItems.unshift({
-                id: Date.now(),
-                name: currentSelectedItem.name,
-                type: currentSelectedItem.type || "rifle",
-                price: price,
-                wear: "Float: 0.12",
-                image: currentSelectedItem.icon_url || "",
-                seller: "Ты",
-                rating: "5.0",
-                deals: completedDealsCount,
-                isVip: isVip,
-                platform: selectedSellPlatform
-            });
-
-            myInventory = myInventory.filter(i => i.assetid !== currentSelectedItem.assetid);
-
-            closeModal('modal-sell');
-            renderInventory(); 
-            renderMyListings();
-            renderMarket();
-            updateBalanceUI();
-            addNotification(`Предмет "${currentSelectedItem.name}" выставлен на продажу за ${price} ₽`, 'deal');
-            alert(`Предмет успешно выставлен на площадку "${selectedSellPlatform}"!`);
-        }
-
         function buyItem(id, price, name) {
             if (userBalance < price) {
                 alert('Недостаточно средств на балансе! Пополните баланс.');
@@ -1417,10 +1440,8 @@
         function cancelListing(idx) {
             const item = myListings.splice(idx, 1)[0];
             myInventory.push(item);
-            marketItems = marketItems.filter(i => i.name !== item.name || i.seller !== "Ты");
             renderInventory();
             renderMyListings();
-            renderMarket();
             updateBalanceUI();
         }
 
