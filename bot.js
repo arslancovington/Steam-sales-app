@@ -11,15 +11,29 @@ if (!botToken) {
   throw new Error("BOT_TOKEN environment variable is required.");
 }
 
-// Твоя ссылка на Render (важно для возврата от Steam)
-// Убедись, что переменная WEBAPP_URL задана в Render (например: https://steam-sales-app.onrender.com)
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-// === 1. ВЕБ-СЕРВЕР И АВТОРИЗАЦИЯ STEAM ===
+// === 1. ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ MONGODB ===
+const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/steam_sales";
+mongoose.connect(mongoUri)
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch(err => console.error("MongoDB connection error:", err));
+
+// === 2. МОДЕЛЬ ПОЛЬЗОВАТЕЛЯ ===
+const userSchema = new mongoose.Schema({
+  tgId: { type: Number, required: true, unique: true },
+  username: { type: String, default: "" },
+  steamId: { type: String, default: "" },
+  tradeUrl: { type: String, default: "" },
+}, { timestamps: true });
+
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+
+// === 3. ВЕБ-СЕРВЕР ===
 const server = http.createServer(async (req, res) => {
   
-  // 1.1 РОУТ: Редирект на официальную страницу входа Steam
+  // 3.1 Редирект на Steam OpenID
   if (req.url === "/auth/steam") {
     const returnTo = `${APP_URL}/auth/steam/return`;
     const realm = APP_URL;
@@ -30,25 +44,48 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 1.2 РОУТ: Возврат пользователя от Steam после успешного входа
+  // 3.2 Возврат от Steam
   if (req.url.startsWith("/auth/steam/return")) {
     const url = new URL(req.url, APP_URL);
     const claimedId = url.searchParams.get("openid.claimed_id");
 
     if (claimedId) {
-      // Достаем SteamID (последние цифры ссылки, например 765611980...)
       const steamId = claimedId.split("/").pop();
-      // Перенаправляем обратно на сайт, передавая SteamID в адресной строке
       res.writeHead(302, { Location: `/?steamId=${steamId}` });
       res.end();
     } else {
       res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<h1>Ошибка авторизации Steam. Попробуйте еще раз.</h1>");
+      res.end("<h1>Ошибка авторизации Steam.</h1>");
     }
     return;
   }
 
-  // 1.3 РОУТ: Запрос настоящего инвентаря CS2
+  // 3.3 Сохранение Trade URL в базу
+  if (req.url === "/api/user/trade-url" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { tgId, tradeUrl } = JSON.parse(body);
+        if (!tgId) throw new Error("Не указан Telegram ID");
+
+        await User.findOneAndUpdate(
+          { tgId: Number(tgId) },
+          { tradeUrl },
+          { upsert: true, new: true }
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 3.4 Запрос инвентаря CS2
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -59,10 +96,11 @@ const server = http.createServer(async (req, res) => {
 
         if (!steamId) throw new Error("Не передан SteamID");
 
-        // Реальный запрос к серверам Steam (AppID 730 = CS2, Context 2)
         const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`);
         
-        if (!response.ok) throw new Error("Инвентарь скрыт настройками приватности Steam");
+        if (!response.ok) {
+          throw new Error("Инвентарь скрыт или профиль закрыт настройками приватности Steam");
+        }
 
         const steamData = await response.json();
 
@@ -80,12 +118,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 1.4 РОУТ: Отдаем интерфейс (index.html) для всех остальных запросов
+  // 3.5 Отдача index.html
   const filePath = path.join(process.cwd(), "index.html");
   fs.readFile(filePath, (err, content) => {
     if (err) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-      res.end("<h1>Файл index.html не найден в корне проекта!</h1>");
+      res.end("<h1>Файл index.html не найден!</h1>");
     } else {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(content);
@@ -97,15 +135,7 @@ server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-// === 2. МОДЕЛЬ ПОЛЬЗОВАТЕЛЯ ===
-const userSchema = new mongoose.Schema({
-  tgId: { type: Number, required: true, unique: true },
-  username: { type: String, default: "" },
-}, { timestamps: true });
-
-const User = mongoose.models.User || mongoose.model("User", userSchema);
-
-// === 3. ЛОГИКА ТЕЛЕГРАМ БОТА ===
+// === 4. ТЕЛЕГРАМ БОТ ===
 const bot = new TelegramBot(botToken, { polling: true });
 
 bot.onText(/\/start/, async (msg) => {
