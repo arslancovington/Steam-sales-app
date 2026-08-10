@@ -986,21 +986,12 @@
         let marketItems = [];
         let myInventory = [];
         let myListings = [];
-        let currentTelegramId = null;
 
-        // Единый слушатель загрузки страницы
         window.addEventListener('DOMContentLoaded', () => {
-            // Получаем Telegram ID из Telegram WebApp API
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-                const user = window.Telegram.WebApp.initDataUnsafe.user;
-                if (user && user.id) {
-                    currentTelegramId = user.id;
-                }
-            }
-
-            // Для тестов в обычном браузере
-            if (!currentTelegramId) {
-                currentTelegramId = 123456789;
+            // Загружаем сохраненную трейд-ссылку из памяти телефона
+            const savedTradeUrl = localStorage.getItem('user_trade_url');
+            if (savedTradeUrl) {
+                document.getElementById('trade-url-input').value = savedTradeUrl;
             }
 
             let progress = 0;
@@ -1121,6 +1112,18 @@
                     <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
                 </div>
             `).join('');
+        }
+
+        // Локальное сохранение трейд-ссылки без базы данных
+        function saveTradeUrl() {
+            const url = document.getElementById('trade-url-input').value;
+            if (!url.includes('tradeoffer/new/')) {
+                alert('Пожалуйста, введите корректную Trade URL ссылку');
+                return;
+            }
+
+            localStorage.setItem('user_trade_url', url);
+            alert('Трейд-ссылка успешно сохранена!');
         }
 
         // ==========================================
@@ -1547,37 +1550,6 @@
             document.getElementById('withdraw-telegram-id-input').value = '';
             closeModal('modal-withdraw');
             alert(`Заявка на вывод ${finalAmount.toFixed(2)} ₽ успешно создана!`);
-        }
-
-        // Обновленная функция сохранения Trade URL с отправкой на бэкенд
-        async function saveTradeUrl() {
-            const url = document.getElementById('trade-url-input').value;
-            if (!url.includes('tradeoffer/new/')) {
-                alert('Пожалуйста, введите корректную Trade URL ссылку');
-                return;
-            }
-
-            try {
-                const backendUrl = 'https://steam-sales-app.onrender.com';
-                const response = await fetch(`${backendUrl}/api/user/trade-url`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        tgId: currentTelegramId, 
-                        tradeUrl: url 
-                    })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    alert('Трейд-ссылка успешно сохранена в базу данных!');
-                } else {
-                    alert('Ошибка при сохранении: ' + (data.error || 'Неизвестная ошибка'));
-                }
-            } catch (err) {
-                console.error("Ошибка сети:", err);
-                alert('Ошибка соединения с сервером');
-            }
         }
     </script>
 </body>
