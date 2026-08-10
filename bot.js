@@ -29,8 +29,9 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
-// Временный массив в памяти сервера для мгновенной публикации и показа лотов всем пользователям
+// Временные хранилища в памяти сервера
 let serverMarketItems = [];
+let serverDeals = [];
 
 // === 3. ВЕБ-СЕРВЕР ===
 const server = http.createServer(async (req, res) => {
@@ -62,7 +63,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.3 Получение всех товаров маркетплейса
+  // 3.3 Получение товаров маркетплейса
   if (req.url === "/api/market/items" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, items: serverMarketItems }));
@@ -81,7 +82,7 @@ const server = http.createServer(async (req, res) => {
           ...itemData,
           createdAt: new Date()
         };
-        serverMarketItems.unshift(newItem); // Добавляем товар в начало списка
+        serverMarketItems.unshift(newItem);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, item: newItem }));
       } catch (err) {
@@ -92,7 +93,52 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.5 Запрос инвентаря CS2
+  // 3.5 Покупка товара и создание сделки
+  if (req.url === "/api/deals/buy" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { itemId, buyerName } = JSON.parse(body);
+        const itemIndex = serverMarketItems.findIndex(i => i._id === itemId);
+        
+        if (itemIndex === -1) {
+          throw new Error("Товар уже куплен или удален");
+        }
+
+        const purchasedItem = serverMarketItems.splice(itemIndex, 1)[0];
+
+        const newDeal = {
+          id: Date.now().toString(),
+          name: purchasedItem.name,
+          price: purchasedItem.price,
+          seller: purchasedItem.seller,
+          buyer: buyerName || "Покупатель",
+          status: "waiting_transfer",
+          image: purchasedItem.image,
+          createdAt: new Date()
+        };
+
+        serverDeals.unshift(newDeal);
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, deal: newDeal }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 3.6 Получение списка сделок
+  if (req.url === "/api/deals/list" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, deals: serverDeals }));
+    return;
+  }
+
+  // 3.7 Запрос инвентаря CS2
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -125,7 +171,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.6 Отдача index.html
+  // 3.8 Отдача index.html
   const filePath = path.join(process.cwd(), "index.html");
   fs.readFile(filePath, (err, content) => {
     if (err) {
@@ -176,3 +222,4 @@ bot.onText(/\/start/, async (msg) => {
     console.error("Ошибка в боте:", error);
   }
 });
+          
