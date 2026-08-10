@@ -1,6 +1,7 @@
 import "dotenv/config";
 import TelegramBot from "node-telegram-bot-api";
 import mongoose from "mongoose";
+import http from "http"; // Встроенный модуль для создания веб-сервера
 
 const botToken = process.env.BOT_TOKEN;
 
@@ -8,6 +9,18 @@ if (!botToken) {
   throw new Error("BOT_TOKEN environment variable is required.");
 }
 
+// === 1. ЗАПУСКАЕМ ВЕБ-СЕРВЕР ДЛЯ RENDER ===
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end("<h1>Сайт работает! Бот запущен.</h1><p>Здесь будет интерфейс вашего маркета.</p>");
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Web server is listening on port ${PORT}`);
+});
+
+// === 2. ОСНОВНОЙ КОД БОТА ===
 const userSchema = new mongoose.Schema(
   {
     tgId: { type: Number, required: true, unique: true },
