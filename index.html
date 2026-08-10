@@ -986,9 +986,23 @@
         let marketItems = [];
         let myInventory = [];
         let myListings = [];
+        let currentTelegramId = null;
 
         // Единый слушатель загрузки страницы
         window.addEventListener('DOMContentLoaded', () => {
+            // Получаем Telegram ID из Telegram WebApp API
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                const user = window.Telegram.WebApp.initDataUnsafe.user;
+                if (user && user.id) {
+                    currentTelegramId = user.id;
+                }
+            }
+
+            // Для тестов в обычном браузере
+            if (!currentTelegramId) {
+                currentTelegramId = 123456789;
+            }
+
             let progress = 0;
             const bar = document.getElementById('splash-bar-fill');
             const status = document.getElementById('splash-status');
@@ -1068,7 +1082,6 @@
             if (!container) return;
             container.innerHTML = '';
 
-            // Если переданы реальные предметы от API
             if (items && descriptions) {
                 myInventory = [];
                 const descMap = {};
@@ -1089,12 +1102,11 @@
                         assetid: item.assetid,
                         name: name,
                         icon_url: iconUrl,
-                        basePrice: 2000 // Заглушка, здесь должна быть логика расчета цены
+                        basePrice: 2000
                     });
                 });
             }
 
-            // Отрисовка массива myInventory
             if (myInventory.length === 0) {
                 container.innerHTML = '<div class="empty-state">Нет предметов для отображения</div>';
                 return;
@@ -1288,7 +1300,6 @@
             document.getElementById('sale-price-input').value = item.basePrice || 2000;
             document.getElementById('vip-checkbox').checked = false;
             
-            // Если есть картинка, показываем ее в модалке
             const imgBox = document.getElementById('sell-modal-img-box');
             if(item.icon_url) {
                 imgBox.innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
@@ -1538,12 +1549,34 @@
             alert(`Заявка на вывод ${finalAmount.toFixed(2)} ₽ успешно создана!`);
         }
 
-        function saveTradeUrl() {
+        // Обновленная функция сохранения Trade URL с отправкой на бэкенд
+        async function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value;
-            if (url.includes('tradeoffer/new/')) {
-                alert('Трейд-ссылка успешно сохранена!');
-            } else {
+            if (!url.includes('tradeoffer/new/')) {
                 alert('Пожалуйста, введите корректную Trade URL ссылку');
+                return;
+            }
+
+            try {
+                const backendUrl = 'https://steam-sales-app.onrender.com';
+                const response = await fetch(`${backendUrl}/api/user/trade-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        tgId: currentTelegramId, 
+                        tradeUrl: url 
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('Трейд-ссылка успешно сохранена в базу данных!');
+                } else {
+                    alert('Ошибка при сохранении: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (err) {
+                console.error("Ошибка сети:", err);
+                alert('Ошибка соединения с сервером');
             }
         }
     </script>
