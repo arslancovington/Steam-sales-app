@@ -232,6 +232,24 @@
             font-weight: bold;
         }
 
+        .steam-login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            background: #171a21;
+            border: 1px solid #66c0f4;
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+            box-shadow: 0 0 10px rgba(102, 192, 244, 0.3);
+        }
+
         /* ===== VIP БЕГУЩАЯ СТРОКА ВВЕРХУ ===== */
         .vip-ticker-section {
             margin: 10px 0 15px 0;
@@ -278,7 +296,7 @@
             cursor: pointer;
             transition: 0.2s;
         }
-        .vip-mini-card:hover { transform: translateY(-2px); }
+        
         .vip-mini-img {
             width: 100%;
             height: 75px;
@@ -360,7 +378,6 @@
             color: var(--neon-cyan);
         }
 
-        /* ===== СЕТКА ПРОСТЫХ ОБЪЯВЛЕНИЙ (2 КАРТОЧКИ В РЯД) ===== */
         .grid-layout { 
             display: grid; 
             grid-template-columns: repeat(2, 1fr); 
@@ -451,10 +468,6 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
 
         .btn-green-glow {
@@ -719,7 +732,7 @@
             <h2 class="neon-text">Маркетплейс скинов</h2>
 
             <!-- VIP БЕГУЩАЯ СТРОКА ВВЕРХУ -->
-            <div class="vip-ticker-section" style="display:none;">
+            <div class="vip-ticker-section">
                 <div class="vip-ticker-header">🔥 VIP лента</div>
                 <div class="vip-ticker-container" id="vip-ticker-container">
                     <!-- Заполняется динамически -->
@@ -737,13 +750,13 @@
             <div id="market-listings" class="grid-layout"></div>
         </section>
 
-        <!-- ИВЕНТАРЬ -->
+        <!-- ИНВЕНТАРЬ -->
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Твой Steam инвентарь</h2>
             <p class="hint-text">Скины из открытого профиля Steam.</p>
 
-            <div id="auth-section" style="margin-bottom: 15px;">
-                <button id="steam-login-btn" class="btn-dark-neon" onclick="loginWithSteam()">
+            <div id="auth-section">
+                <button id="steam-login-btn" class="steam-login-btn" onclick="loginWithSteam()">
                     <svg class="steam-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 2a10 10 0 0 0-7.5 16.6l3-3.6a4 4 0 1 1 5.7-5.7l3.6-3A10 10 0 0 0 12 2z"></path>
                         <circle cx="12" cy="12" r="3"></circle>
@@ -758,7 +771,7 @@
             </div>
 
             <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Загрузка инвентаря Steam...</div>
+                <div class="empty-state">Для просмотра скинов необходимо войти</div>
             </div>
         </section>
 
@@ -850,7 +863,6 @@
                 <button type="button" class="platform-option-btn" id="plat-csmoney" onclick="selectSellPlatform('CS.MONEY')">CS.MONEY</button>
             </div>
 
-            <!-- Блок цены и VIP показывается ТОЛЬКО для нашей площадки -->
             <div id="our-platform-fields">
                 <div class="price-input-container">
                     <span class="currency-symbol">₽</span>
@@ -862,7 +874,6 @@
                 </label>
             </div>
 
-            <!-- Блок отображения цены на внешней площадке -->
             <div id="external-platform-price-box" style="display: none; margin: 12px 0; padding: 12px; background: rgba(0, 255, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: 8px; text-align: center;">
                 <div style="font-size: 11px; color: var(--text-muted);">Оценочная цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
                 <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">0 ₽</div>
@@ -976,68 +987,63 @@
         let myInventory = [];
         let myListings = [];
 
-        // 1. Инициализация и проверка SteamID
+        // Единый слушатель загрузки страницы
         window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const steamId = urlParams.get('steamId');
-
+            let progress = 0;
+            const bar = document.getElementById('splash-bar-fill');
+            const status = document.getElementById('splash-status');
             const splash = document.getElementById('splash');
-            const authSection = document.getElementById('auth-section');
 
-            if (steamId) {
-                console.log("Успешный вход! SteamID:", steamId);
-                if (authSection) authSection.style.display = 'none';
-                
-                // Пропускаем долгую загрузку, если уже авторизованы
-                splash.classList.add('hidden');
-                initApp(steamId);
-            } else {
-                // Анимация сплеш-экрана для неавторизованных
-                let progress = 0;
-                const bar = document.getElementById('splash-bar-fill');
-                const status = document.getElementById('splash-status');
+            const interval = setInterval(() => {
+                progress += 25;
+                bar.style.width = progress + '%';
+                if (progress === 50) status.innerText = "Подключение к API...";
+                if (progress === 75) status.innerText = "Инициализация...";
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    splash.classList.add('hidden');
+                    initApp();
+                }
+            }, 300);
 
-                const interval = setInterval(() => {
-                    progress += 25;
-                    bar.style.width = progress + '%';
-                    if (progress === 50) status.innerText = "Подключение к Steam API...";
-                    if (progress === 75) status.innerText = "Загрузка данных...";
-                    if (progress >= 100) {
-                        clearInterval(interval);
-                        splash.classList.add('hidden');
-                        initApp(null);
-                    }
-                }, 300);
-            }
+            // Проверяем авторизацию Steam
+            checkSteamAuth();
         });
 
-        async function initApp(steamId) {
+        async function initApp() {
             updateBalanceUI();
             renderMarket();
             renderTradeHistory();
-            await fetchSteamInventory(steamId);
         }
 
-        // 2. Вход через Steam (Редирект на бэкенд)
+        // ==========================================
+        // ИНТЕГРАЦИЯ STEAM АВТОРИЗАЦИИ И ИНВЕНТАРЯ
+        // ==========================================
+
         function loginWithSteam() {
             const backendUrl = 'https://steam-sales-app.onrender.com'; 
             window.location.href = `${backendUrl}/auth/steam`;
         }
 
-        // 3. Получение инвентаря от сервера
-        async function fetchSteamInventory(steamId) {
+        function checkSteamAuth() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const steamId = urlParams.get('steamId');
+
+            if (steamId) {
+                console.log("Успешный вход! SteamID:", steamId);
+                const authSection = document.getElementById('auth-section');
+                if (authSection) authSection.style.display = 'none';
+                loadSteamInventory(steamId);
+            }
+        }
+
+        async function loadSteamInventory(steamId) {
             const container = document.getElementById('steam-inventory-grid');
             if (container) container.innerHTML = '<div class="empty-state">Загрузка скинов из Steam...</div>';
 
-            if (!steamId) {
-                // Используем пустой массив, если пользователь не авторизован
-                myInventory = [];
-                renderInventoryUI();
-                return;
-            }
-
             try {
                 const backendUrl = 'https://steam-sales-app.onrender.com'; 
+
                 const response = await fetch(`${backendUrl}/api/steam/inventory`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1047,85 +1053,71 @@
                 const data = await response.json();
                 
                 if (data.success && data.items) {
-                    processSteamItems(data.items, data.descriptions);
+                    renderInventory(data.items, data.descriptions);
                 } else {
                     if (container) container.innerHTML = '<div class="empty-state">Инвентарь пуст или скрыт настройками приватности</div>';
                 }
             } catch (err) {
                 console.error("Ошибка загрузки инвентаря:", err);
-                if (container) container.innerHTML = '<div class="empty-state" style="color: var(--danger-red);">Ошибка соединения с сервером</div>';
+                if (container) container.innerHTML = '<div class="empty-state">Ошибка соединения с сервером</div>';
             }
         }
 
-        // 4. Обработка предметов от Steam API
-        function processSteamItems(items, descriptions) {
-            myInventory = [];
-            const descMap = {};
-            if (descriptions) {
+        function renderInventory(items = null, descriptions = null) {
+            const container = document.getElementById('steam-inventory-grid');
+            if (!container) return;
+            container.innerHTML = '';
+
+            // Если переданы реальные предметы от API
+            if (items && descriptions) {
+                myInventory = [];
+                const descMap = {};
                 descriptions.forEach(desc => {
                     descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
                 });
+
+                items.forEach(item => {
+                    const key = item.classid + '_' + (item.instanceid || '0');
+                    const desc = descMap[key];
+
+                    if (!desc || !desc.marketable) return;
+
+                    const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
+                    const name = desc.market_hash_name || desc.name;
+                    
+                    myInventory.push({
+                        assetid: item.assetid,
+                        name: name,
+                        icon_url: iconUrl,
+                        basePrice: 2000 // Заглушка, здесь должна быть логика расчета цены
+                    });
+                });
             }
 
-            items.forEach(item => {
-                const key = item.classid + '_' + (item.instanceid || '0');
-                const desc = descMap[key];
-
-                if (!desc || !desc.marketable) return; 
-
-                const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
-                const name = desc.market_hash_name || desc.name;
-
-                myInventory.push({
-                    assetid: item.assetid,
-                    name: name,
-                    icon_url: iconUrl,
-                    basePrice: 2000, 
-                    type: "unknown"
-                });
-            });
-
-            renderInventoryUI();
-        }
-
-        // 5. Отрисовка инвентаря (единая функция)
-        function renderInventoryUI() {
-            const grid = document.getElementById('steam-inventory-grid');
-            if (!grid) return;
-
+            // Отрисовка массива myInventory
             if (myInventory.length === 0) {
-                grid.innerHTML = '<div class="empty-state">Нет предметов в инвентаре</div>';
+                container.innerHTML = '<div class="empty-state">Нет предметов для отображения</div>';
                 return;
             }
 
-            grid.innerHTML = myInventory.map(item => {
-                // Экранирование для корректной передачи объекта в onclick
-                const itemJson = JSON.stringify(item).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
-                return `
+            container.innerHTML = myInventory.map(item => `
                 <div class="card">
                     <div class="skin-image">
-                        ${item.icon_url ? `<img src="${item.icon_url}" class="skin-img" loading="lazy">` : `<span class="skin-fallback">🔫</span>`}
+                        ${item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🔫</span>`}
                     </div>
                     <h4>${item.name}</h4>
-                    <button class="btn-green-glow" onclick="openSellModal(${itemJson})">Выставить</button>
+                    <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
                 </div>
-                `;
-            }).join('');
+            `).join('');
         }
 
-        // ===============================================
-        // ОСТАЛЬНЫЕ ФУНКЦИИ БЕЗ ИЗМЕНЕНИЙ
-        // ===============================================
+        // ==========================================
+        // БАЗОВАЯ ЛОГИКА UI
+        // ==========================================
 
         function addNotification(text, type = 'info') {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            notificationsList.unshift({
-                id: Date.now(),
-                text: text,
-                time: timeStr,
-                type: type,
-                read: false
-            });
+            notificationsList.unshift({ id: Date.now(), text: text, time: timeStr, type: type, read: false });
             updateBalanceUI();
             renderNotifications();
         }
@@ -1231,30 +1223,21 @@
 
             container.innerHTML = items.map(item => {
                 const platform = item.platform || 'Our P2P';
-
                 return `
                     <div class="card">
                         <div class="skin-image">
                             ${item.image ? `<img src="${item.image}" class="skin-img">` : `<span class="skin-fallback">🎯</span>`}
                         </div>
-
                         <div class="wear">${item.wear || 'Float: 0.15'}</div>
                         <h4>${item.name}</h4>
-
                         <div class="platform-badge">🌐 ${platform}</div>
-
-                        <div class="seller-line"
-                             onclick="openSellerProfile('${String(item.seller).replace(/'/g, "\\'")}')">
+                        <div class="seller-line" onclick="openSellerProfile('${String(item.seller).replace(/'/g, "\\'")}')">
                             👤 ${item.seller} ⭐ ${item.rating}
                         </div>
-
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
                             <div class="price">${item.price} ₽</div>
                         </div>
-                        
-                        <button class="btn-green-glow"
-                                onclick="buyItem(${item.id}, ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить
-                        </button>
+                        <button class="btn-green-glow" onclick="buyItem(${item.id}, ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить</button>
                     </div>
                 `;
             }).join('');
@@ -1263,12 +1246,7 @@
         function filterMarket(type) {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             const buttons = document.querySelectorAll('.filter-btn');
-            const labels = {
-                all: 'Все',
-                knife: 'Ножи',
-                rifle: 'Винтовки',
-                gloves: 'Перчатки'
-            };
+            const labels = { all: 'Все', knife: 'Ножи', rifle: 'Винтовки', gloves: 'Перчатки' };
             buttons.forEach(btn => {
                 if (labels[type] && btn.textContent.trim() === labels[type]) btn.classList.add('active');
             });
@@ -1307,29 +1285,24 @@
         function openSellModal(item) {
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
+            document.getElementById('sale-price-input').value = item.basePrice || 2000;
+            document.getElementById('vip-checkbox').checked = false;
             
-            // Если у предмета есть иконка, показываем её, иначе эмодзи
+            // Если есть картинка, показываем ее в модалке
             const imgBox = document.getElementById('sell-modal-img-box');
-            if (item.icon_url) {
+            if(item.icon_url) {
                 imgBox.innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
             } else {
                 imgBox.innerHTML = `<span class="skin-fallback">🛡️</span>`;
             }
-            
-            document.getElementById('sale-price-input').value = item.basePrice || 2000;
-            document.getElementById('vip-checkbox').checked = false;
-            selectSellPlatform('Our P2P');
-            document.getElementById('sell-modal-title').innerText = 'Выставить скин';
 
+            selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
         }
 
         function confirmSellItem() {
             if (selectedSellPlatform !== 'Our P2P') {
-                let targetUrl = 'https://lis-skins.com';
-                if (selectedSellPlatform === 'CS.MONEY') {
-                    targetUrl = 'https://cs.money';
-                }
+                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
                 closeModal('modal-sell');
                 window.open(targetUrl, '_blank');
                 return;
@@ -1376,7 +1349,7 @@
             myInventory = myInventory.filter(i => i.assetid !== currentSelectedItem.assetid);
 
             closeModal('modal-sell');
-            renderInventoryUI();
+            renderInventory(); 
             renderMyListings();
             renderMarket();
             updateBalanceUI();
@@ -1432,10 +1405,8 @@
         function cancelListing(idx) {
             const item = myListings.splice(idx, 1)[0];
             myInventory.push(item);
-            
             marketItems = marketItems.filter(i => i.name !== item.name || i.seller !== "Ты");
-
-            renderInventoryUI();
+            renderInventory();
             renderMyListings();
             renderMarket();
             updateBalanceUI();
@@ -1484,7 +1455,6 @@
 
         function selectTopupMethod(type) {
             selectedTopupType = type;
-            
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
             document.getElementById('method-' + type).classList.add('active');
 
