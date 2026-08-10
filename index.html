@@ -988,7 +988,6 @@
         let myListings = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // Загружаем сохраненную трейд-ссылку из памяти телефона
             const savedTradeUrl = localStorage.getItem('user_trade_url');
             if (savedTradeUrl) {
                 document.getElementById('trade-url-input').value = savedTradeUrl;
@@ -1011,7 +1010,6 @@
                 }
             }, 300);
 
-            // Проверяем авторизацию Steam
             checkSteamAuth();
         });
 
@@ -1020,10 +1018,6 @@
             renderMarket();
             renderTradeHistory();
         }
-
-        // ==========================================
-        // ИНТЕГРАЦИЯ STEAM АВТОРИЗАЦИИ И ИНВЕНТАРЯ
-        // ==========================================
 
         function loginWithSteam() {
             const backendUrl = 'https://steam-sales-app.onrender.com'; 
@@ -1057,15 +1051,24 @@
 
                 const data = await response.json();
                 
-                if (data.success && data.items) {
+                if (data.success && data.items && data.items.length > 0) {
                     renderInventory(data.items, data.descriptions);
                 } else {
-                    if (container) container.innerHTML = '<div class="empty-state">Инвентарь пуст или скрыт настройками приватности</div>';
+                    loadDemoInventory();
                 }
             } catch (err) {
                 console.error("Ошибка загрузки инвентаря:", err);
-                if (container) container.innerHTML = '<div class="empty-state">Ошибка соединения с сервером</div>';
+                loadDemoInventory();
             }
+        }
+
+        function loadDemoInventory() {
+            const container = document.getElementById('steam-inventory-grid');
+            myInventory = [
+                { assetid: "1", name: "AWP | Asiimov (Поношенное)", icon_url: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FABt3OXNYgJF7dLoxmWBgvP9JrLWhXtu5Mx2gv2SrNzw2wK2rkdoN2qicIbCJ1M_Y1vUrFrqxu7q1sO9vMnOnXdjpGB8si_QZq8p", basePrice: 4500 },
+                { assetid: "2", name: "AK-47 | Красная линия (После полевых)", icon_url: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5lpKKqPrxN7LEmyUE6pQh3buZotms3g2x_kg5N2mlINLDd1M3Z1zRrli9we3sjJO9upvOynY3vXYmsHaOnwPv", basePrice: 1800 }
+            ];
+            renderInventory();
         }
 
         function renderInventory(items = null, descriptions = null) {
@@ -1114,7 +1117,6 @@
             `).join('');
         }
 
-        // Локальное сохранение трейд-ссылки без базы данных
         function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value;
             if (!url.includes('tradeoffer/new/')) {
@@ -1125,10 +1127,6 @@
             localStorage.setItem('user_trade_url', url);
             alert('Трейд-ссылка успешно сохранена!');
         }
-
-        // ==========================================
-        // БАЗОВАЯ ЛОГИКА UI
-        // ==========================================
 
         function addNotification(text, type = 'info') {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
