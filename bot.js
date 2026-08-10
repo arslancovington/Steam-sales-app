@@ -29,19 +29,8 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
-const marketItemSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  type: { type: String, default: "rifle" },
-  price: { type: Number, required: true },
-  wear: { type: String, default: "Float: 0.15" },
-  image: { type: String, default: "" },
-  seller: { type: String, default: "Игрок" },
-  rating: { type: String, default: "5.0" },
-  isVip: { type: Boolean, default: false },
-  platform: { type: String, default: "Our P2P" }
-}, { timestamps: true });
-
-const MarketItem = mongoose.models.MarketItem || mongoose.model("MarketItem", marketItemSchema);
+// Временный массив в памяти сервера для мгновенной публикации и показа лотов всем пользователям
+let serverMarketItems = [];
 
 // === 3. ВЕБ-СЕРВЕР ===
 const server = http.createServer(async (req, res) => {
@@ -75,14 +64,8 @@ const server = http.createServer(async (req, res) => {
 
   // 3.3 Получение всех товаров маркетплейса
   if (req.url === "/api/market/items" && req.method === "GET") {
-    try {
-      const items = await MarketItem.find().sort({ createdAt: -1 });
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: true, items }));
-    } catch (err) {
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, error: err.message }));
-    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, items: serverMarketItems }));
     return;
   }
 
@@ -93,7 +76,12 @@ const server = http.createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const itemData = JSON.parse(body);
-        const newItem = await MarketItem.create(itemData);
+        const newItem = {
+          _id: Date.now().toString(),
+          ...itemData,
+          createdAt: new Date()
+        };
+        serverMarketItems.unshift(newItem); // Добавляем товар в начало списка
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, item: newItem }));
       } catch (err) {
