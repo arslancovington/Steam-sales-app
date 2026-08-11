@@ -358,7 +358,6 @@
                 document.getElementById('external-plat-title').innerText = platform;
                 document.getElementById('external-plat-price').innerText = 'Загрузка цены...';
 
-                // Запрос реальной цены из Steam Market API через наш сервер
                 try {
                     const res = await fetch(`/api/steam/price?name=${encodeURIComponent(currentSelectedItem.name)}`);
                     const data = await res.json();
@@ -374,12 +373,17 @@
         }
 
         async function openSellModal(item) {
+            // Проверка, не выставлен ли уже этот предмет
+            if (myListings.some(l => l.assetid === item.assetid)) {
+                alert('Этот предмет уже выставлен на продажу!');
+                return;
+            }
+
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
             document.getElementById('vip-checkbox').checked = false;
             document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
             
-            // Получаем дефолтную цену для нашей площадки
             try {
                 const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
                 const data = await res.json();
@@ -408,6 +412,7 @@
             if (isVip) userBalance -= 245;
 
             const listing = {
+                assetid: currentSelectedItem.assetid,
                 name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url,
                 seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', 
                 rating: document.getElementById('my-rating').innerText, isVip, platform: selectedSellPlatform
@@ -416,11 +421,14 @@
             const res = await fetch('/api/market/add', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(listing)
             });
-            if ((await res.json()).success) {
+            const data = await res.json();
+            if (data.success) {
                 document.getElementById('modal-sell').classList.remove('active');
                 alert('Выставлено на продажу!');
                 fetchMarketItems();
                 syncUserProfile();
+            } else {
+                alert(data.error || 'Ошибка при выставлении');
             }
         }
 
