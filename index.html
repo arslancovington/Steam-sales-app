@@ -116,7 +116,7 @@
             </div>
         </section>
 
-        <section id="tab-deals" class="tab"><h2 class="neon-text">Сделки</h2><div class="empty-state">Нет сделок</div></section>
+        <section id="tab-deals" class="tab"><h2 class="neon-text">Сделки</h2><div class="empty-state">Нет активных сделок</div></section>
         <section id="tab-notifications" class="tab"><h2 class="neon-text">Уведомления</h2><div class="empty-state">Нет уведомлений</div></section>
 
         <section id="tab-profile" class="tab">
@@ -373,7 +373,6 @@
         }
 
         async function openSellModal(item) {
-            // Проверка, не выставлен ли уже этот предмет
             if (myListings.some(l => l.assetid === item.assetid)) {
                 alert('Этот предмет уже выставлен на продажу!');
                 return;
@@ -424,11 +423,50 @@
             const data = await res.json();
             if (data.success) {
                 document.getElementById('modal-sell').classList.remove('active');
-                alert('Выставлено на продажу!');
+                alert('Выставлено на продажу! Уведомление отправлено в бот.');
                 fetchMarketItems();
                 syncUserProfile();
             } else {
                 alert(data.error || 'Ошибка при выставлении');
+            }
+        }
+
+        async function buyItem(item) {
+            const tradeUrl = localStorage.getItem('user_trade_url');
+            if (!tradeUrl) {
+                alert('Сначала укажите свою Trade URL в разделе инвентаря!');
+                switchTab('inventory', document.querySelectorAll('.nav-item')[1]);
+                return;
+            }
+            if (userBalance < item.price) {
+                alert('Недостаточно средств на балансе! Пополните баланс.');
+                openTopUpModal();
+                return;
+            }
+
+            if (!confirm(`Купить предмет "${item.name}" за ${item.price} ₽?`)) return;
+
+            try {
+                const res = await fetch('/api/deals/buy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        itemId: item._id,
+                        buyerTgId: myTgId,
+                        buyerTradeUrl: tradeUrl,
+                        buyerName: myUsername
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Заказ успешно оформлен! Проверьте Telegram-бот для связи со сделкой.');
+                    syncUserProfile();
+                    fetchMarketItems();
+                } else {
+                    alert(data.error || 'Ошибка при покупке');
+                }
+            } catch (e) {
+                alert('Ошибка соединения');
             }
         }
 
@@ -469,7 +507,8 @@
                 <div class="card">
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
-                    <div style="font-weight:bold; color:var(--neon-green);">${i.price} ₽</div>
+                    <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
+                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
                 </div>
             `).join('');
         }
@@ -527,7 +566,7 @@
                     closeModal('modal-topup');
                     window.open(data.payUrl, '_blank');
                 } else {
-                    alert('Ошибка создания счета');
+                    alert('Ошибка создания счета. Проверьте консоль сервера (токен Crypto Bot).');
                 }
             } catch (err) { alert('Ошибка соединения'); }
         }
