@@ -43,11 +43,7 @@
             transition: opacity 0.6s ease, visibility 0.6s ease;
         }
 
-        #splash.hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
+        #splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
         .splash-glow {
             position: absolute;
@@ -63,81 +59,27 @@
             50% { transform: scale(1.15); opacity: 1; }
         }
 
-        .splash-logo {
-            position: relative;
-            font-size: 54px;
-            filter: drop-shadow(0 0 18px rgba(124, 252, 0, 0.6));
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
-        }
-
-        .splash-title {
-            position: relative;
-            font-size: 22px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            text-shadow: 0 0 12px var(--neon-green);
-        }
-
-        .splash-sub {
-            position: relative;
-            font-size: 12px;
-            color: var(--text-muted);
-            letter-spacing: 1px;
-        }
+        .splash-logo { position: relative; font-size: 54px; filter: drop-shadow(0 0 18px rgba(124, 252, 0, 0.6)); }
+        .splash-title { position: relative; font-size: 22px; font-weight: bold; letter-spacing: 2px; text-shadow: 0 0 12px var(--neon-green); }
+        .splash-sub { position: relative; font-size: 12px; color: var(--text-muted); letter-spacing: 1px; }
 
         .splash-ring {
-            position: relative;
-            width: 46px;
-            height: 46px;
-            border-radius: 50%;
-            border: 2px solid rgba(124, 252, 0, 0.15);
-            border-top-color: var(--neon-green);
-            border-right-color: var(--neon-cyan);
+            position: relative; width: 46px; height: 46px; border-radius: 50%;
+            border: 2px solid rgba(124, 252, 0, 0.15); border-top-color: var(--neon-green); border-right-color: var(--neon-cyan);
             animation: spin 0.9s linear infinite;
         }
-
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .splash-bar {
-            position: relative;
-            width: 220px;
-            height: 5px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
-            overflow: hidden;
-        }
-
+        .splash-bar { position: relative; width: 220px; height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
         .splash-bar-fill {
-            width: 0%;
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
-            box-shadow: 0 0 14px rgba(124, 252, 0, 0.7);
-            transition: width 0.35s ease;
+            width: 0%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+            box-shadow: 0 0 14px rgba(124, 252, 0, 0.7); transition: width 0.35s ease;
         }
-
-        .splash-status {
-            position: relative;
-            font-size: 12px;
-            color: var(--neon-green);
-            min-height: 16px;
-        }
+        .splash-status { position: relative; font-size: 12px; color: var(--neon-green); min-height: 16px; }
 
         .top-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: rgba(11, 17, 16, 0.9);
-            backdrop-filter: blur(5px);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            display: flex; justify-content: space-between; align-items: center; padding: 15px;
+            background: rgba(11, 17, 16, 0.9); backdrop-filter: blur(5px); position: sticky; top: 0; z-index: 100;
         }
 
         .bot-profile { display: flex; align-items: center; gap: 10px; }
@@ -146,551 +88,136 @@
         .bot-name { font-weight: bold; color: var(--text-main); font-size: 14px; }
         .bot-status { color: var(--neon-green); font-size: 11px; font-weight: bold; }
 
-        .balance-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-        }
-
+        .balance-container { display: flex; align-items: center; gap: 8px; position: relative; }
         .balance-widget {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 5px 10px;
-            border-radius: 8px;
-            border: 1px solid var(--neon-green);
-            box-shadow: 0 0 10px rgba(124, 252, 0, 0.2);
-            font-size: 14px;
-            white-space: nowrap;
+            display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 8px;
+            border: 1px solid var(--neon-green); box-shadow: 0 0 10px rgba(124, 252, 0, 0.2); font-size: 14px; white-space: nowrap;
         }
-
-        .add-funds-btn {
-            background: transparent;
-            color: var(--neon-green);
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .notification-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--danger-red);
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-            padding: 2px 6px;
-            border-radius: 99px;
-            box-shadow: 0 0 8px var(--danger-red);
-            display: none;
-        }
+        .add-funds-btn { background: transparent; color: var(--neon-green); border: none; font-size: 20px; cursor: pointer; line-height: 1; }
 
         .tab { display: none; padding: 15px; padding-bottom: 95px; }
         .tab.active { display: block; }
 
         .neon-text { color: var(--text-main); text-shadow: 0 0 5px var(--neon-green); margin-top: 0; }
         .section-title { margin-top: 22px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 15px; }
+        .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; line-height: 1.4; }
 
-        .hint-text {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin: 8px 0 0 0;
-            line-height: 1.4;
-        }
-
-        .filter-bar {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            margin: 15px 0 10px 0;
-            padding-bottom: 5px;
-            scrollbar-width: none;
-        }
-        .filter-bar::-webkit-scrollbar { display: none; }
-
+        .filter-bar { display: flex; gap: 8px; overflow-x: auto; margin: 15px 0 10px 0; padding-bottom: 5px; scrollbar-width: none; }
         .filter-btn {
-            background: #111;
-            border: 1px solid #333;
-            color: var(--text-muted);
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: 0.2s;
+            background: #111; border: 1px solid #333; color: var(--text-muted); padding: 6px 12px;
+            border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; transition: 0.2s;
         }
-
-        .filter-btn.active {
-            background: rgba(124, 252, 0, 0.1);
-            border-color: var(--neon-green);
-            color: var(--neon-green);
-            font-weight: bold;
-        }
+        .filter-btn.active { background: rgba(124, 252, 0, 0.1); border-color: var(--neon-green); color: var(--neon-green); font-weight: bold; }
 
         .steam-login-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            width: 100%;
-            padding: 12px;
-            background: #171a21;
-            border: 1px solid #66c0f4;
-            color: white;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 15px;
-            box-shadow: 0 0 10px rgba(102, 192, 244, 0.3);
+            display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px;
+            background: #171a21; border: 1px solid #66c0f4; color: white; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 15px;
         }
 
         .vip-ticker-section {
-            margin: 10px 0 15px 0;
-            background: linear-gradient(135deg, rgba(191, 0, 255, 0.08), rgba(20, 30, 25, 0.9));
-            border: 1px solid var(--neon-purple);
-            border-radius: 10px;
-            padding: 10px;
-            box-shadow: 0 0 12px rgba(191, 0, 255, 0.15);
+            margin: 10px 0 15px 0; background: linear-gradient(135deg, rgba(191, 0, 255, 0.08), rgba(20, 30, 25, 0.9));
+            border: 1px solid var(--neon-purple); border-radius: 10px; padding: 10px; box-shadow: 0 0 12px rgba(191, 0, 255, 0.15);
         }
-
-        .vip-ticker-header {
-            font-size: 11px;
-            font-weight: bold;
-            color: var(--neon-purple);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .vip-ticker-container {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-            scrollbar-width: none;
-        }
-        .vip-ticker-container::-webkit-scrollbar { display: none; }
-
+        .vip-ticker-header { font-size: 11px; font-weight: bold; color: var(--neon-purple); margin-bottom: 8px; text-transform: uppercase; }
+        .vip-ticker-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
         .vip-mini-card {
-            min-width: 150px;
-            max-width: 150px;
-            background: rgba(20, 10, 30, 0.85);
-            border: 1px solid var(--neon-purple);
-            border-radius: 8px;
-            padding: 8px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-shadow: 0 0 8px rgba(191, 0, 255, 0.2);
-            cursor: pointer;
-            transition: 0.2s;
+            min-width: 150px; max-width: 150px; background: rgba(20, 10, 30, 0.85); border: 1px solid var(--neon-purple);
+            border-radius: 8px; padding: 8px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer;
         }
-        
-        .vip-mini-img {
-            width: 100%;
-            height: 75px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            margin-bottom: 6px;
-        }
+        .vip-mini-img { width: 100%; height: 75px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 6px; }
         .vip-mini-img img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
         .vip-mini-title { font-size: 11px; font-weight: bold; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
         .vip-mini-price { font-size: 13px; font-weight: bold; color: var(--neon-purple); }
 
         .vip-badge {
-            font-size: 9px;
-            padding: 2px 5px;
-            border-radius: 4px;
-            margin-bottom: 4px;
-            display: inline-block;
-            font-weight: bold;
-            color: var(--neon-purple);
-            background: rgba(191, 0, 255, 0.1);
-            border: 1px solid rgba(191, 0, 255, 0.4);
+            font-size: 9px; padding: 2px 5px; border-radius: 4px; margin-bottom: 4px; display: inline-block; font-weight: bold;
+            color: var(--neon-purple); background: rgba(191, 0, 255, 0.1); border: 1px solid rgba(191, 0, 255, 0.4);
         }
 
-        .trade-url-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 8px;
-            background: var(--card-bg);
-            border: 1px solid #222;
-        }
+        .trade-url-box { display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
+        .trade-url-box input { flex: 1; padding: 10px; background: #111; border: 1px solid #333; color: white; border-radius: 6px; }
+        .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 6px; cursor: pointer; }
 
-        .trade-url-box input {
-            flex: 1;
-            padding: 10px;
-            background: #111;
-            border: 1px solid #333;
-            color: white;
-            border-radius: 6px;
-        }
+        .inventory-actions { display: flex; gap: 10px; margin-bottom: 15px; }
+        .inventory-actions button { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-inv-topup { background: rgba(124, 252, 0, 0.1); border: 1px solid var(--neon-green); color: var(--neon-green); }
+        .btn-inv-withdraw { background: rgba(0, 255, 255, 0.1); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); }
 
-        .btn-cyan {
-            background: transparent;
-            color: var(--neon-cyan);
-            border: 1px solid var(--neon-cyan);
-            padding: 10px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .inventory-actions {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .inventory-actions button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .btn-inv-topup {
-            background: rgba(124, 252, 0, 0.1);
-            border: 1px solid var(--neon-green);
-            color: var(--neon-green);
-        }
-
-        .btn-inv-withdraw {
-            background: rgba(0, 255, 255, 0.1);
-            border: 1px solid var(--neon-cyan);
-            color: var(--neon-cyan);
-        }
-
-        .grid-layout { 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 10px; 
-        }
-
+        .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .card {
-            background: var(--card-bg);
-            padding: 10px;
-            border-radius: 10px;
-            position: relative;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            background: var(--card-bg); padding: 10px; border-radius: 10px; position: relative;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between;
         }
-
         .card h4 { margin: 6px 0 4px 0; font-size: 12px; color: var(--text-main); line-height: 1.2; min-height: 30px; overflow: hidden; }
         .wear { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
         .price { font-size: 14px; font-weight: bold; color: var(--text-main); }
 
         .skin-image {
-            width: 100%;
-            height: 90px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 6px;
-            background: rgba(0, 0, 0, 0.25);
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: 100%; height: 90px; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 6px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.05);
         }
-
         .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; display: block; }
         .skin-fallback { font-size: 30px; }
 
         .platform-badge {
-            display: inline-block;
-            font-size: 9px;
-            padding: 2px 5px;
-            border-radius: 4px;
-            margin: 3px 0 2px 0;
-            border: 1px solid var(--neon-cyan);
-            color: var(--neon-cyan);
-            background: rgba(0, 255, 255, 0.08);
-            font-weight: bold;
+            display: inline-block; font-size: 9px; padding: 2px 5px; border-radius: 4px; margin: 3px 0 2px 0;
+            border: 1px solid var(--neon-cyan); color: var(--neon-cyan); background: rgba(0, 255, 255, 0.08); font-weight: bold;
         }
-
-        .seller-line {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 10px;
-            color: var(--neon-cyan);
-            margin: 4px 0 2px 0;
-            cursor: pointer;
-            text-decoration: underline dotted rgba(0, 255, 255, 0.4);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        .seller-line { font-size: 10px; color: var(--neon-cyan); margin: 4px 0 2px 0; }
 
         .history-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-
-        .history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #333;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 13px;
-        }
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); border: 1px solid #333; padding: 10px; border-radius: 8px; font-size: 13px; }
 
         .neon-border-green { border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(124, 252, 0, 0.15); }
+        .btn-dark-neon { flex: 1; background: transparent; border: 1px solid var(--neon-cyan); color: var(--text-main); padding: 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 4px; }
+        .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
 
-        .btn-dark-neon {
-            flex: 1;
-            background: transparent;
-            border: 1px solid var(--neon-cyan);
-            color: var(--text-main);
-            padding: 14px;
-            border-radius: 8px;
-            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .btn-green-glow {
-            width: 100%;
-            background: var(--neon-green);
-            border: none;
-            color: #000;
-            font-weight: bold;
-            padding: 8px;
-            border-radius: 6px;
-            box-shadow: 0 0 10px rgba(124, 252, 0, 0.4);
-            cursor: pointer;
-            font-size: 11px;
-            margin-top: 4px;
-        }
-
-        .btn-danger {
-            background: transparent;
-            border: 1px solid var(--danger-red);
-            color: var(--danger-red);
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 10px;
-            width: 100%;
-            margin-top: 6px;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        .empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 13px;
-            padding: 22px 10px;
-            border: 1px dashed #2b3a32;
-            border-radius: 10px;
-        }
+        .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px 10px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
         .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: rgba(11, 17, 16, 0.95);
-            backdrop-filter: blur(10px);
-            display: flex;
-            justify-content: space-around;
-            padding: 15px 0;
-            border-top: 1px solid rgba(124, 252, 0, 0.3);
-            z-index: 100;
+            position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); backdrop-filter: blur(10px);
+            display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100;
         }
-
-        .nav-item {
-            background: none;
-            border: none;
-            font-size: 26px;
-            filter: grayscale(100%);
-            opacity: 0.5;
-            transition: 0.3s;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .active-nav {
-            filter: none;
-            opacity: 1;
-            text-shadow: 0 0 10px var(--neon-cyan);
-            transform: scale(1.1);
-        }
+        .nav-item { background: none; border: none; font-size: 26px; filter: grayscale(100%); opacity: 0.5; transition: 0.3s; cursor: pointer; position: relative; }
+        .active-nav { filter: none; opacity: 1; text-shadow: 0 0 10px var(--neon-cyan); transform: scale(1.1); }
 
         .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
+            z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;
         }
-
         .modal-overlay.active { display: flex; opacity: 1; }
-
-        .modal-content {
-            background: var(--bg-color);
-            padding: 20px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 380px;
-            text-align: center;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; }
 
         .price-input-container { position: relative; margin: 10px 0; }
+        .currency-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
+        #sale-price-input, .topup-input { width: 100%; padding: 12px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 8px; font-size: 16px; outline: none; }
 
-        .currency-symbol {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--neon-cyan);
-            font-weight: bold;
-        }
-
-        #sale-price-input, .topup-input {
-            width: 100%;
-            padding: 12px 12px 12px 34px;
-            background: #111;
-            border: 1px solid var(--neon-cyan);
-            color: white;
-            border-radius: 8px;
-            font-size: 16px;
-            outline: none;
-        }
-
-        .platform-select-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 6px;
-            margin: 10px 0;
-        }
-
-        .platform-option-btn {
-            background: #111;
-            border: 1px solid #333;
-            color: var(--text-muted);
-            padding: 8px 4px;
-            border-radius: 6px;
-            font-size: 11px;
-            cursor: pointer;
-            text-align: center;
-            transition: 0.2s;
-            white-space: nowrap;
-        }
-
-        .platform-option-btn.active {
-            background: rgba(0, 255, 255, 0.1);
-            border-color: var(--neon-cyan);
-            color: var(--neon-cyan);
-            font-weight: bold;
-        }
+        .platform-select-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
+        .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
+        .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
 
         .modal-buttons { display: flex; gap: 10px; margin-top: 15px; }
 
-        .seller-head {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-align: left;
-            margin-bottom: 14px;
-        }
-
+        .seller-head { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 14px; }
         .seller-avatar {
-            width: 54px;
-            height: 54px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            background: rgba(0, 255, 255, 0.08);
-            border: 1px solid var(--neon-cyan);
-            flex-shrink: 0;
+            width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 26px; background: rgba(0, 255, 255, 0.08); border: 1px solid var(--neon-cyan); flex-shrink: 0; overflow: hidden;
         }
-
         .seller-meta { display: flex; flex-direction: column; gap: 3px; }
         .seller-nick { font-weight: bold; font-size: 15px; }
         .seller-sub { font-size: 11px; color: var(--text-muted); }
 
-        .stat-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .stat-box {
-            background: rgba(0, 0, 0, 0.45);
-            border: 1px solid #2a352f;
-            border-radius: 8px;
-            padding: 8px;
-            text-align: left;
-        }
-
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .stat-box { background: rgba(0,0,0,0.45); border: 1px solid #2a352f; border-radius: 8px; padding: 8px; text-align: left; }
         .stat-label { font-size: 10px; color: var(--text-muted); }
         .stat-value { font-size: 14px; font-weight: bold; }
 
-        .topup-methods {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 15px 0;
-        }
+        .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; }
+        .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
-        .topup-method-card {
-            background: rgba(0,0,0,0.4);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 12px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .topup-method-card.active {
-            border-color: var(--neon-green);
-            background: rgba(124, 252, 0, 0.05);
-        }
-
-        .vip-checkbox-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 10px 0;
-            font-size: 13px;
-            color: var(--neon-purple);
-            cursor: pointer;
-            text-align: left;
-        }
+        .vip-checkbox-container { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; color: var(--neon-purple); cursor: pointer; text-align: left; }
     </style>
 </head>
 <body>
@@ -722,22 +249,18 @@
     </header>
 
     <main class="content-area">
-
         <section id="tab-market" class="tab active">
             <h2 class="neon-text">Маркетплейс скинов</h2>
-
             <div class="vip-ticker-section">
                 <div class="vip-ticker-header">🔥 VIP лента</div>
                 <div class="vip-ticker-container" id="vip-ticker-container"></div>
             </div>
-
             <div class="filter-bar">
                 <button class="filter-btn active" onclick="filterMarket('all')">Все</button>
                 <button class="filter-btn" onclick="filterMarket('knife')">Ножи</button>
                 <button class="filter-btn" onclick="filterMarket('rifle')">Винтовки</button>
                 <button class="filter-btn" onclick="filterMarket('gloves')">Перчатки</button>
             </div>
-
             <h3 class="section-title" style="margin-top: 15px;">Обычные предложения</h3>
             <div id="market-listings" class="grid-layout"></div>
         </section>
@@ -745,22 +268,15 @@
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Твой Steam инвентарь</h2>
             <p class="hint-text">Скины из открытого профиля Steam.</p>
-
             <div id="auth-section">
                 <button id="steam-login-btn" class="steam-login-btn" onclick="loginWithSteam()">
-                    <svg class="steam-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2a10 10 0 0 0-7.5 16.6l3-3.6a4 4 0 1 1 5.7-5.7l3.6-3A10 10 0 0 0 12 2z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
                     <span>Войти через Steam</span>
                 </button>
             </div>
-
             <div class="trade-url-box">
                 <input type="text" id="trade-url-input" placeholder="Вставьте ссылку на обмен (Trade URL)...">
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
             </div>
-
             <div id="steam-inventory-grid" class="grid-layout">
                 <div class="empty-state">Для просмотра скинов необходимо войти через Steam</div>
             </div>
@@ -768,9 +284,7 @@
 
         <section id="tab-deals" class="tab">
             <h2 class="neon-text">Активные сделки</h2>
-            <div id="deals-list" class="history-list">
-                <div class="empty-state">Нет активных сделок</div>
-            </div>
+            <div id="deals-list" class="history-list"><div class="empty-state">Нет активных сделок</div></div>
         </section>
 
         <section id="tab-notifications" class="tab">
@@ -778,17 +292,15 @@
             <div class="inventory-actions" style="margin-bottom: 10px;">
                 <button class="btn-inv-topup" onclick="clearNotifications()">Очистить все</button>
             </div>
-            <div id="notifications-list" class="history-list">
-                <div class="empty-state">Нет новых уведомлений</div>
-            </div>
+            <div id="notifications-list" class="history-list"><div class="empty-state">Нет новых уведомлений</div></div>
         </section>
 
         <section id="tab-profile" class="tab">
             <h2 class="neon-text">Твой профиль</h2>
-
             <div class="card neon-border-green" style="margin-bottom: 15px; padding: 15px;">
                 <div class="seller-head">
-                    <div class="seller-avatar">🧑‍🚀</div>
+                    <!-- Аватарка Steam вместо смайлика -->
+                    <div class="seller-avatar" id="user-avatar-box">🧑‍🚀</div>
                     <div class="seller-meta">
                         <span class="seller-nick" id="my-nick">Ты</span>
                         <span class="seller-sub">Рейтинг ⭐ <span id="my-rating">5.0</span></span>
@@ -796,75 +308,49 @@
                     </div>
                 </div>
                 <div class="stat-grid">
-                    <div class="stat-box">
-                        <div class="stat-label">Баланс</div>
-                        <div class="stat-value" id="profile-balance">0 ₽</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Активных лотов</div>
-                        <div class="stat-value" id="profile-listings">0</div>
-                    </div>
+                    <div class="stat-box"><div class="stat-label">Баланс</div><div class="stat-value" id="profile-balance">0 ₽</div></div>
+                    <div class="stat-box"><div class="stat-label">Активных лотов</div><div class="stat-value" id="profile-listings">0</div></div>
                 </div>
             </div>
-
             <div class="inventory-actions">
                 <button class="btn-inv-topup" onclick="openTopUpModal()">Пополнить</button>
                 <button class="btn-inv-withdraw" onclick="openWithdrawModal()">Вывести (-5%)</button>
             </div>
-
             <h3 class="section-title">🏷️ Мои лоты на продаже</h3>
             <div id="my-listings" class="grid-layout"></div>
-
             <h3 class="section-title">📜 История сделок</h3>
-            <div id="trade-history-list" class="history-list">
-                <div class="empty-state">История пуста</div>
-            </div>
+            <div id="trade-history-list" class="history-list"><div class="empty-state">История пуста</div></div>
         </section>
-
     </main>
 
     <nav class="bottom-nav">
         <button class="nav-item active-nav" onclick="switchTab('market', this)">🛒</button>
         <button class="nav-item" onclick="switchTab('inventory', this)">🎒</button>
         <button class="nav-item" onclick="switchTab('deals', this)">🤝</button>
-        <button class="nav-item" onclick="switchTab('notifications', this)">
-            🔔
-            <div class="notification-badge" id="nav-notif-badge" style="display:none; position:absolute; top:2px; right:8px;">0</div>
-        </button>
+        <button class="nav-item" onclick="switchTab('notifications', this)">🔔<div class="notification-badge" id="nav-notif-badge" style="display:none; position:absolute; top:2px; right:8px;">0</div></button>
         <button class="nav-item" onclick="switchTab('profile', this)">👤</button>
     </nav>
 
+    <!-- Модалки -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text" id="sell-modal-title">Выставить скин</h3>
-            <div class="skin-image" id="sell-modal-img-box">
-                <span class="skin-fallback">🛡️</span>
-            </div>
+            <div class="skin-image" id="sell-modal-img-box"><span class="skin-fallback">🛡️</span></div>
             <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px; margin-bottom: 5px;"></p>
-            
             <div style="font-size: 11px; color: var(--text-muted); text-align: left; margin-top: 5px;">Выберите площадку для продажи:</div>
             <div class="platform-select-group">
                 <button type="button" class="platform-option-btn active" id="plat-our" onclick="selectSellPlatform('Our P2P')">Наша площадка</button>
                 <button type="button" class="platform-option-btn" id="plat-lis" onclick="selectSellPlatform('Lis-Skins')">Lis-Skins</button>
                 <button type="button" class="platform-option-btn" id="plat-csmoney" onclick="selectSellPlatform('CS.MONEY')">CS.MONEY</button>
             </div>
-
             <div id="our-platform-fields">
-                <div class="price-input-container">
-                    <span class="currency-symbol">₽</span>
-                    <input type="number" id="sale-price-input" placeholder="Введите цену">
-                </div>
-                
-                <label class="vip-checkbox-container">
-                    <input type="checkbox" id="vip-checkbox"> Сделать VIP-объявлением (245 ₽ / 48 часов)
-                </label>
+                <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Введите цену"></div>
+                <label class="vip-checkbox-container"><input type="checkbox" id="vip-checkbox"> Сделать VIP-объявлением (245 ₽ / 48 часов)</label>
             </div>
-
             <div id="external-platform-price-box" style="display: none; margin: 12px 0; padding: 12px; background: rgba(0, 255, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: 8px; text-align: center;">
                 <div style="font-size: 11px; color: var(--text-muted);">Оценочная цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
                 <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">0 ₽</div>
             </div>
-
             <div class="modal-buttons">
                 <button class="btn-dark-neon" onclick="closeModal('modal-sell')">Отмена</button>
                 <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="width:auto; flex:1; margin-top:0;">Продать</button>
@@ -875,7 +361,6 @@
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
-            
             <div class="topup-methods">
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
                     <div style="font-size: 20px;">💎</div>
@@ -888,13 +373,11 @@
                     <div style="font-size: 10px; color: var(--text-muted);">Мин. 100 звёзд</div>
                 </div>
             </div>
-
             <div class="price-input-container">
                 <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
                 <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
             </div>
-            <p class="hint-text" id="topup-hint">Сумма зачислится по актуальному курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.</p>
-
+            <p class="hint-text" id="topup-hint">Сумма зачислится по курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.</p>
             <div class="modal-buttons">
                 <button class="btn-dark-neon" onclick="closeModal('modal-topup')">Отмена</button>
                 <button class="btn-green-glow" onclick="processTopUp()" style="width:auto; flex:1; margin-top:0;">Пополнить</button>
@@ -906,19 +389,15 @@
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
             <p class="hint-text">Вывод в USDT через Crypto Bot. Комиссия — 5%.</p>
-            
             <div class="price-input-container" style="margin-top: 15px;">
                 <span class="currency-symbol">₽</span>
                 <input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях">
             </div>
-
-            <!-- Автоматический подставленный юзернейм вместо ручного ввода ID -->
             <div class="price-input-container" style="margin-top: 10px;">
                 <span class="currency-symbol" style="color: var(--neon-green);">💎</span>
                 <input type="text" id="withdraw-crypto-account-input" class="topup-input" placeholder="@username" style="padding-left: 38px; font-size: 14px;" readonly>
             </div>
             <p class="hint-text">Вывод пойдет на ваш текущий Telegram @username</p>
-
             <div class="modal-buttons">
                 <button class="btn-dark-neon" onclick="closeModal('modal-withdraw')">Отмена</button>
                 <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
@@ -947,13 +426,11 @@
         window.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('my-nick').innerText = myUsername;
             
-            // Автоматически заполняем поле вывода юзернеймом пользователя
             const withdrawInput = document.getElementById('withdraw-crypto-account-input');
             if (withdrawInput) {
                 withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `@${myUsername}`;
             }
 
-            // Загружаем реальный баланс с сервера из базы данных
             await syncUserProfile();
 
             let progress = 0;
@@ -989,7 +466,7 @@
                     updateBalanceUI();
                 }
             } catch (err) {
-                console.error("Ошибка синхронизации профиля:", err);
+                console.error("Ошибка синхронизации:", err);
             }
         }
 
@@ -1002,15 +479,12 @@
                     renderMarket();
                     updateMyListingsFromMarket();
                 }
-            } catch (err) {
-                console.error("Ошибка загрузки маркета:", err);
-            }
+            } catch (err) {}
         }
 
         async function initApp() {
             updateBalanceUI();
             await fetchMarketItems();
-            renderTradeHistory();
             setInterval(fetchMarketItems, 10000);
         }
 
@@ -1020,9 +494,7 @@
             updateBalanceUI();
         }
 
-        function loginWithSteam() {
-            window.location.href = `/auth/steam`;
-        }
+        function loginWithSteam() { window.location.href = `/auth/steam`; }
 
         function checkSteamAuth() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -1031,12 +503,10 @@
             if (steamId) {
                 const authSection = document.getElementById('auth-section');
                 if (authSection) authSection.style.display = 'none';
-                
                 const tradeUrl = localStorage.getItem('user_trade_url') || "";
                 saveUserDataToServer(steamId, tradeUrl);
                 loadSteamInventory(steamId);
             } else {
-                // Проверяем, есть ли сохраненный steamId в localStorage или пробуем загрузить по ранее привязанному
                 const savedSteamId = localStorage.getItem('user_steam_id');
                 if (savedSteamId) {
                     const authSection = document.getElementById('auth-section');
@@ -1052,38 +522,38 @@
                 await fetch('/api/user/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tgId: myTgId,
-                        tgUser: myUsername,
-                        steamId: steamId,
-                        tradeUrl: tradeUrl
-                    })
+                    body: JSON.stringify({ tgId: myTgId, tgUser: myUsername, steamId, tradeUrl })
                 });
-            } catch (err) {
-                console.error("Ошибка сохранения данных:", err);
-            }
+            } catch (err) {}
         }
 
         async function loadSteamInventory(steamId) {
             const container = document.getElementById('steam-inventory-grid');
-            if (container) container.innerHTML = '<div class="empty-state">Загрузка реального инвентаря из Steam...</div>';
+            if (container) container.innerHTML = '<div class="empty-state">Загрузка реального инвентаря и аватара из Steam...</div>';
 
             try {
                 const response = await fetch(`/api/steam/inventory`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ steamId: steamId })
+                    body: JSON.stringify({ steamId })
                 });
 
                 const data = await response.json();
                 
+                // Устанавливаем аватарку Steam вместо смайлика
+                if (data.avatarUrl) {
+                    document.getElementById('user-avatar-box').innerHTML = `<img src="${data.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                }
+                if (data.steamName) {
+                    document.getElementById('my-nick').innerText = data.steamName;
+                }
+
                 if (data.success && data.items && data.items.length > 0) {
                     renderInventory(data.items, data.descriptions);
                 } else {
-                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль Steam скрыт (проверьте настройки приватности)</div>';
+                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль Steam скрыт</div>';
                 }
             } catch (err) {
-                console.error("Ошибка загрузки инвентаря:", err);
                 container.innerHTML = '<div class="empty-state">Не удалось загрузить инвентарь Steam</div>';
             }
         }
@@ -1095,37 +565,26 @@
 
             myInventory = [];
             const descMap = {};
-            descriptions.forEach(desc => {
-                descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
-            });
+            descriptions.forEach(desc => { descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc; });
 
             items.forEach(item => {
                 const key = item.classid + '_' + (item.instanceid || '0');
                 const desc = descMap[key];
-
                 if (!desc || !desc.marketable) return;
 
                 const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
                 const name = desc.market_hash_name || desc.name;
-                
-                myInventory.push({
-                    assetid: item.assetid,
-                    name: name,
-                    icon_url: iconUrl,
-                    basePrice: 2000
-                });
+                myInventory.push({ assetid: item.assetid, name, icon_url: iconUrl, basePrice: 2000 });
             });
 
             if (myInventory.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет продаваемых предметов в инвентаре</div>';
+                container.innerHTML = '<div class="empty-state">Нет продаваемых предметов</div>';
                 return;
             }
 
             container.innerHTML = myInventory.map(item => `
                 <div class="card">
-                    <div class="skin-image">
-                        ${item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🔫</span>`}
-                    </div>
+                    <div class="skin-image">${item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🔫</span>`}</div>
                     <h4>${item.name}</h4>
                     <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
                 </div>
@@ -1135,137 +594,75 @@
         async function confirmSellItem() {
             if (selectedSellPlatform !== 'Our P2P') {
                 let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
-                closeModal('modal-sell');
-                window.open(targetUrl, '_blank');
-                return;
+                closeModal('modal-sell'); window.open(targetUrl, '_blank'); return;
             }
 
             const price = parseFloat(document.getElementById('sale-price-input').value);
             const isVip = document.getElementById('vip-checkbox').checked;
 
-            if (!price || price <= 0) {
-                alert('Введите корректную цену!');
-                return;
-            }
-
-            if (isVip) {
-                const vipCostRub = 245;
-                if (userBalance < vipCostRub) {
-                    alert(`Недостаточно средств для VIP (требуется ${vipCostRub} ₽).`);
-                    return;
-                }
-                userBalance -= vipCostRub;
-            }
+            if (!price || price <= 0) { alert('Введите корректную цену!'); return; }
+            if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (требуется 245 ₽).'); return; }
+            if (isVip) userBalance -= 245;
 
             const newListingData = {
-                name: currentSelectedItem.name,
-                type: currentSelectedItem.type || "rifle",
-                price: price,
-                wear: "Float: 0.12",
-                image: currentSelectedItem.icon_url || "",
-                seller: myUsername,
-                tgId: myTgId,
-                rating: "5.0",
-                isVip: isVip,
-                platform: selectedSellPlatform
+                name: currentSelectedItem.name, type: currentSelectedItem.type || "rifle", price, wear: "Float: 0.12",
+                image: currentSelectedItem.icon_url || "", seller: myUsername, tgId: myTgId, rating: "5.0", isVip, platform: selectedSellPlatform
             };
 
             try {
                 const response = await fetch('/api/market/add', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newListingData)
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newListingData)
                 });
                 const data = await response.json();
-                
                 if (data.success) {
                     myInventory = myInventory.filter(i => i.assetid !== currentSelectedItem.assetid);
-                    closeModal('modal-sell');
-                    renderInventory([], []); 
-                    await fetchMarketItems();
-                    updateBalanceUI();
-                    addNotification(`Предмет "${currentSelectedItem.name}" выставлен на продажу!`, 'deal');
-                    alert(`Предмет успешно выставлен! Уведомление отправлено в Telegram.`);
+                    closeModal('modal-sell'); renderInventory([], []); 
+                    await fetchMarketItems(); updateBalanceUI();
+                    alert('Предмет успешно выставлен на продажу!');
                 }
-            } catch (err) {
-                alert('Ошибка соединения с сервером');
-            }
+            } catch (err) {}
         }
 
         async function buyItem(id, price, name) {
-            if (userBalance < price) {
-                alert('Недостаточно средств на балансе! Пополните баланс.');
-                openTopUpModal();
-                return;
-            }
-
+            if (userBalance < price) { alert('Недостаточно средств на балансе!'); openTopUpModal(); return; }
             const tradeUrl = localStorage.getItem('user_trade_url');
-            if (!tradeUrl) {
-                alert('Укажите вашу Trade URL ссылку во вкладке «Инвентарь»!');
-                switchTab('inventory', document.querySelectorAll('.nav-item')[1]);
-                return;
-            }
+            if (!tradeUrl) { alert('Укажите Trade URL во вкладке «Инвентарь»!'); switchTab('inventory', document.querySelectorAll('.nav-item')[1]); return; }
 
             try {
                 const response = await fetch('/api/deals/buy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        itemId: id,
-                        buyerName: myUsername,
-                        buyerTgId: myTgId,
-                        buyerTradeUrl: tradeUrl
-                    })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId: id, buyerName: myUsername, buyerTgId: myTgId, buyerTradeUrl: tradeUrl })
                 });
-
                 const data = await response.json();
-                if (!data.success) {
-                    alert(data.error || 'Ошибка при покупке');
-                    return;
-                }
+                if (!data.success) { alert(data.error || 'Ошибка при покупке'); return; }
 
-                userBalance -= price;
-                updateBalanceUI();
+                userBalance -= price; updateBalanceUI();
                 pendingDeals.push(data.deal);
                 addNotification(`Куплен предмет: "${name}" за ${price} ₽`, 'deal');
                 await fetchMarketItems();
-                alert(`Сделка успешно создана! Средства списаны.`);
-            } catch (err) {
-                alert('Ошибка соединения с сервером');
-            }
+                alert('Сделка успешно создана!');
+            } catch (err) {}
         }
 
         function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value;
-            if (!url.includes('tradeoffer/new/')) {
-                alert('Введите корректную Trade URL ссылку');
-                return;
-            }
-
+            if (!url.includes('tradeoffer/new/')) { alert('Введите корректную Trade URL'); return; }
             localStorage.setItem('user_trade_url', url);
             saveUserDataToServer(null, url);
-            alert('Трейд-ссылка успешно сохранена и синхронизирована с базой!');
+            alert('Трейд-ссылка успешно сохранена!');
         }
 
         function addNotification(text, type = 'info') {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             notificationsList.unshift({ id: Date.now(), text, time: timeStr, type, read: false });
-            updateBalanceUI();
-            renderNotifications();
+            updateBalanceUI(); renderNotifications();
         }
 
-        function clearNotifications() {
-            notificationsList = [];
-            updateBalanceUI();
-            renderNotifications();
-        }
+        function clearNotifications() { notificationsList = []; updateBalanceUI(); renderNotifications(); }
 
         function renderNotifications() {
             const container = document.getElementById('notifications-list');
-            if (notificationsList.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет новых уведомлений</div>';
-                return;
-            }
+            if (notificationsList.length === 0) { container.innerHTML = '<div class="empty-state">Нет новых уведомлений</div>'; return; }
             container.innerHTML = notificationsList.map(n => `
                 <div class="history-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
@@ -1289,29 +686,20 @@
             document.getElementById('tab-' + tabId).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             btnElement.classList.add('active-nav');
-            
-            if(tabId === 'deals') {
-                renderDeals();
-            } else if(tabId === 'profile') {
-                updateMyListingsFromMarket();
-                renderTradeHistory();
-            }
+            if(tabId === 'deals') renderDeals();
+            if(tabId === 'profile') { updateMyListingsFromMarket(); renderTradeHistory(); }
         }
 
         function renderMarket(filter = 'all') {
             const vipContainer = document.getElementById('vip-ticker-container');
             const vipItems = marketItems.filter(i => i.isVip);
-
-            if (vipItems.length === 0) {
-                document.querySelector('.vip-ticker-section').style.display = 'none';
-            } else {
+            if (vipItems.length === 0) { document.querySelector('.vip-ticker-section').style.display = 'none'; }
+            else {
                 document.querySelector('.vip-ticker-section').style.display = 'block';
                 vipContainer.innerHTML = vipItems.map(item => `
                     <div class="vip-mini-card" onclick="buyItem('${item._id}', ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">
                         <div class="vip-badge" style="margin:0 0 4px 0; font-size:8px;">🔥 VIP</div>
-                        <div class="vip-mini-img">
-                            ${item.image ? `<img src="${item.image}">` : `<span style="font-size:24px;">🎯</span>`}
-                        </div>
+                        <div class="vip-mini-img">${item.image ? `<img src="${item.image}">` : `<span style="font-size:24px;">🎯</span>`}</div>
                         <div class="vip-mini-title">${item.name}</div>
                         <div class="vip-mini-price">${item.price} ₽</div>
                     </div>
@@ -1319,19 +707,12 @@
             }
 
             const container = document.getElementById('market-listings');
-            let items = marketItems;
-            if (filter !== 'all') items = marketItems.filter(i => i.type === filter);
-
-            if (items.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет лотов в данной категории</div>';
-                return;
-            }
+            let items = filter === 'all' ? marketItems : marketItems.filter(i => i.type === filter);
+            if (items.length === 0) { container.innerHTML = '<div class="empty-state">Нет лотов в данной категории</div>'; return; }
 
             container.innerHTML = items.map(item => `
                 <div class="card">
-                    <div class="skin-image">
-                        ${item.image ? `<img src="${item.image}" class="skin-img">` : `<span class="skin-fallback">🎯</span>`}
-                    </div>
+                    <div class="skin-image">${item.image ? `<img src="${item.image}" class="skin-img">` : `<span class="skin-fallback">🎯</span>`}</div>
                     <div class="wear">${item.wear || 'Float: 0.15'}</div>
                     <h4>${item.name}</h4>
                     <div class="platform-badge">🌐 ${item.platform || 'Our P2P'}</div>
@@ -1360,12 +741,9 @@
             const actionBtn = document.getElementById('sell-action-btn');
 
             if (platform === 'Our P2P') {
-                ourFields.style.display = 'block';
-                externalPriceBox.style.display = 'none';
-                actionBtn.innerText = 'Продать';
+                ourFields.style.display = 'block'; externalPriceBox.style.display = 'none'; actionBtn.innerText = 'Продать';
             } else {
-                ourFields.style.display = 'none';
-                externalPriceBox.style.display = 'block';
+                ourFields.style.display = 'none'; externalPriceBox.style.display = 'block';
                 const base = currentSelectedItem ? (currentSelectedItem.basePrice || 2000) : 2000;
                 let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
                 document.getElementById('external-plat-title').innerText = platform;
@@ -1379,20 +757,14 @@
             document.getElementById('sell-modal-skin-name').innerText = item.name;
             document.getElementById('sale-price-input').value = item.basePrice || 2000;
             document.getElementById('vip-checkbox').checked = false;
-            
-            const imgBox = document.getElementById('sell-modal-img-box');
-            imgBox.innerHTML = item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🛡️</span>`;
-
+            document.getElementById('sell-modal-img-box').innerHTML = item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🛡️</span>`;
             selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
         }
 
         function renderMyListings() {
             const container = document.getElementById('my-listings');
-            if (myListings.length === 0) {
-                container.innerHTML = '<div class="empty-state">У вас нет активных лотов</div>';
-                return;
-            }
+            if (myListings.length === 0) { container.innerHTML = '<div class="empty-state">У вас нет активных лотов</div>'; return; }
             container.innerHTML = myListings.map(item => `
                 <div class="card">
                     ${item.isVip ? `<div class="vip-badge">VIP Лента</div>` : ``}
@@ -1403,14 +775,8 @@
             `).join('');
         }
 
-        function renderDeals() {
-            const container = document.getElementById('deals-list');
-            container.innerHTML = pendingDeals.length === 0 ? '<div class="empty-state">Нет активных сделок</div>' : '';
-        }
-
-        function renderTradeHistory() {
-            document.getElementById('trade-history-list').innerHTML = '<div class="empty-state">История пуста</div>';
-        }
+        function renderDeals() { document.getElementById('deals-list').innerHTML = '<div class="empty-state">Нет активных сделок</div>'; }
+        function renderTradeHistory() { document.getElementById('trade-history-list').innerHTML = '<div class="empty-state">История пуста</div>'; }
 
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
@@ -1426,83 +792,49 @@
             const input = document.getElementById('topup-amount-input');
 
             if (type === 'crypto') {
-                symbol.innerText = 'USDT';
-                hint.innerText = 'Сумма зачислится по курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.';
-                input.placeholder = '10';
+                symbol.innerText = 'USDT'; hint.innerText = 'Сумма зачислится по курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.'; input.placeholder = '10';
             } else {
-                symbol.innerText = '⭐';
-                hint.innerText = 'Сумма зачислится по курсу (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
-                input.placeholder = '100';
+                symbol.innerText = '⭐'; hint.innerText = 'Сумма зачислится по курсу (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.'; input.placeholder = '100';
             }
         }
 
         async function processTopUp() {
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
             const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
-
-            if (isNaN(amount) || amount < minLimit) {
-                alert(`Минимальная сумма пополнения: ${minLimit} ${selectedTopupType === 'crypto' ? 'USDT' : 'звёзд'}`);
-                return;
-            }
+            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
 
             let rublesToAdd = selectedTopupType === 'crypto' ? amount * 90 : amount * 1.8;
             let currency = selectedTopupType === 'crypto' ? 'USDT' : 'Звёзды ⭐';
 
             try {
                 await fetch('/api/billing/invoice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
                 });
-
-                userBalance += Math.round(rublesToAdd);
-                updateBalanceUI();
-                addNotification(`Создан счет на пополнение ${Math.round(rublesToAdd)} ₽`, 'topup');
                 closeModal('modal-topup');
-                alert('Счет успешно выставлен! Проверьте чат с ботом в Telegram.');
-            } catch (err) {
-                alert('Ошибка соединения');
-            }
+                alert('Счет успешно выставлен в Telegram!');
+            } catch (err) { alert('Ошибка соединения'); }
         }
 
         async function processWithdraw() {
             const amount = parseFloat(document.getElementById('withdraw-amount-input').value);
             const cryptoAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
 
-            if (isNaN(amount) || amount < 500 || !cryptoAccount) {
-                alert('Минимальная сумма вывода — 500 ₽.');
-                return;
-            }
-            if (userBalance < amount) {
-                alert('Недостаточно средств на балансе.');
-                return;
-            }
+            if (isNaN(amount) || amount < 500) { alert('Мин. сумма вывода — 500 ₽.'); return; }
+            if (userBalance < amount) { alert('Недостаточно средств на балансе.'); return; }
 
             try {
                 const response = await fetch('/api/billing/withdraw', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        tgId: myTgId, 
-                        amount: amount, 
-                        recipientAccount: cryptoAccount,
-                        username: myUsername
-                    })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: cryptoAccount, username: myUsername })
                 });
-
                 const data = await response.json();
                 if (data.success) {
-                    userBalance -= amount;
-                    updateBalanceUI();
-                    addNotification(`Заявка на вывод ${amount} ₽ создана.`, 'withdraw');
+                    userBalance -= amount; updateBalanceUI();
                     closeModal('modal-withdraw');
                     alert('Заявка на вывод успешно отправлена администраторам!');
-                } else {
-                    alert('Ошибка при выводе');
                 }
-            } catch (err) {
-                alert('Ошибка соединения с сервером');
-            }
+            } catch (err) { alert('Ошибка соединения'); }
         }
     </script>
 </body>
