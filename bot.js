@@ -48,7 +48,7 @@ const PORT = process.env.PORT || 3000;
 
 const bot = new TelegramBot(botToken, { polling: true });
 let serverMarketItems = [];
-let serverDeals = [];
+let serverDeals = {};
 let withdrawRequests = {};
 
 const steamHeaders = {
@@ -67,8 +67,15 @@ async function createCryptoInvoice(amountUsdt, description, tgId, received) {
       })
     });
     const data = await response.json();
-    return data.ok ? data.result.pay_url : null;
-  } catch (e) { return null; }
+    if (!data.ok) {
+      console.error("Crypto Pay API Error:", data);
+      return null;
+    }
+    return data.result.pay_url;
+  } catch (e) {
+    console.error("Crypto Invoice Exception:", e);
+    return null; 
+  }
 }
 
 async function transferCryptoToUser(tgId, amountUsdt, comment) {
@@ -203,14 +210,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Защита от дубликатов и отправка уведомлений
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const item = JSON.parse(body);
         
-        // Проверяем, не выставлен ли уже этот же скин по assetid
         if (item.assetid && serverMarketItems.some(i => i.assetid === item.assetid && String(i.tgId) === String(item.tgId))) {
           res.writeHead(400);
           res.end(JSON.stringify({ success: false, error: "Этот предмет уже выставлен на продажу!" }));
@@ -220,13 +225,21 @@ const server = http.createServer(async (req, res) => {
         item._id = Date.now().toString();
         serverMarketItems.unshift(item);
 
-        // Уведомление в админ-чат
+        // Уведомление продавцу о выставлении лота
+        if (item.tgId) {
+          await bot.sendMessage(
+            item.tgId,
+            `🏷 **Лот успешно выставлен!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nСтатус: Активен на маркетплейсе.`,
+            { parse_mode: "Markdown" }
+          ).catch(() => {});
+        }
+
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
             `🏷 **Новый лот на маркете!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец: *${item.seller}* (ID: \`${item.tgId}\`)`,
             { parse_mode: "Markdown" }
-          );
+          ).catch(() => {});
         }
 
         res.end(JSON.stringify({ success: true }));
@@ -253,38 +266,60 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Покупка предмета и отправка уведомлений продавцу и покупателю
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { itemId, buyerTgId, buyerTradeUrl, buyerName } = JSON.parse(body);
         const idx = serverMarketItems.findIndex(i => i._id === itemId);
-        if (idx === -1) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: "Товар уже куплен" })); return; }
+        if (idx === -1) { 
+          res.writeHead(400); 
+          res.end(JSON.stringify({ success: false, error: "Товар уже куплен" })); 
+          return; 
+        }
         
         const item = serverMarketItems.splice(idx, 1)[0];
         updateUserBalance(buyerTgId, -item.price);
 
-        let users = loadUsers();
-        if (users[item.tgId]) {
-          users[item.tgId]["CompletedDeals"] = (users[item.tgId]["CompletedDeals"] || 0) + 1;
-          saveUsers(users);
-        }
-
         const dealId = Date.now().toString();
-        serverDeals.push({ ...item, id: dealId, buyerTgId, status: 'sent' });
+        serverDeals[dealId] = { ...item, buyerTgId, buyerTradeUrl, buyerName, status: 'pending_sent' };
 
-        // Уведомление продавцу в Telegram
+        // 1. Уведомление покупателю
+        await bot.sendMessage(
+          buyerTgId,
+          `🎉 **Заказ успешно оформлен!**\n\nПредмет: *${item.name}*\nСумма: *${item.price} ₽*\nПродавец: *${item.seller}*\n\nОжидайте отправки предмета в Steam от продавца.`,
+          { parse_mode: "Markdown" }
+        ).catch(() => {});
+
+        // 2. Уведомление продавцу с запросом на отправку
         if (item.tgId) {
-          await bot.sendMessage(item.tgId, `🛒 **У вас купили предмет!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nСсылка покупателя: \`${buyerTradeUrl}\``, { parse_mode: "Markdown" });
+          await bot.sendMessage(
+            item.tgId,
+            `🛒 **У вас купили предмет!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПокупатель: *${buyerName}*\nСсылка для обмена: \`${buyerTradeUrl}\`\n\nПожалуйста, отправьте предмет в Steam покупателю, после чего нажмите кнопку ниже:`,
+            { 
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[{ text: "📦 Подтвердить отправку", callback_data: `deal_sent_${dealId}` }]]
+              }
+            }
+          ).catch(() => {});
         }
 
-        // Уведомление в админ-чат
+        // 3. Уведомление в админ-чат
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(ADMIN_CHAT_ID, `🛍 **Совершена сделка!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец ID: \`${item.tgId}\`\nПокупатель: *${buyerName}* (ID: \`${buyerTgId}\`)`, { parse_mode: "Markdown" });
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `🛍 **Новая сделка!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец ID: \`${item.tgId}\`\nПокупатель: *${buyerName}* (ID: \`${buyerTgId}\`)`,
+            { parse_mode: "Markdown" }
+          ).catch(() => {});
         }
 
         res.end(JSON.stringify({ success: true, deal: { id: dealId } }));
-      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: e.message })); }
+      } catch(e) { 
+        res.writeHead(400); 
+        res.end(JSON.stringify({ success: false, error: e.message })); 
+      }
     });
     return;
   }
@@ -335,7 +370,7 @@ const server = http.createServer(async (req, res) => {
         const { tgId, amount, currency, received } = JSON.parse(body);
         let payUrl = null;
         if (currency === "USDT") {
-          payUrl = await createCryptoInvoice(amount, "Пополнение", tgId, received);
+          payUrl = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
         } else {
           payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
         }
@@ -392,31 +427,112 @@ bot.on("successful_payment", async (msg) => {
   }
 });
 
+// Обработка интерактивных кнопок сделок и вывода
 bot.on("callback_query", async (q) => {
-  if (!q.data.startsWith("wd_")) { bot.answerCallbackQuery(q.id); return; }
-  const parts = q.data.split("_");
-  const status = parts[1];
-  const wdId = parts[2];
-  const reqData = withdrawRequests[wdId];
+  const data = q.data;
 
-  if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
+  // Обработка подтверждения отправки/получения скина в сделках
+  if (data.startsWith("deal_sent_") || data.startsWith("deal_received_")) {
+    const parts = data.split("_");
+    const action = parts[1]; // sent или received
+    const dealId = parts[2];
+    const deal = serverDeals[dealId];
 
-  if (status === 'ok') {
-    const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
-    if (resTr) {
-      await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
-      await bot.editMessageText(`✅ Заявка №${wdId} выплачена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
-    } else {
-      await bot.sendMessage(reqData.tgId, `✅ Вывод на *${reqData.usdtApprox} USDT* подтвержден администратором.`, { parse_mode: "Markdown" });
-      await bot.editMessageText(`✅ Заявка №${wdId} закрыта (вручную).`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    if (!deal) {
+      await bot.answerCallbackQuery(q.id, { text: "Сделка не найдена или устарела", show_alert: true });
+      return;
     }
-  } else {
-    updateUserBalance(reqData.tgId, reqData.amount);
-    await bot.sendMessage(reqData.tgId, "❌ Вывод отклонен, средства возвращены на баланс.");
-    await bot.editMessageText(`❌ Заявка №${wdId} отклонена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+
+    if (action === 'sent') {
+      deal.status = 'pending_received';
+      // Уведомление продавцу
+      await bot.editMessageText(`✅ Вы подтвердили отправку предмета *${deal.name}*. Ожидайте подтверждения от покупателя.`, {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+        parse_mode: "Markdown"
+      }).catch(() => {});
+
+      // Уведомление покупателю с кнопкой подтверждения получения
+      await bot.sendMessage(
+        deal.buyerTgId,
+        `📦 **Продавец сообщил об отправке предмета!**\n\nПредмет: *${deal.name}*\n\nПожалуйста, примите обмен в Steam, а затем нажмите кнопку ниже для подтверждения получения:`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "✅ Подтвердить получение", callback_data: `deal_received_${dealId}` }]]
+          }
+        }
+      ).catch(() => {});
+
+    } else if (action === 'received') {
+      deal.status = 'completed';
+      
+      // Зачисление средств продавцу
+      let users = loadUsers();
+      if (users[deal.tgId]) {
+        users[deal.tgId]["Balance"] = (users[deal.tgId]["Balance"] || 0) + deal.price;
+        users[deal.tgId]["CompletedDeals"] = (users[deal.tgId]["CompletedDeals"] || 0) + 1;
+        saveUsers(users);
+      }
+
+      // Уведомление покупателю
+      await bot.editMessageText(`✅ Вы подтвердили получение предмета *${deal.name}*. Сделка успешно завершена!`, {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+        parse_mode: "Markdown"
+      }).catch(() => {});
+
+      // Уведомление продавцу о зачислении средств
+      if (deal.tgId) {
+        await bot.sendMessage(
+          deal.tgId,
+          `🎉 **Сделка успешно завершена!**\n\nПокупатель подтвердил получение предмета *${deal.name}*.\nНа ваш баланс зачислено: *${deal.price} ₽*.`,
+          { parse_mode: "Markdown" }
+        ).catch(() => {});
+      }
+
+      // Уведомление в админ-чат
+      if (ADMIN_CHAT_ID) {
+        await bot.sendMessage(
+          ADMIN_CHAT_ID,
+          `✅ **Сделка #${dealId} успешно завершена!**\nПредмет: *${deal.name}* (${deal.price} ₽)`,
+          { parse_mode: "Markdown" }
+        ).catch(() => {});
+      }
+
+      delete serverDeals[dealId];
+    }
+
+    await bot.answerCallbackQuery(q.id);
+    return;
   }
-  delete withdrawRequests[wdId];
-  bot.answerCallbackQuery(q.id);
+
+  // Обработка заявок на вывод
+  if (data.startsWith("wd_")) {
+    const parts = data.split("_");
+    const status = parts[1];
+    const wdId = parts[2];
+    const reqData = withdrawRequests[wdId];
+
+    if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
+
+    if (status === 'ok') {
+      const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
+      if (resTr) {
+        await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
+        await bot.editMessageText(`✅ Заявка №${wdId} выплачена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      } else {
+        await bot.sendMessage(reqData.tgId, `✅ Вывод на *${reqData.usdtApprox} USDT* подтвержден администратором.`, { parse_mode: "Markdown" });
+        await bot.editMessageText(`✅ Заявка №${wdId} закрыта (вручную).`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      }
+    } else {
+      updateUserBalance(reqData.tgId, reqData.amount);
+      await bot.sendMessage(reqData.tgId, "❌ Вывод отклонен, средства возвращены на баланс.");
+      await bot.editMessageText(`❌ Заявка №${wdId} отклонена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    }
+    delete withdrawRequests[wdId];
+    bot.answerCallbackQuery(q.id);
+  }
 });
 
 server.listen(PORT, () => { console.log(`Server started on port ${PORT}`); });
