@@ -12,6 +12,7 @@ if (!botToken) {
 
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID; // ID закрытой группы для логов и заявок
 
 const bot = new TelegramBot(botToken, { polling: true });
 
@@ -66,6 +67,7 @@ const server = http.createServer(async (req, res) => {
         };
         serverMarketItems.unshift(newItem);
 
+        // Уведомление продавцу в ЛС
         if (newItem.tgId) {
           await bot.sendMessage(
             newItem.tgId,
@@ -74,6 +76,18 @@ const server = http.createServer(async (req, res) => {
             `💰 Стоимость: *${newItem.price} ₽*\n` +
             `⏳ Статус: Активен на маркетплейсе\n\n` +
             `⚠️ *Не удаляйте предмет из инвентаря Steam*, пока он выставлен.`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
+        // Лог в админ-группу
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `🏷 **Новый лот на маркете!**\n\n` +
+            `🎯 Предмет: *${newItem.name}*\n` +
+            `💵 Цена: *${newItem.price} ₽*\n` +
+            `👤 Продавец: *${newItem.seller}* (ID: \`${newItem.tgId || "не указан"}\`)`,
             { parse_mode: "Markdown" }
           );
         }
@@ -112,7 +126,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка товара, создание сделки и отправка уведомлений в бот продавцу и покупателю
+  // Покупка товара и создание сделки
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -152,7 +166,7 @@ const server = http.createServer(async (req, res) => {
 
         serverDeals.unshift(newDeal);
 
-        // 1. Уведомление продавцу в Telegram с трейд-ссылкой покупателя
+        // Уведомление продавцу в ЛС
         if (purchasedItem.tgId) {
           await bot.sendMessage(
             purchasedItem.tgId,
@@ -160,8 +174,8 @@ const server = http.createServer(async (req, res) => {
             `🎯 Предмет: *${purchasedItem.name}*\n` +
             `💰 Стоимость: *${purchasedItem.price} ₽*\n` +
             `👤 Покупатель: *${buyerName}*\n` +
-            `🔗 Трейд-ссылка покупателя: \`${buyerTradeUrl || "Не указана"}\`\n\n` +
-            `⏳ *Шаг 1:* Передайте скин покупателю по его трейд-ссылке в Steam, затем нажмите кнопку ниже.`,
+            `🔗 Трейд-ссылка покупателя: \`${buyerTradeUrl}\`\n\n` +
+            `⏳ *Шаг 1:* Передайте скин покупателю по ссылке в Steam, затем нажмите кнопку ниже.`,
             {
               parse_mode: "Markdown",
               reply_markup: {
@@ -173,7 +187,7 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        // 2. Уведомление покупателю в Telegram
+        // Уведомление покупателю в ЛС
         if (buyerTgId) {
           await bot.sendMessage(
             buyerTgId,
@@ -181,7 +195,20 @@ const server = http.createServer(async (req, res) => {
             `🎯 Предмет: *${purchasedItem.name}*\n` +
             `💰 Сумма: *${purchasedItem.price} ₽*\n` +
             `👤 Продавец: *${purchasedItem.seller}*\n\n` +
-            `⏳ *Статус:* Ожидаем, пока продавец отправит вам обмен в Steam.`,
+            `⏳ *Статус:* Ожидаем отправку скина от продавца.`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
+        // Отчет в админ-группу
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `🛍 **Совершена сделка (покупка)!**\n\n` +
+            `🎯 Предмет: *${purchasedItem.name}*\n` +
+            `💵 Цена: *${purchasedItem.price} ₽*\n` +
+            `👤 Продавец ID: \`${purchasedItem.tgId || "н/д"}\`\n` +
+            `🛒 Покупатель: *${buyerName}* (ID: \`${buyerTgId}\`)`,
             { parse_mode: "Markdown" }
           );
         }
@@ -196,7 +223,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Счета и вывод
+  // Выставление счета на пополнение баланса
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -204,6 +231,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { tgId, amount, currency, received } = JSON.parse(body);
         const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
+
         if (tgId) {
           await bot.sendMessage(
             tgId,
@@ -215,6 +243,19 @@ const server = http.createServer(async (req, res) => {
             { parse_mode: "Markdown" }
           );
         }
+
+        // Лог в админ-группу
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `💳 **Создан счет на пополнение**\n\n` +
+            `👤 Пользователь ID: \`${tgId}\`\n` +
+            `💰 Сумма: *${amount} ${currency}* (Зачисление: ${received} ₽)\n` +
+            `🆔 ID платежа: \`${invoiceId}\``,
+            { parse_mode: "Markdown" }
+          );
+        }
+
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, invoiceId }));
       } catch (err) {
@@ -225,6 +266,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Запрос на вывод средств
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -232,6 +274,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { tgId, amount, recipientId } = JSON.parse(body);
         const withdrawId = Math.floor(1000000 + Math.random() * 9000000);
+
         if (tgId) {
           await bot.sendMessage(
             tgId,
@@ -243,6 +286,30 @@ const server = http.createServer(async (req, res) => {
             { parse_mode: "Markdown" }
           );
         }
+
+        // Лог в админ-группу с кнопками управления
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `📤 **Новый запрос на вывод средств!**\n\n` +
+            `👤 Пользователь ID: \`${tgId}\`\n` +
+            `💵 Сумма к выплате: *${amount} ₽*\n` +
+            `🎯 Кошелек / TG ID получателя: \`${recipientId}\`\n` +
+            `🆔 ID заявки: \`${withdrawId}\``,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: "✅ Выплачено", callback_data: `wd_ok_${withdrawId}` },
+                    { text: "❌ Отклонить", callback_data: `wd_no_${withdrawId}` }
+                  ]
+                ]
+              }
+            }
+          );
+        }
+
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, withdrawId }));
       } catch (err) {
@@ -292,7 +359,7 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Обработка инлайн-кнопок подтверждения в Telegram боте
+// Обработка инлайн-кнопок в Telegram боте и админ-чате
 bot.on("callback_query", async (query) => {
   const data = query.data;
   const chatId = query.message.chat.id;
@@ -314,7 +381,7 @@ bot.on("callback_query", async (query) => {
           deal.buyerTgId,
           `📦 **Продавец отправил вам скин!**\n\n` +
           `🎯 Предмет: *${deal.name}*\n\n` +
-          `⏳ Проверьте свой Steam-аккаунт и подтвердите получение предмета кнопкой ниже:`,
+          `⏳ Проверьте свой Steam-аккаунт и подтвердите получение предмета:`,
           {
             parse_mode: "Markdown",
             reply_markup: {
@@ -347,7 +414,22 @@ bot.on("callback_query", async (query) => {
         );
       }
     }
+  } else if (data.startsWith("wd_ok_")) {
+    const wdId = data.split("_")[2];
+    await bot.editMessageText(`✅ Заявка на вывод №${wdId} обработана и выплачена.`, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      parse_mode: "Markdown"
+    });
+  } else if (data.startsWith("wd_no_")) {
+    const wdId = data.split("_")[2];
+    await bot.editMessageText(`❌ Заявка на вывод №${wdId} отклонена администратором.`, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      parse_mode: "Markdown"
+    });
   }
+
   bot.answerCallbackQuery(query.id);
 });
 
