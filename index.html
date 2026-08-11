@@ -68,7 +68,12 @@
         .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; }
         .price-input-container { position: relative; margin: 10px 0; }
         .currency-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
-        #sale-price-input, .topup-input { width: 100%; padding: 12px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 8px; }
+        #sale-price-input, .topup-input { width: 100%; padding: 12px 12px 12px 34px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 8px; }
+
+        .platform-select-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
+        .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
+        .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
+
         .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
@@ -146,15 +151,34 @@
         <button class="nav-item" onclick="switchTab('profile', this)">👤</button>
     </nav>
 
-    <!-- Модалка продажи -->
+    <!-- Модалка продажи со всеми площадками -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Выставить скин</h3>
             <div class="skin-image" id="sell-modal-img-box">🛡️</div>
-            <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px;"></p>
-            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Цена"></div>
-            <button class="btn-green-glow" onclick="confirmSellItem()">Продать</button>
-            <button class="btn-cyan" onclick="closeModal('modal-sell')" style="width:100%; margin-top:8px;">Отмена</button>
+            <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px; margin-bottom: 5px;"></p>
+            
+            <div style="font-size: 11px; color: var(--text-muted); text-align: left; margin-top: 5px;">Выберите площадку для продажи:</div>
+            <div class="platform-select-group">
+                <button type="button" class="platform-option-btn active" id="plat-our" onclick="selectSellPlatform('Our P2P')">Наша площадка</button>
+                <button type="button" class="platform-option-btn" id="plat-lis" onclick="selectSellPlatform('Lis-Skins')">Lis-Skins</button>
+                <button type="button" class="platform-option-btn" id="plat-csmoney" onclick="selectSellPlatform('CS.MONEY')">CS.MONEY</button>
+            </div>
+
+            <div id="our-platform-fields">
+                <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Введите цену"></div>
+                <label style="display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer; text-align: left;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽ / 48 часов)</label>
+            </div>
+
+            <div id="external-platform-price-box" style="display: none; margin: 12px 0; padding: 12px; background: rgba(0, 255, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted);">Оценочная цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
+                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">0 ₽</div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
+                <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="width:auto; flex:1; margin-top:0;">Продать</button>
+            </div>
         </div>
     </div>
 
@@ -179,7 +203,7 @@
                 <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
             </div>
             <p class="hint-text" id="topup-hint">Сумма зачислится после оплаты (~90 ₽ за 1 USDT).</p>
-            <div class="modal-buttons">
+            <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" onclick="processTopUp()" style="width:auto; flex:1; margin-top:0;">Оплатить</button>
             </div>
@@ -193,7 +217,7 @@
             <p class="hint-text">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
             <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
             <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" readonly></div>
-            <div class="modal-buttons">
+            <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
             </div>
@@ -203,6 +227,7 @@
     <script>
         let userBalance = 0;
         let selectedTopupType = 'crypto';
+        let selectedSellPlatform = 'Our P2P';
         let currentSelectedItem = null;
         let myInventory = [], marketItems = [], myListings = [];
 
@@ -312,21 +337,61 @@
             `).join('');
         }
 
+        function selectSellPlatform(platform) {
+            selectedSellPlatform = platform;
+            document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
+            if (platform === 'Our P2P') document.getElementById('plat-our').classList.add('active');
+            if (platform === 'Lis-Skins') document.getElementById('plat-lis').classList.add('active');
+            if (platform === 'CS.MONEY') document.getElementById('plat-csmoney').classList.add('active');
+
+            const ourFields = document.getElementById('our-platform-fields');
+            const externalPriceBox = document.getElementById('external-platform-price-box');
+            const actionBtn = document.getElementById('sell-action-btn');
+
+            if (platform === 'Our P2P') {
+                ourFields.style.display = 'block'; 
+                externalPriceBox.style.display = 'none'; 
+                actionBtn.innerText = 'Продать';
+            } else {
+                ourFields.style.display = 'none'; 
+                externalPriceBox.style.display = 'block';
+                const base = currentSelectedItem ? (currentSelectedItem.basePrice || 1500) : 1500;
+                let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
+                document.getElementById('external-plat-title').innerText = platform;
+                document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
+                actionBtn.innerText = `Перейти на ${platform}`;
+            }
+        }
+
         function openSellModal(item) {
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
-            document.getElementById('sale-price-input').value = item.basePrice;
+            document.getElementById('sale-price-input').value = item.basePrice || 1500;
+            document.getElementById('vip-checkbox').checked = false;
             document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
+            selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
         }
 
         async function confirmSellItem() {
+            if (selectedSellPlatform !== 'Our P2P') {
+                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
+                closeModal('modal-sell'); 
+                window.open(targetUrl, '_blank'); 
+                return;
+            }
+
             const price = parseFloat(document.getElementById('sale-price-input').value);
-            if (!price || price <= 0) { alert('Введите цену'); return; }
+            const isVip = document.getElementById('vip-checkbox').checked;
+
+            if (!price || price <= 0) { alert('Введите корректную цену!'); return; }
+            if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (требуется 245 ₽).'); return; }
+            if (isVip) userBalance -= 245;
 
             const listing = {
                 name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url,
-                seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', rating: document.getElementById('my-rating').innerText
+                seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', 
+                rating: document.getElementById('my-rating').innerText, isVip, platform: selectedSellPlatform
             };
 
             const res = await fetch('/api/market/add', {
@@ -336,6 +401,7 @@
                 document.getElementById('modal-sell').classList.remove('active');
                 alert('Выставлено на продажу!');
                 fetchMarketItems();
+                syncUserProfile();
             }
         }
 
