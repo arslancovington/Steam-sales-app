@@ -51,6 +51,12 @@ let serverMarketItems = [];
 let serverDeals = [];
 let withdrawRequests = {};
 
+// Заголовки для обхода блокировок Steam API
+const steamHeaders = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
+};
+
 async function createCryptoInvoice(amountUsdt, description, tgId, received) {
   try {
     const response = await fetch("https://pay.crypt.bot/api/createInvoice", {
@@ -131,14 +137,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Профиль пользователя и рейтинг из сделок
+  // Профиль пользователя
   if (req.url.startsWith("/api/user/profile")) {
     const url = new URL(req.url, APP_URL);
     const tgId = url.searchParams.get("tgId");
     const tgUser = url.searchParams.get("tgUser") || "Игрок";
     const user = getUser(tgId, tgUser);
     
-    // Динамический расчет рейтинга: 0 сделок = 0.0, от 1 до 10 сделок = 4.0-4.9, от 10+ = 5.0
     let dealsCount = user["CompletedDeals"] || 0;
     let rating = dealsCount === 0 ? "0.0" : Math.min(5.0, (3.5 + dealsCount * 0.1)).toFixed(1);
 
@@ -154,7 +159,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Сохранение юзера
+  // Сохранение пользователя
   if (req.url === "/api/user/save" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", () => {
@@ -193,19 +198,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка и инкремент сделок продавца
+  // Покупка
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { itemId, buyerTgId, buyerTradeUrl, buyerName } = JSON.parse(body);
+        const { itemId, buyerTgId, buyerTradeUrl } = JSON.parse(body);
         const idx = serverMarketItems.findIndex(i => i._id === itemId);
         if (idx === -1) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: "Товар уже куплен" })); return; }
         
         const item = serverMarketItems.splice(idx, 1)[0];
         updateUserBalance(buyerTgId, -item.price);
 
-        // Увеличиваем счетчик успешных сделок продавца
         let users = loadUsers();
         if (users[item.tgId]) {
           users[item.tgId]["CompletedDeals"] = (users[item.tgId]["CompletedDeals"] || 0) + 1;
@@ -224,7 +228,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Загрузка инвентаря и аватара Steam
+  // Загрузка инвентаря и аватара Steam (с исправленными заголовками)
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -235,7 +239,7 @@ const server = http.createServer(async (req, res) => {
         let avatarUrl = "";
         let steamName = "";
         try {
-          const xmlRes = await fetch(`https://steamcommunity.com/profiles/${steamId}?xml=1`);
+          const xmlRes = await fetch(`https://steamcommunity.com/profiles/${steamId}?xml=1`, { headers: steamHeaders });
           const xmlText = await xmlRes.text();
           const avMatch = xmlText.match(/<avatarMedium>([\s\S]*?)<\/avatarMedium>/);
           if (avMatch) avatarUrl = avMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim();
@@ -243,7 +247,7 @@ const server = http.createServer(async (req, res) => {
           if (nameMatch) steamName = nameMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim();
         } catch(e) {}
 
-        const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`);
+        const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`, { headers: steamHeaders });
         if (!response.ok) {
           res.end(JSON.stringify({ success: true, items: [], descriptions: [], avatarUrl, steamName }));
           return;
@@ -264,27 +268,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Стандартные обработчики пополнений и выводов...
+  // Пополнение баланса (возвращает ссылку на оплату на клиент)
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { tgId, amount, currency, received } = JSON.parse(body);
-        let payUrl = currency === "USDT" ? await createCryptoInvoice(amount, "Пополнение", tgId, received) : await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
-        await bot.sendMessage(tgId, `💡 Счет создан: ${amount} ${currency} (~${received} ₽)`);
-        res.end(JSON.stringify({ success: true }));
-      } catch(e) { res.writeHead(500); res.end(); }
+        let payUrl = null;
+        if (currency === "USDT") {
+          payUrl = await createCryptoInvoice(amount, "Пополнение", tgId, received);
+        } else {
+          payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
+        }
+        res.end(JSON.stringify({ success: true, payUrl }));
+      } catch(e) { res.writeHead(500); res.end(JSON.stringify({ success: false })); }
     });
     return;
   }
 
+  // Вывод средств
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { tgId, amount, recipientAccount, username } = JSON.parse(body);
+        const wdId = Date.now().toString().slice(-7);
+        const usdtApprox = (Math.round(amount * 0.95) / 90).toFixed(2);
+        
         updateUserBalance(tgId, -amount);
-        if (ADMIN_CHAT_ID) await bot.sendMessage(ADMIN_CHAT_ID, `📤 Вывод ${amount} ₽ для @${username}`);
+        withdrawRequests[wdId] = { tgId, amount, usdtApprox };
+
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод!**\nСумма: *${amount} ₽* (~${usdtApprox} USDT)\nЮзер: @${username}\nID: \`${wdId}\``, {
+            parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [[{ text: "✅ Выплатить", callback_data: `wd_ok_${wdId}` }, { text: "❌ Отклонить", callback_data: `wd_no_${wdId}` }]] }
+          });
+        }
         res.end(JSON.stringify({ success: true }));
       } catch (err) { res.writeHead(500); res.end(); }
     });
@@ -298,12 +317,44 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+bot.on("pre_checkout_query", async (query) => { await bot.answerPreCheckoutQuery(query.id, true); });
+bot.on("successful_payment", async (msg) => {
+  const payment = msg.successful_payment;
+  const payload = payment.invoice_payload;
+  const chatId = msg.chat.id;
+  if (payload && payload.startsWith("topup_")) {
+    const parts = payload.split("_");
+    const tgId = parts[1];
+    const received = parseInt(parts[2]);
+    updateUserBalance(tgId, received);
+    await bot.sendMessage(chatId, `🎉 **Оплата через Telegram Stars подтверждена!**\nЗачислено *${received} ₽*.`, { parse_mode: "Markdown" });
+  }
+});
+
 bot.on("callback_query", async (q) => {
   if (!q.data.startsWith("wd_")) { bot.answerCallbackQuery(q.id); return; }
   const parts = q.data.split("_");
-  if (parts[1] === 'ok') {
-    await bot.sendMessage(parts[2], "✅ Выплата подтверждена!");
+  const status = parts[1];
+  const wdId = parts[2];
+  const reqData = withdrawRequests[wdId];
+
+  if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
+
+  if (status === 'ok') {
+    const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
+    if (resTr) {
+      await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
+      await bot.editMessageText(`✅ Заявка №${wdId} выплачена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    } else {
+      await bot.sendMessage(reqData.tgId, `✅ Вывод на *${reqData.usdtApprox} USDT* подтвержден администратором.`, { parse_mode: "Markdown" });
+      await bot.editMessageText(`✅ Заявка №${wdId} закрыта (вручную).`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    }
+  } else {
+    updateUserBalance(reqData.tgId, reqData.amount);
+    await bot.sendMessage(reqData.tgId, "❌ Вывод отклонен, средства возвращены на баланс.");
+    await bot.editMessageText(`❌ Заявка №${wdId} отклонена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
   }
+  delete withdrawRequests[wdId];
   bot.answerCallbackQuery(q.id);
 });
 
