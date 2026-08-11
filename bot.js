@@ -13,17 +13,13 @@ if (!botToken) {
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-// Инициализация Telegram бота
 const bot = new TelegramBot(botToken, { polling: true });
 
-// Хранилища в памяти сервера
 let serverMarketItems = [];
 let serverDeals = [];
 
-// === ВЕБ-СЕРВЕР ===
 const server = http.createServer(async (req, res) => {
   
-  // Редирект на Steam OpenID
   if (req.url === "/auth/steam") {
     const returnTo = `${APP_URL}/auth/steam/return`;
     const realm = APP_URL;
@@ -34,7 +30,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Возврат от Steam
   if (req.url.startsWith("/auth/steam/return")) {
     const url = new URL(req.url, APP_URL);
     const claimedId = url.searchParams.get("openid.claimed_id");
@@ -50,14 +45,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Получение товаров маркетплейса
+  // Получение всех товаров маркетплейса
   if (req.url === "/api/market/items" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, items: serverMarketItems }));
     return;
   }
 
-  // Добавление товара на маркет + уведомление в чат бота
+  // Добавление товара на маркет
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -71,15 +66,14 @@ const server = http.createServer(async (req, res) => {
         };
         serverMarketItems.unshift(newItem);
 
-        // Отправка уведомления продавцу в Telegram
-        if (itemData.tgId) {
+        if (newItem.tgId) {
           await bot.sendMessage(
-            itemData.tgId,
+            newItem.tgId,
             `✅ **Предмет успешно выставлен на продажу!**\n\n` +
             `🎯 Предмет: *${newItem.name}*\n` +
             `💰 Стоимость: *${newItem.price} ₽*\n` +
             `⏳ Статус: Активен на маркетплейсе\n\n` +
-            `⚠️ *Не удаляйте предмет из инвентаря Steam*, пока он выставлен на продажу.`,
+            `⚠️ *Не удаляйте предмет из инвентаря Steam*, пока он выставлен.`,
             { parse_mode: "Markdown" }
           );
         }
@@ -94,76 +88,37 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Выставление счета на пополнение баланса
-  if (req.url === "/api/billing/invoice" && req.method === "POST") {
+  // Снятие лота с продажи
+  if (req.url === "/api/market/remove" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { tgId, amount, currency, received } = JSON.parse(body);
-        const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
-
-        if (tgId) {
-          await bot.sendMessage(
-            tgId,
-            `💡 **Счет на оплату ${currency} выставлен** 💡\n\n` +
-            `💳 Сумма к оплате: *${amount} ${currency}*\n` +
-            `🆔 ID платежа: *${invoiceId}*\n` +
-            `💎 Получите: *${received} ₽*\n\n` +
-            `❗ **Оплачивайте ровно ту сумму** на которую создали платеж и только на те реквизиты, которые получили. Оплата на другие реквизиты или неверная сумма вызовет потерю платежа.\n\n` +
-            `⏳ Среднее время зачисления депозита — **до 30 минут** после оплаты.`,
-            { parse_mode: "Markdown" }
-          );
+        const { itemId, tgId } = JSON.parse(body);
+        const index = serverMarketItems.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
+        
+        if (index !== -1) {
+          serverMarketItems.splice(index, 1);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        } else {
+          throw new Error("Лот не найден");
         }
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: true, invoiceId }));
       } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
+        res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: false, error: err.message }));
       }
     });
     return;
   }
 
-  // Запрос на вывод средств
-  if (req.url === "/api/billing/withdraw" && req.method === "POST") {
-    let body = "";
-    req.on("data", chunk => body += chunk);
-    req.on("end", async () => {
-      try {
-        const { tgId, amount, recipientId } = JSON.parse(body);
-        const withdrawId = Math.floor(1000000 + Math.random() * 9000000);
-
-        if (tgId) {
-          await bot.sendMessage(
-            tgId,
-            `📤 **Заявка на вывод средств создана**\n\n` +
-            `🆔 ID заявки: *${withdrawId}*\n` +
-            `💵 Сумма: *${amount} ₽*\n` +
-            `👤 Получатель (TG ID): *${recipientId}*\n` +
-            `⏳ Статус: *В обработке администратором*`,
-            { parse_mode: "Markdown" }
-          );
-        }
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: true, withdrawId }));
-      } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // Покупка товара с проверкой (нельзя купить собственный предмет)
+  // Покупка товара, создание сделки и отправка уведомлений в бот продавцу и покупателю
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { itemId, buyerName, buyerTgId } = JSON.parse(body);
+        const { itemId, buyerName, buyerTgId, buyerTradeUrl } = JSON.parse(body);
         const itemIndex = serverMarketItems.findIndex(i => i._id === itemId);
         
         if (itemIndex === -1) {
@@ -172,7 +127,6 @@ const server = http.createServer(async (req, res) => {
 
         const purchasedItem = serverMarketItems[itemIndex];
 
-        // Строгая проверка: нельзя купить свой собственный предмет
         if (purchasedItem.tgId && buyerTgId && String(purchasedItem.tgId) === String(buyerTgId)) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "Вы не можете купить собственный предмет!" }));
@@ -181,14 +135,16 @@ const server = http.createServer(async (req, res) => {
 
         serverMarketItems.splice(itemIndex, 1);
 
+        const dealId = Date.now().toString();
         const newDeal = {
-          id: Date.now().toString(),
+          id: dealId,
           name: purchasedItem.name,
           price: purchasedItem.price,
           seller: purchasedItem.seller,
           sellerTgId: purchasedItem.tgId,
           buyer: buyerName || "Покупатель",
           buyerTgId: buyerTgId,
+          buyerTradeUrl: buyerTradeUrl || "Не указана",
           status: "waiting_transfer",
           image: purchasedItem.image,
           createdAt: new Date()
@@ -196,14 +152,36 @@ const server = http.createServer(async (req, res) => {
 
         serverDeals.unshift(newDeal);
 
+        // 1. Уведомление продавцу в Telegram с трейд-ссылкой покупателя
         if (purchasedItem.tgId) {
           await bot.sendMessage(
             purchasedItem.tgId,
             `🛒 **У вас купили предмет!**\n\n` +
             `🎯 Предмет: *${purchasedItem.name}*\n` +
             `💰 Стоимость: *${purchasedItem.price} ₽*\n` +
-            `👤 Покупатель: *${buyerName}*\n\n` +
-            `⏳ *Статус:* Требуется передача скина в Steam.`,
+            `👤 Покупатель: *${buyerName}*\n` +
+            `🔗 Трейд-ссылка покупателя: \`${buyerTradeUrl || "Не указана"}\`\n\n` +
+            `⏳ *Шаг 1:* Передайте скин покупателю по его трейд-ссылке в Steam, затем нажмите кнопку ниже.`,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "📤 Я отправил скин", callback_data: `sent_${dealId}` }]
+                ]
+              }
+            }
+          );
+        }
+
+        // 2. Уведомление покупателю в Telegram
+        if (buyerTgId) {
+          await bot.sendMessage(
+            buyerTgId,
+            `🎉 **Заказ успешно оформлен!**\n\n` +
+            `🎯 Предмет: *${purchasedItem.name}*\n` +
+            `💰 Сумма: *${purchasedItem.price} ₽*\n` +
+            `👤 Продавец: *${purchasedItem.seller}*\n\n` +
+            `⏳ *Статус:* Ожидаем, пока продавец отправит вам обмен в Steam.`,
             { parse_mode: "Markdown" }
           );
         }
@@ -218,7 +196,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Запрос инвентаря CS2
+  // Счета и вывод
+  if (req.url === "/api/billing/invoice" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { tgId, amount, currency, received } = JSON.parse(body);
+        const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
+        if (tgId) {
+          await bot.sendMessage(
+            tgId,
+            `💡 **Счет на оплату ${currency} выставлен** 💡\n\n` +
+            `💳 Сумма к оплате: *${amount} ${currency}*\n` +
+            `🆔 ID платежа: *${invoiceId}*\n` +
+            `💎 Получите: *${received} ₽*\n\n` +
+            `❗ **Оплачивайте ровно ту сумму** на которую создали платеж.`,
+            { parse_mode: "Markdown" }
+          );
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, invoiceId }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (req.url === "/api/billing/withdraw" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { tgId, amount, recipientId } = JSON.parse(body);
+        const withdrawId = Math.floor(1000000 + Math.random() * 9000000);
+        if (tgId) {
+          await bot.sendMessage(
+            tgId,
+            `📤 **Заявка на вывод средств создана**\n\n` +
+            `🆔 ID заявки: *${withdrawId}*\n` +
+            `💵 Сумма: *${amount} ₽*\n` +
+            `👤 Получатель: *${recipientId}*\n` +
+            `⏳ Статус: *В обработке*`,
+            { parse_mode: "Markdown" }
+          );
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, withdrawId }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -226,17 +260,12 @@ const server = http.createServer(async (req, res) => {
       try {
         const data = JSON.parse(body);
         const steamId = data.steamId;
-
         if (!steamId) throw new Error("Не передан SteamID");
 
         const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`);
-        
-        if (!response.ok) {
-          throw new Error("Инвентарь скрыт или профиль закрыт настройками приватности Steam");
-        }
+        if (!response.ok) throw new Error("Инвентарь скрыт или профиль закрыт");
 
         const steamData = await response.json();
-
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
           success: true,
@@ -251,7 +280,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Отдача index.html
   const filePath = path.join(process.cwd(), "index.html");
   fs.readFile(filePath, (err, content) => {
     if (err) {
@@ -264,16 +292,73 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
+// Обработка инлайн-кнопок подтверждения в Telegram боте
+bot.on("callback_query", async (query) => {
+  const data = query.data;
+  const chatId = query.message.chat.id;
+
+  if (data.startsWith("sent_")) {
+    const dealId = data.split("_")[1];
+    const deal = serverDeals.find(d => d.id === dealId);
+
+    if (deal) {
+      deal.status = "sent";
+      await bot.editMessageText(`✅ Вы подтвердили отправку скина для сделки *${deal.name}*.`, {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        parse_mode: "Markdown"
+      });
+
+      if (deal.buyerTgId) {
+        await bot.sendMessage(
+          deal.buyerTgId,
+          `📦 **Продавец отправил вам скин!**\n\n` +
+          `🎯 Предмет: *${deal.name}*\n\n` +
+          `⏳ Проверьте свой Steam-аккаунт и подтвердите получение предмета кнопкой ниже:`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "✅ Я получил скин", callback_data: `received_${dealId}` }]
+              ]
+            }
+          }
+        );
+      }
+    }
+  } else if (data.startsWith("received_")) {
+    const dealId = data.split("_")[1];
+    const deal = serverDeals.find(d => d.id === dealId);
+
+    if (deal) {
+      deal.status = "completed";
+      await bot.editMessageText(`🎉 Сделка по предмету *${deal.name}* успешно завершена!`, {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        parse_mode: "Markdown"
+      });
+
+      if (deal.sellerTgId) {
+        await bot.sendMessage(
+          deal.sellerTgId,
+          `🎉 **Покупатель подтвердил получение скина!**\n\n` +
+          `Сделка по предмету *${deal.name}* успешно завершена. Средства зачислены на ваш баланс.`,
+          { parse_mode: "Markdown" }
+        );
+      }
+    }
+  }
+  bot.answerCallbackQuery(query.id);
+});
+
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-// === ТЕЛЕГРАМ БОТ ===
 bot.onText(/\/start/, async (msg) => {
   try {
     const chatId = msg.chat.id;
     const from = msg.from;
-
     if (!from) return;
 
     await bot.sendMessage(
