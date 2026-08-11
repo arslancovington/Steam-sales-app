@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 
 const botToken = process.env.BOT_TOKEN;
+const CRYPTO_PAY_TOKEN = process.env.CRYPTO_PAY_TOKEN || "620902:AATcBsJtTEYOEJxBiShsJFcE82mFJ88nL9z";
 
 if (!botToken) {
   throw new Error("BOT_TOKEN environment variable is required.");
@@ -12,12 +13,42 @@ if (!botToken) {
 
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID; // ID закрытой группы для логов и заявок
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 
 const bot = new TelegramBot(botToken, { polling: true });
 
 let serverMarketItems = [];
 let serverDeals = [];
+
+// Функция создания инвойса через Crypto Pay API
+async function createCryptoInvoice(amountUsdt, description) {
+  try {
+    const response = await fetch("https://pay.crypt.bot/api/createInvoice", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN
+      },
+      body: JSON.stringify({
+        asset: "USDT",
+        amount: String(amountUsdt),
+        description: description,
+        payload: "balance_topup",
+        allow_comments: true,
+        allow_anonymous: false
+      })
+    });
+
+    const data = await response.json();
+    if (data.ok && data.result) {
+      return data.result.pay_url; // Ссылка на оплату от CryptoBot
+    }
+    return null;
+  } catch (err) {
+    console.error("Crypto Pay API error:", err);
+    return null;
+  }
+}
 
 const server = http.createServer(async (req, res) => {
   
@@ -67,7 +98,6 @@ const server = http.createServer(async (req, res) => {
         };
         serverMarketItems.unshift(newItem);
 
-        // Уведомление продавцу в ЛС
         if (newItem.tgId) {
           await bot.sendMessage(
             newItem.tgId,
@@ -80,7 +110,6 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        // Лог в админ-группу
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
@@ -166,7 +195,6 @@ const server = http.createServer(async (req, res) => {
 
         serverDeals.unshift(newDeal);
 
-        // Уведомление продавцу в ЛС
         if (purchasedItem.tgId) {
           await bot.sendMessage(
             purchasedItem.tgId,
@@ -187,7 +215,6 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        // Уведомление покупателю в ЛС
         if (buyerTgId) {
           await bot.sendMessage(
             buyerTgId,
@@ -200,7 +227,6 @@ const server = http.createServer(async (req, res) => {
           );
         }
 
-        // Отчет в админ-группу
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
@@ -223,7 +249,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Выставление счета на пополнение баланса
+  // Выставление счета на пополнение баланса через Crypto Pay API
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -232,19 +258,32 @@ const server = http.createServer(async (req, res) => {
         const { tgId, amount, currency, received } = JSON.parse(body);
         const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
 
-        if (tgId) {
-          await bot.sendMessage(
-            tgId,
-            `💡 **Счет на оплату ${currency} выставлен** 💡\n\n` +
-            `💳 Сумма к оплате: *${amount} ${currency}*\n` +
-            `🆔 ID платежа: *${invoiceId}*\n` +
-            `💎 Получите: *${received} ₽*\n\n` +
-            `❗ **Оплачивайте ровно ту сумму** на которую создали платеж.`,
-            { parse_mode: "Markdown" }
-          );
+        let payUrl = null;
+        if (currency === "USDT") {
+          payUrl = await createCryptoInvoice(amount, `Пополнение баланса Steam Sales на ${received} ₽`);
         }
 
-        // Лог в админ-группу
+        if (tgId) {
+          let messageText = `💡 **Счет на оплату ${currency} выставлен** 💡\n\n` +
+            `💳 Сумма к оплате: *${amount} ${currency}*\n` +
+            `🆔 ID платежа: *${invoiceId}*\n` +
+            `💎 Получите: *${received} ₽*\n\n`;
+
+          let replyMarkup = undefined;
+          if (payUrl) {
+            messageText += `🔗 Нажмите кнопку ниже для безопасной оплаты через **Crypto Bot**:`;
+            replyMarkup = {
+              inline_keyboard: [
+                [{ text: "💳 Оплатить в Crypto Bot", url: payUrl }]
+              ]
+            };
+          } else {
+            messageText += `❗ **Оплачивайте ровно ту сумму** на которую создали платеж.`;
+          }
+
+          await bot.sendMessage(tgId, messageText, { parse_mode: "Markdown", reply_markup: replyMarkup });
+        }
+
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
@@ -266,42 +305,44 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Запрос на вывод средств
+  // Запрос на вывод средств в USDT
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { tgId, amount, recipientId } = JSON.parse(body);
+        const { tgId, amount, recipientAccount, username } = JSON.parse(body);
         const withdrawId = Math.floor(1000000 + Math.random() * 9000000);
+        const netAmount = Math.round(amount * 0.95);
+        const usdtApprox = (netAmount / 90).toFixed(2);
 
         if (tgId) {
           await bot.sendMessage(
             tgId,
-            `📤 **Заявка на вывод средств создана**\n\n` +
+            `📤 **Заявка на вывод средств (Crypto Bot) создана**\n\n` +
             `🆔 ID заявки: *${withdrawId}*\n` +
-            `💵 Сумма: *${amount} ₽*\n` +
-            `👤 Получатель: *${recipientId}*\n` +
-            `⏳ Статус: *В обработке*`,
+            `💵 Списано: *${amount} ₽*\n` +
+            `💎 К получению (~): *~${usdtApprox} USDT* (с учетом комиссии 5%)\n` +
+            `👤 Аккаунт: *${recipientAccount}*\n` +
+            `⏳ Статус: *В обработке администратором*`,
             { parse_mode: "Markdown" }
           );
         }
 
-        // Лог в админ-группу с кнопками управления
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
-            `📤 **Новый запрос на вывод средств!**\n\n` +
-            `👤 Пользователь ID: \`${tgId}\`\n` +
-            `💵 Сумма к выплате: *${amount} ₽*\n` +
-            `🎯 Кошелек / TG ID получателя: \`${recipientId}\`\n` +
+            `📤 **Новый запрос на вывод в USDT!**\n\n` +
+            `👤 Пользователь: @${username || "ненейм"} (ID: \`${tgId}\`)\n` +
+            `💵 Сумма: *${amount} ₽* (~${usdtApprox} USDT)\n` +
+            `🎯 Аккаунт Crypto Bot: \`${recipientAccount}\`\n` +
             `🆔 ID заявки: \`${withdrawId}\``,
             {
               parse_mode: "Markdown",
               reply_markup: {
                 inline_keyboard: [
                   [
-                    { text: "✅ Выплачено", callback_data: `wd_ok_${withdrawId}` },
+                    { text: "✅ Выплачено (USDT)", callback_data: `wd_ok_${withdrawId}` },
                     { text: "❌ Отклонить", callback_data: `wd_no_${withdrawId}` }
                   ]
                 ]
@@ -359,7 +400,6 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Обработка инлайн-кнопок в Telegram боте и админ-чате
 bot.on("callback_query", async (query) => {
   const data = query.data;
   const chatId = query.message.chat.id;
