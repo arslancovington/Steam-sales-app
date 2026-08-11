@@ -47,6 +47,7 @@
         .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
         
         .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 4px; }
+        .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
@@ -151,7 +152,7 @@
         <button class="nav-item" onclick="switchTab('profile', this)">👤</button>
     </nav>
 
-    <!-- Модалка продажи со всеми площадками -->
+    <!-- Модалка продажи -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Выставить скин</h3>
@@ -172,7 +173,7 @@
 
             <div id="external-platform-price-box" style="display: none; margin: 12px 0; padding: 12px; background: rgba(0, 255, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: 8px; text-align: center;">
                 <div style="font-size: 11px; color: var(--text-muted);">Оценочная цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
-                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">0 ₽</div>
+                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">Загрузка цены...</div>
             </div>
 
             <div style="display:flex; gap:10px; margin-top:15px;">
@@ -233,14 +234,14 @@
 
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const myTgId = tgUser?.id || 123456789;
-        const myUsername = tgUser?.username || tgUser?.first_name || "Игрок";
+        const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
 
         window.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('my-nick').innerText = myUsername;
             
             const withdrawInput = document.getElementById('withdraw-crypto-account-input');
             if (withdrawInput) {
-                withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `@${myUsername}`;
+                withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
             }
 
             const urlParams = new URLSearchParams(window.location.search);
@@ -318,8 +319,7 @@
                 myInventory.push({
                     assetid: item.assetid,
                     name: desc.market_hash_name || desc.name,
-                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`,
-                    basePrice: 1500
+                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`
                 });
             });
 
@@ -337,7 +337,7 @@
             `).join('');
         }
 
-        function selectSellPlatform(platform) {
+        async function selectSellPlatform(platform) {
             selectedSellPlatform = platform;
             document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
             if (platform === 'Our P2P') document.getElementById('plat-our').classList.add('active');
@@ -355,20 +355,39 @@
             } else {
                 ourFields.style.display = 'none'; 
                 externalPriceBox.style.display = 'block';
-                const base = currentSelectedItem ? (currentSelectedItem.basePrice || 1500) : 1500;
-                let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
                 document.getElementById('external-plat-title').innerText = platform;
-                document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
+                document.getElementById('external-plat-price').innerText = 'Загрузка цены...';
+
+                // Запрос реальной цены из Steam Market API через наш сервер
+                try {
+                    const res = await fetch(`/api/steam/price?name=${encodeURIComponent(currentSelectedItem.name)}`);
+                    const data = await res.json();
+                    let base = (data.success && data.price) ? data.price : 1500;
+                    let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
+                    document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
+                } catch (e) {
+                    document.getElementById('external-plat-price').innerText = '1395 ₽';
+                }
+
                 actionBtn.innerText = `Перейти на ${platform}`;
             }
         }
 
-        function openSellModal(item) {
+        async function openSellModal(item) {
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
-            document.getElementById('sale-price-input').value = item.basePrice || 1500;
             document.getElementById('vip-checkbox').checked = false;
             document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
+            
+            // Получаем дефолтную цену для нашей площадки
+            try {
+                const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
+                const data = await res.json();
+                document.getElementById('sale-price-input').value = (data.success && data.price) ? data.price : 1500;
+            } catch(e) {
+                document.getElementById('sale-price-input').value = 1500;
+            }
+
             selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
         }
@@ -405,6 +424,25 @@
             }
         }
 
+        async function cancelListing(itemId) {
+            try {
+                const res = await fetch('/api/market/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId, tgId: myTgId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Лот успешно снят с продажи!');
+                    fetchMarketItems();
+                } else {
+                    alert(data.error || 'Не удалось снять лот');
+                }
+            } catch (err) {
+                alert('Ошибка соединения');
+            }
+        }
+
         async function fetchMarketItems() {
             const res = await fetch('/api/market/items');
             const data = await res.json();
@@ -432,8 +470,10 @@
             const container = document.getElementById('my-listings');
             container.innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
                 <div class="card">
+                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
-                    <div style="font-weight:bold;">${i.price} ₽</div>
+                    <div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div>
+                    <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять с продажи</button>
                 </div>
             `).join('');
         }
