@@ -51,7 +51,6 @@ let serverMarketItems = [];
 let serverDeals = [];
 let withdrawRequests = {};
 
-// Заголовки для обхода блокировок Steam API
 const steamHeaders = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
@@ -90,7 +89,6 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // Вебхук Crypto Bot
   if (req.url === "/api/crypto-webhook" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -113,7 +111,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Авторизация Steam
   if (req.url === "/auth/steam") {
     const returnTo = `${APP_URL}/auth/steam/return`;
     const realm = APP_URL;
@@ -137,7 +134,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Профиль пользователя
   if (req.url.startsWith("/api/user/profile")) {
     const url = new URL(req.url, APP_URL);
     const tgId = url.searchParams.get("tgId");
@@ -159,7 +155,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Сохранение пользователя
   if (req.url === "/api/user/save" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", () => {
@@ -180,11 +175,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Маркетплейс
   if (req.url === "/api/market/items" && req.method === "GET") {
     res.end(JSON.stringify({ success: true, items: serverMarketItems }));
     return;
   }
+
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -198,7 +193,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -228,7 +222,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Загрузка инвентаря и аватара Steam (с исправленными заголовками)
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -268,7 +261,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Пополнение баланса (возвращает ссылку на оплату на клиент)
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -286,7 +278,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Вывод средств
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
