@@ -1,6 +1,5 @@
 import "dotenv/config";
 import TelegramBot from "node-telegram-bot-api";
-import mongoose from "mongoose";
 import http from "http";
 import fs from "fs";
 import path from "path";
@@ -14,29 +13,15 @@ if (!botToken) {
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-// === 1. ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ MONGODB ===
-const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/steam_sales";
-mongoose.connect(mongoUri)
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => console.error("MongoDB connection error:", err));
-
-// === 2. МОДЕЛИ ДАННЫХ ===
-const userSchema = new mongoose.Schema({
-  tgId: { type: Number, required: true, unique: true },
-  username: { type: String, default: "" },
-  tradeUrl: { type: String, default: "" },
-}, { timestamps: true });
-
-const User = mongoose.models.User || mongoose.model("User", userSchema);
-
-// Временные хранилища в памяти сервера
+// Хранилища в памяти сервера (работают быстро и без ошибок с БД)
+let serverUsers = [];
 let serverMarketItems = [];
 let serverDeals = [];
 
-// === 3. ВЕБ-СЕРВЕР ===
+// === ВЕБ-СЕРВЕР ===
 const server = http.createServer(async (req, res) => {
   
-  // 3.1 Редирект на Steam OpenID
+  // Редирект на Steam OpenID
   if (req.url === "/auth/steam") {
     const returnTo = `${APP_URL}/auth/steam/return`;
     const realm = APP_URL;
@@ -47,7 +32,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.2 Возврат от Steam
+  // Возврат от Steam
   if (req.url.startsWith("/auth/steam/return")) {
     const url = new URL(req.url, APP_URL);
     const claimedId = url.searchParams.get("openid.claimed_id");
@@ -63,14 +48,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.3 Получение товаров маркетплейса
+  // Получение товаров маркетплейса
   if (req.url === "/api/market/items" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, items: serverMarketItems }));
     return;
   }
 
-  // 3.4 Добавление товара на маркет
+  // Добавление товара на маркет
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -93,7 +78,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.5 Покупка товара и создание сделки
+  // Покупка товара и создание сделки
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -131,14 +116,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.6 Получение списка сделок
+  // Получение списка сделок
   if (req.url === "/api/deals/list" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, deals: serverDeals }));
     return;
   }
 
-  // 3.7 Запрос инвентаря CS2
+  // Запрос инвентаря CS2
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -171,7 +156,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3.8 Отдача index.html
+  // Отдача index.html
   const filePath = path.join(process.cwd(), "index.html");
   fs.readFile(filePath, (err, content) => {
     if (err) {
@@ -188,7 +173,7 @@ server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-// === 4. ТЕЛЕГРАМ БОТ ===
+// === ТЕЛЕГРАМ БОТ ===
 const bot = new TelegramBot(botToken, { polling: true });
 
 bot.onText(/\/start/, async (msg) => {
@@ -198,13 +183,9 @@ bot.onText(/\/start/, async (msg) => {
 
     if (!from) return;
 
-    let user = await User.findOne({ tgId: from.id });
-
-    if (!user) {
-      user = await User.create({
-        tgId: from.id,
-        username: from.username || "",
-      });
+    // Сохраняем пользователя в память
+    if (!serverUsers.some(u => u.tgId === from.id)) {
+      serverUsers.push({ tgId: from.id, username: from.username || "" });
     }
 
     await bot.sendMessage(
