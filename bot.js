@@ -193,6 +193,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Эндпоинт для отмены / снятия лота с продажи
+  if (req.url === "/api/market/cancel" && req.method === "POST") {
+    let body = ""; req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { itemId, tgId } = JSON.parse(body);
+        const idx = serverMarketItems.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
+        if (idx !== -1) {
+          serverMarketItems.splice(idx, 1);
+          res.end(JSON.stringify({ success: true }));
+        } else {
+          res.writeHead(400); 
+          res.end(JSON.stringify({ success: false, error: "Лот не найден или не принадлежит вам" }));
+        }
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
+    });
+    return;
+  }
+
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -286,11 +305,14 @@ const server = http.createServer(async (req, res) => {
         const wdId = Date.now().toString().slice(-7);
         const usdtApprox = (Math.round(amount * 0.95) / 90).toFixed(2);
         
+        const safeUser = username && username !== 'undefined' ? `@${username}` : `ID: ${tgId}`;
+        const safeAccount = recipientAccount && recipientAccount !== 'undefined' ? recipientAccount : `ID: ${tgId}`;
+
         updateUserBalance(tgId, -amount);
         withdrawRequests[wdId] = { tgId, amount, usdtApprox };
 
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод!**\nСумма: *${amount} ₽* (~${usdtApprox} USDT)\nЮзер: @${username}\nID: \`${wdId}\``, {
+          await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод!**\nСумма: *${amount} ₽* (~${usdtApprox} USDT)\nПользователь: ${safeUser}\nCrypto Bot: \`${safeAccount}\`\nID: \`${wdId}\``, {
             parse_mode: "Markdown",
             reply_markup: { inline_keyboard: [[{ text: "✅ Выплатить", callback_data: `wd_ok_${wdId}` }, { text: "❌ Отклонить", callback_data: `wd_no_${wdId}` }]] }
           });
