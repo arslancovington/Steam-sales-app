@@ -41,7 +41,7 @@ async function createCryptoInvoice(amountUsdt, description) {
 
     const data = await response.json();
     if (data.ok && data.result) {
-      return data.result.pay_url; // Ссылка на оплату от CryptoBot
+      return data.result.pay_url;
     }
     return null;
   } catch (err) {
@@ -249,7 +249,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Выставление счета на пополнение баланса через Crypto Pay API
+  // Выставление счета на пополнение баланса (USDT через Crypto Bot или Stars)
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -259,8 +259,32 @@ const server = http.createServer(async (req, res) => {
         const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
 
         let payUrl = null;
+        let replyMarkup = undefined;
+
         if (currency === "USDT") {
           payUrl = await createCryptoInvoice(amount, `Пополнение баланса Steam Sales на ${received} ₽`);
+          if (payUrl) {
+            replyMarkup = {
+              inline_keyboard: [[{ text: "💳 Оплатить в Crypto Bot", url: payUrl }]]
+            };
+          }
+        } else if (currency.includes("Звёзды")) {
+          try {
+            const invoiceLink = await bot.createInvoiceLink(
+              "Пополнение баланса",
+              `Зачисление ${received} ₽ на ваш баланс Steam Sales`,
+              `topup_${invoiceId}`,
+              "",
+              "XTR",
+              [{ label: "Пополнение баланса", amount: parseInt(amount) }]
+            );
+
+            replyMarkup = {
+              inline_keyboard: [[{ text: `⭐ Оплатить ${amount} звёзд`, url: invoiceLink }]]
+            };
+          } catch (invErr) {
+            console.error("Ошибка создания инвойса Stars:", invErr);
+          }
         }
 
         if (tgId) {
@@ -269,14 +293,8 @@ const server = http.createServer(async (req, res) => {
             `🆔 ID платежа: *${invoiceId}*\n` +
             `💎 Получите: *${received} ₽*\n\n`;
 
-          let replyMarkup = undefined;
-          if (payUrl) {
-            messageText += `🔗 Нажмите кнопку ниже для безопасной оплаты через **Crypto Bot**:`;
-            replyMarkup = {
-              inline_keyboard: [
-                [{ text: "💳 Оплатить в Crypto Bot", url: payUrl }]
-              ]
-            };
+          if (replyMarkup) {
+            messageText += `🔗 Нажмите кнопку ниже для безопасной оплаты:`;
           } else {
             messageText += `❗ **Оплачивайте ровно ту сумму** на которую создали платеж.`;
           }
