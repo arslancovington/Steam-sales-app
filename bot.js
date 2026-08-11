@@ -9,15 +9,14 @@ import sqlite3 from "sqlite3";
 const dbFile = path.join(process.cwd(), "database.db");
 const db = new sqlite3.Database(dbFile, (err) => {
   if (err) console.error("Ошибка открытия БД:", err.message);
-  else console.log("Подключено к базе данных SQLite.");
+  else console.log("База данных подключена успешно.");
 });
 
-// Создание таблицы пользователей, если её нет
+// Создание таблицы для сохранения пользователей
 db.run(`CREATE TABLE IF NOT EXISTS users (
   tg_id TEXT PRIMARY KEY,
   tg_user TEXT,
   steam_id TEXT,
-  steam_user TEXT,
   trade_url TEXT,
   balance INTEGER DEFAULT 1500,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -66,25 +65,24 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // 1. ИСПРАВЛЕННЫЙ СТИМ ОПЕНАЙДИ ВХОД (Редирект на реальную авторизацию)
+  // 1. Исправленный редирект для авторизации через Steam OpenID
   if (req.url === "/auth/steam") {
     const returnTo = `${APP_URL}/auth/steam/return`;
     const realm = APP_URL;
     const steamOpenIdUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(returnTo)}&openid.realm=${encodeURIComponent(realm)}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select&openid.claimed_id=http://specs.openid.net/auth/2.0/identifier_select`;
-    
+
     res.writeHead(302, { Location: steamOpenIdUrl });
     res.end();
     return;
   }
 
-  // Возврат после успешного входа через Steam и сохранение в БД
+  // 2. Обработка возврата после успешного входа через Steam
   if (req.url.startsWith("/auth/steam/return")) {
     const url = new URL(req.url, APP_URL);
     const claimedId = url.searchParams.get("openid.claimed_id");
 
     if (claimedId) {
       const steamId = claimedId.split("/").pop();
-      // Перенаправляем обратно в WebApp с параметром steamId
       res.writeHead(302, { Location: `/?steamId=${steamId}` });
       res.end();
     } else {
@@ -94,20 +92,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API Сохранения пользователя и трейд-ссылки в БД
+  // 3. API для сохранения пользователя в базу данных (TG user, TG id, Steam user, Trade url)
   if (req.url === "/api/user/save" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", () => {
       try {
         const { tgId, tgUser, steamId, tradeUrl } = JSON.parse(body);
-        db.run(
-          `INSERT INTO users (tg_id, tg_user, steam_id, trade_url) VALUES (?, ?, ?, ?)
-           ON CONFLICT(tg_id) DO UPDATE SET tg_user = excluded.tg_user, steam_id = coalesce(?, steam_id), trade_url = coalesce(?, trade_url)`,
-          [tgId, tgUser, steamId, steamId, tradeUrl, tradeUrl],
-          (err) => {
-            if (err) console.error("Ошибка сохранения в БД:", err);
-          }
-        );
+        if (tgId) {
+          db.run(
+            `INSERT INTO users (tg_id, tg_user, steam_id, trade_url) VALUES (?, ?, ?, ?)
+             ON CONFLICT(tg_id) DO UPDATE SET 
+             tg_user = coalesce(?, tg_user), 
+             steam_id = coalesce(?, steam_id), 
+             trade_url = coalesce(?, trade_url)`,
+            [tgId, tgUser, steamId, tradeUrl, tgUser, steamId, tradeUrl],
+            (err) => { if (err) console.error("Ошибка сохранения в БД:", err); }
+          );
+        }
         res.end(JSON.stringify({ success: true }));
       } catch (e) {
         res.writeHead(400); res.end(JSON.stringify({ success: false }));
@@ -142,25 +143,25 @@ const server = http.createServer(async (req, res) => {
       const item = serverMarketItems.splice(idx, 1)[0];
       const dealId = Date.now().toString();
       serverDeals.push({ ...item, id: dealId, buyerTgId, status: 'sent' });
-      await bot.sendMessage(item.tgId, `🛒 У вас купили ${item.name}! Трейд-ссылка покупателя: \`${buyerTradeUrl}\``, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "📤 Я отправил скин", callback_data: `sent_${dealId}` }]] } });
+      await bot.sendMessage(item.tgId, `🛒 У вас купили ${item.name}! Ссылка: \`${buyerTradeUrl}\``, { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[{ text: "📤 Я отправил скин", callback_data: `sent_${dealId}` }]] } });
       res.end(JSON.stringify({ success: true, deal: { id: dealId } }));
     });
     return;
   }
 
-  // API Пополнение баланса
+  // API Пополнение
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       const { tgId, amount, currency } = JSON.parse(body);
       let payUrl = currency === "USDT" ? await createCryptoInvoice(amount, "Пополнение баланса") : await bot.createInvoiceLink("Пополнение", "Пополнение баланса", "topup", "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
-      await bot.sendMessage(tgId, `💡 Счет на пополнение (${currency}) выставлен на сумму ${amount} ${currency}`, { reply_markup: { inline_keyboard: [[{ text: "💳 Оплатить", url: payUrl }]] } });
+      await bot.sendMessage(tgId, `💡 Счет выставлен: ${amount} ${currency}`, { reply_markup: { inline_keyboard: [[{ text: "💳 Оплатить", url: payUrl }]] } });
       res.end(JSON.stringify({ success: true }));
     });
     return;
   }
 
-  // API Вывод средств
+  // API Вывод
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -168,7 +169,7 @@ const server = http.createServer(async (req, res) => {
       const wdId = Date.now().toString().slice(-7);
       withdrawRequests[wdId] = { tgId, amount, usdtApprox: (Math.round(amount * 0.95) / 90).toFixed(2) };
       if (ADMIN_CHAT_ID) {
-        await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод: ${amount} ₽**\n👤 @${username} (ID: \`${tgId}\`)\n🎯 Crypto Bot: \`${recipientAccount}\`\n🆔 \`${wdId}\``, {
+        await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка: ${amount} ₽**\n👤 @${username} (ID: \`${tgId}\`)\n🎯 Crypto Bot: \`${recipientAccount}\`\n🆔 \`${wdId}\``, {
           parse_mode: "Markdown",
           reply_markup: { inline_keyboard: [[{ text: "✅ Выплатить", callback_data: `wd_ok_${wdId}` }, { text: "❌ Отклонить", callback_data: `wd_no_${wdId}` }]] }
         });
@@ -178,7 +179,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Отдача index.html клиенту
+  // Отдача index.html
   const filePath = path.join(process.cwd(), "index.html");
   fs.readFile(filePath, (err, content) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -186,7 +187,7 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Обработка админских кнопок в Телеграме
+// Кнопки подтверждения вывода
 bot.on("callback_query", async (q) => {
   const parts = q.data.split("_");
   const action = parts[0];
@@ -199,14 +200,14 @@ bot.on("callback_query", async (q) => {
     if (status === 'ok') {
       const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
       if (resTr) {
-        await bot.sendMessage(reqData.tgId, `✅ **Выплата успешно подтверждена!**\n💎 Получено: *${reqData.usdtApprox} USDT*`, { parse_mode: "Markdown" });
-        await bot.editMessageText(`✅ Выплата ${wdId} успешно проведена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+        await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT`, { parse_mode: "Markdown" });
+        await bot.editMessageText(`✅ Выплата ${wdId} проведена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
       } else {
         bot.answerCallbackQuery(q.id, { text: "Ошибка перевода Crypto Bot" });
         return;
       }
     } else {
-      await bot.sendMessage(reqData.tgId, "❌ Ваш запрос на вывод средств был отклонен администратором.");
+      await bot.sendMessage(reqData.tgId, "❌ Вывод отклонен администратором.");
       await bot.editMessageText(`❌ Выплата ${wdId} отклонена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
     }
     delete withdrawRequests[wdId];
