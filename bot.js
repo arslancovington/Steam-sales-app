@@ -222,4 +222,3 @@ bot.onText(/\/start/, async (msg) => {
     console.error("Ошибка в боте:", error);
   }
 });
-          
