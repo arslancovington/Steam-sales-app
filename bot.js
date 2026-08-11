@@ -94,7 +94,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Выставление счета на пополнение баланса (как на скриншоте)
+  // Выставление счета на пополнение баланса
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -157,7 +157,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка товара и уведомления в чат продавцу
+  // Покупка товара с проверкой (нельзя купить собственный предмет)
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -170,7 +170,16 @@ const server = http.createServer(async (req, res) => {
           throw new Error("Товар уже куплен или удален");
         }
 
-        const purchasedItem = serverMarketItems.splice(itemIndex, 1)[0];
+        const purchasedItem = serverMarketItems[itemIndex];
+
+        // Строгая проверка: нельзя купить свой собственный предмет
+        if (purchasedItem.tgId && buyerTgId && String(purchasedItem.tgId) === String(buyerTgId)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Вы не можете купить собственный предмет!" }));
+          return;
+        }
+
+        serverMarketItems.splice(itemIndex, 1);
 
         const newDeal = {
           id: Date.now().toString(),
@@ -187,7 +196,6 @@ const server = http.createServer(async (req, res) => {
 
         serverDeals.unshift(newDeal);
 
-        // Уведомление продавцу в Telegram (если известен его tgId)
         if (purchasedItem.tgId) {
           await bot.sendMessage(
             purchasedItem.tgId,
@@ -195,7 +203,7 @@ const server = http.createServer(async (req, res) => {
             `🎯 Предмет: *${purchasedItem.name}*\n` +
             `💰 Стоимость: *${purchasedItem.price} ₽*\n` +
             `👤 Покупатель: *${buyerName}*\n\n` +
-            `⏳ *Статус:* Требуется передача скина в Steam. Зайдите в приложение во вкладку «Сделки».`,
+            `⏳ *Статус:* Требуется передача скина в Steam.`,
             { parse_mode: "Markdown" }
           );
         }
