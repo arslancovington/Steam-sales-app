@@ -715,7 +715,7 @@
         </div>
         <div class="balance-container">
             <div class="balance-widget">
-                <span id="user-balance">1500 ₽</span>
+                <span id="user-balance">0 ₽</span>
                 <button class="add-funds-btn" onclick="openTopUpModal()">+</button>
             </div>
         </div>
@@ -762,7 +762,7 @@
             </div>
 
             <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Для просмотра скинов необходимо войти</div>
+                <div class="empty-state">Для просмотра скинов необходимо войти через Steam</div>
             </div>
         </section>
 
@@ -798,7 +798,7 @@
                 <div class="stat-grid">
                     <div class="stat-box">
                         <div class="stat-label">Баланс</div>
-                        <div class="stat-value" id="profile-balance">1500 ₽</div>
+                        <div class="stat-value" id="profile-balance">0 ₽</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">Активных лотов</div>
@@ -890,10 +890,10 @@
             </div>
 
             <div class="price-input-container">
-                <span class="currency-symbol" id="topup-symbol">USDT</span>
-                <input type="number" id="topup-amount-input" class="topup-input" placeholder="Сумма (USDT)" style="padding-left: 55px;">
+                <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
+                <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
             </div>
-            <p class="hint-text" id="topup-hint">Сумма в рублях зачислится по актуальному курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.</p>
+            <p class="hint-text" id="topup-hint">Сумма зачислится по актуальному курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.</p>
 
             <div class="modal-buttons">
                 <button class="btn-dark-neon" onclick="closeModal('modal-topup')">Отмена</button>
@@ -904,33 +904,34 @@
 
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
-            <h3 class="neon-text">Вывод средств в USDT</h3>
-            <p class="hint-text">Вывод средств через Crypto Bot. Комиссия платформы — **5%**.</p>
+            <h3 class="neon-text">Вывод средств</h3>
+            <p class="hint-text">Вывод в USDT через Crypto Bot. Комиссия — 5%.</p>
             
             <div class="price-input-container" style="margin-top: 15px;">
                 <span class="currency-symbol">₽</span>
                 <input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях">
             </div>
 
+            <!-- Автоматический подставленный юзернейм вместо ручного ввода ID -->
             <div class="price-input-container" style="margin-top: 10px;">
                 <span class="currency-symbol" style="color: var(--neon-green);">💎</span>
-                <input type="text" id="withdraw-crypto-account-input" class="topup-input" placeholder="Ваш @username в Crypto Bot" style="padding-left: 38px; font-size: 14px;">
+                <input type="text" id="withdraw-crypto-account-input" class="topup-input" placeholder="@username" style="padding-left: 38px; font-size: 14px;" readonly>
             </div>
+            <p class="hint-text">Вывод пойдет на ваш текущий Telegram @username</p>
 
             <div class="modal-buttons">
                 <button class="btn-dark-neon" onclick="closeModal('modal-withdraw')">Отмена</button>
-                <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести в USDT</button>
+                <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
             </div>
         </div>
     </div>
 
     <script>
-        let userBalance = 1500;
+        let userBalance = 0;
         let selectedTopupType = 'crypto';
         let selectedSellPlatform = 'Our P2P';
         let currentSelectedItem = null;
         let pendingDeals = [];
-        let incomingSales = [];
         let completedDealsCount = 0;
         let notificationsList = [];
         let tradeHistory = [];
@@ -943,13 +944,17 @@
         const myTgId = tgUser?.id || 123456789;
         const myUsername = tgUser?.username || tgUser?.first_name || "Игрок";
 
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedTradeUrl = localStorage.getItem('user_trade_url');
-            if (savedTradeUrl) {
-                document.getElementById('trade-url-input').value = savedTradeUrl;
+        window.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('my-nick').innerText = myUsername;
+            
+            // Автоматически заполняем поле вывода юзернеймом пользователя
+            const withdrawInput = document.getElementById('withdraw-crypto-account-input');
+            if (withdrawInput) {
+                withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `@${myUsername}`;
             }
 
-            document.getElementById('my-nick').innerText = myUsername;
+            // Загружаем реальный баланс с сервера из базы данных
+            await syncUserProfile();
 
             let progress = 0;
             const bar = document.getElementById('splash-bar-fill');
@@ -971,6 +976,23 @@
             checkSteamAuth();
         });
 
+        async function syncUserProfile() {
+            try {
+                const response = await fetch(`/api/user/profile?tgId=${myTgId}&tgUser=${encodeURIComponent(myUsername)}`);
+                const data = await response.json();
+                if (data.success) {
+                    userBalance = data.balance;
+                    if (data.tradeUrl) {
+                        localStorage.setItem('user_trade_url', data.tradeUrl);
+                        document.getElementById('trade-url-input').value = data.tradeUrl;
+                    }
+                    updateBalanceUI();
+                }
+            } catch (err) {
+                console.error("Ошибка синхронизации профиля:", err);
+            }
+        }
+
         async function fetchMarketItems() {
             try {
                 const response = await fetch('/api/market/items');
@@ -981,7 +1003,7 @@
                     updateMyListingsFromMarket();
                 }
             } catch (err) {
-                console.error("Ошибка загрузки маркетплейса:", err);
+                console.error("Ошибка загрузки маркета:", err);
             }
         }
 
@@ -989,7 +1011,6 @@
             updateBalanceUI();
             await fetchMarketItems();
             renderTradeHistory();
-            
             setInterval(fetchMarketItems, 10000);
         }
 
@@ -1011,15 +1032,22 @@
                 const authSection = document.getElementById('auth-section');
                 if (authSection) authSection.style.display = 'none';
                 
-                // Сохраняем пользователя и SteamID в базу данных сервера
                 const tradeUrl = localStorage.getItem('user_trade_url') || "";
                 saveUserDataToServer(steamId, tradeUrl);
-
                 loadSteamInventory(steamId);
+            } else {
+                // Проверяем, есть ли сохраненный steamId в localStorage или пробуем загрузить по ранее привязанному
+                const savedSteamId = localStorage.getItem('user_steam_id');
+                if (savedSteamId) {
+                    const authSection = document.getElementById('auth-section');
+                    if (authSection) authSection.style.display = 'none';
+                    loadSteamInventory(savedSteamId);
+                }
             }
         }
 
         async function saveUserDataToServer(steamId = null, tradeUrl = null) {
+            if (steamId) localStorage.setItem('user_steam_id', steamId);
             try {
                 await fetch('/api/user/save', {
                     method: 'POST',
@@ -1032,13 +1060,13 @@
                     })
                 });
             } catch (err) {
-                console.error("Ошибка сохранения юзера в БД:", err);
+                console.error("Ошибка сохранения данных:", err);
             }
         }
 
         async function loadSteamInventory(steamId) {
             const container = document.getElementById('steam-inventory-grid');
-            if (container) container.innerHTML = '<div class="empty-state">Загрузка скинов из Steam...</div>';
+            if (container) container.innerHTML = '<div class="empty-state">Загрузка реального инвентаря из Steam...</div>';
 
             try {
                 const response = await fetch(`/api/steam/inventory`, {
@@ -1052,55 +1080,44 @@
                 if (data.success && data.items && data.items.length > 0) {
                     renderInventory(data.items, data.descriptions);
                 } else {
-                    loadDemoInventory();
+                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль Steam скрыт (проверьте настройки приватности)</div>';
                 }
             } catch (err) {
                 console.error("Ошибка загрузки инвентаря:", err);
-                loadDemoInventory();
+                container.innerHTML = '<div class="empty-state">Не удалось загрузить инвентарь Steam</div>';
             }
         }
 
-        function loadDemoInventory() {
-            const container = document.getElementById('steam-inventory-grid');
-            myInventory = [
-                { assetid: "1", name: "AWP | Asiimov (Поношенное)", icon_url: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FABt3OXNYgJF7dLoxmWBgvP9JrLWhXtu5Mx2gv2SrNzw2wK2rkdoN2qicIbCJ1M_Y1vUrFrqxu7q1sO9vMnOnXdjpGB8si_QZq8p", basePrice: 4500 },
-                { assetid: "2", name: "AK-47 | Красная линия (После полевых)", icon_url: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5lpKKqPrxN7LEmyUE6pQh3buZotms3g2x_kg5N2mlINLDd1M3Z1zRrli9we3sjJO9upvOynY3vXYmsHaOnwPv", basePrice: 1800 }
-            ];
-            renderInventory();
-        }
-
-        function renderInventory(items = null, descriptions = null) {
+        function renderInventory(items, descriptions) {
             const container = document.getElementById('steam-inventory-grid');
             if (!container) return;
             container.innerHTML = '';
 
-            if (items && descriptions) {
-                myInventory = [];
-                const descMap = {};
-                descriptions.forEach(desc => {
-                    descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
+            myInventory = [];
+            const descMap = {};
+            descriptions.forEach(desc => {
+                descMap[desc.classid + '_' + (desc.instanceid || '0')] = desc;
+            });
+
+            items.forEach(item => {
+                const key = item.classid + '_' + (item.instanceid || '0');
+                const desc = descMap[key];
+
+                if (!desc || !desc.marketable) return;
+
+                const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
+                const name = desc.market_hash_name || desc.name;
+                
+                myInventory.push({
+                    assetid: item.assetid,
+                    name: name,
+                    icon_url: iconUrl,
+                    basePrice: 2000
                 });
-
-                items.forEach(item => {
-                    const key = item.classid + '_' + (item.instanceid || '0');
-                    const desc = descMap[key];
-
-                    if (!desc || !desc.marketable) return;
-
-                    const iconUrl = `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`;
-                    const name = desc.market_hash_name || desc.name;
-                    
-                    myInventory.push({
-                        assetid: item.assetid,
-                        name: name,
-                        icon_url: iconUrl,
-                        basePrice: 2000
-                    });
-                });
-            }
+            });
 
             if (myInventory.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет предметов для отображения</div>';
+                container.innerHTML = '<div class="empty-state">Нет продаваемых предметов в инвентаре</div>';
                 return;
             }
 
@@ -1134,7 +1151,7 @@
             if (isVip) {
                 const vipCostRub = 245;
                 if (userBalance < vipCostRub) {
-                    alert(`Недостаточно средств для оплаты VIP-статуса (требуется ${vipCostRub} ₽).`);
+                    alert(`Недостаточно средств для VIP (требуется ${vipCostRub} ₽).`);
                     return;
                 }
                 userBalance -= vipCostRub;
@@ -1164,16 +1181,13 @@
                 if (data.success) {
                     myInventory = myInventory.filter(i => i.assetid !== currentSelectedItem.assetid);
                     closeModal('modal-sell');
-                    renderInventory(); 
+                    renderInventory([], []); 
                     await fetchMarketItems();
                     updateBalanceUI();
-                    addNotification(`Предмет "${currentSelectedItem.name}" успешно выставлен на продажу!`, 'deal');
-                    alert(`Предмет успешно выставлен на площадку!`);
-                } else {
-                    alert('Ошибка при публикации товара');
+                    addNotification(`Предмет "${currentSelectedItem.name}" выставлен на продажу!`, 'deal');
+                    alert(`Предмет успешно выставлен! Уведомление отправлено в Telegram.`);
                 }
             } catch (err) {
-                console.error("Ошибка сети:", err);
                 alert('Ошибка соединения с сервером');
             }
         }
@@ -1187,7 +1201,7 @@
 
             const tradeUrl = localStorage.getItem('user_trade_url');
             if (!tradeUrl) {
-                alert('Пожалуйста, укажите вашу Trade URL ссылку во вкладке «Инвентарь» перед покупкой!');
+                alert('Укажите вашу Trade URL ссылку во вкладке «Инвентарь»!');
                 switchTab('inventory', document.querySelectorAll('.nav-item')[1]);
                 return;
             }
@@ -1205,7 +1219,6 @@
                 });
 
                 const data = await response.json();
-
                 if (!data.success) {
                     alert(data.error || 'Ошибка при покупке');
                     return;
@@ -1213,15 +1226,11 @@
 
                 userBalance -= price;
                 updateBalanceUI();
-
                 pendingDeals.push(data.deal);
-                renderDeals();
-                
-                addNotification(`Сделка создана: "${name}" за ${price} ₽`, 'deal');
+                addNotification(`Куплен предмет: "${name}" за ${price} ₽`, 'deal');
                 await fetchMarketItems();
-                alert(`Сделка успешно создана! Средства зарезервированы.`);
+                alert(`Сделка успешно создана! Средства списаны.`);
             } catch (err) {
-                console.error("Ошибка покупки:", err);
                 alert('Ошибка соединения с сервером');
             }
         }
@@ -1229,18 +1238,18 @@
         function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value;
             if (!url.includes('tradeoffer/new/')) {
-                alert('Пожалуйста, введите корректную Trade URL ссылку');
+                alert('Введите корректную Trade URL ссылку');
                 return;
             }
 
             localStorage.setItem('user_trade_url', url);
             saveUserDataToServer(null, url);
-            alert('Трейд-ссылка успешно сохранена!');
+            alert('Трейд-ссылка успешно сохранена и синхронизирована с базой!');
         }
 
         function addNotification(text, type = 'info') {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            notificationsList.unshift({ id: Date.now(), text: text, time: timeStr, type: type, read: false });
+            notificationsList.unshift({ id: Date.now(), text, time: timeStr, type, read: false });
             updateBalanceUI();
             renderNotifications();
         }
@@ -1257,23 +1266,15 @@
                 container.innerHTML = '<div class="empty-state">Нет новых уведомлений</div>';
                 return;
             }
-
-            container.innerHTML = notificationsList.map(n => {
-                let colorVar = 'var(--neon-cyan)';
-                if (n.type === 'topup') colorVar = 'var(--neon-green)';
-                if (n.type === 'withdraw') colorVar = 'var(--warning-orange)';
-                if (n.type === 'deal' || n.type === 'sale') colorVar = 'var(--neon-purple)';
-
-                return `
-                    <div class="history-item" style="flex-direction: column; align-items: flex-start; gap: 4px; border-left: 3px solid ${colorVar};">
-                        <div style="display: flex; justify-content: space-between; width: 100%;">
-                            <span style="font-weight: bold; font-size: 12px; color: ${colorVar};">${n.type.toUpperCase()}</span>
-                            <span style="font-size: 10px; color: var(--text-muted);">${n.time}</span>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-main);">${n.text}</div>
+            container.innerHTML = notificationsList.map(n => `
+                <div class="history-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span style="font-weight: bold; font-size: 12px; color: var(--neon-cyan);">${n.type.toUpperCase()}</span>
+                        <span style="font-size: 10px; color: var(--text-muted);">${n.time}</span>
                     </div>
-                `;
-            }).join('');
+                    <div style="font-size: 12px; color: var(--text-main);">${n.text}</div>
+                </div>
+            `).join('');
         }
 
         function updateBalanceUI() {
@@ -1281,22 +1282,11 @@
             document.getElementById('profile-balance').innerText = userBalance + ' ₽';
             document.getElementById('profile-listings').innerText = myListings.length;
             document.getElementById('completed-deals-count').innerText = completedDealsCount;
-            
-            const navBadge = document.getElementById('nav-notif-badge');
-            const unreadCount = notificationsList.filter(n => !n.read).length || (pendingDeals.length + incomingSales.length);
-            
-            if (unreadCount > 0) {
-                navBadge.style.display = 'block';
-                navBadge.innerText = unreadCount;
-            } else {
-                navBadge.style.display = 'none';
-            }
         }
 
         function switchTab(tabId, btnElement) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + tabId).classList.add('active');
-
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             btnElement.classList.add('active-nav');
             
@@ -1305,10 +1295,6 @@
             } else if(tabId === 'profile') {
                 updateMyListingsFromMarket();
                 renderTradeHistory();
-            } else if(tabId === 'notifications') {
-                notificationsList.forEach(n => n.read = true);
-                updateBalanceUI();
-                renderNotifications();
             }
         }
 
@@ -1334,45 +1320,31 @@
 
             const container = document.getElementById('market-listings');
             let items = marketItems;
-
-            if (filter !== 'all') {
-                items = marketItems.filter(i => i.type === filter);
-            }
+            if (filter !== 'all') items = marketItems.filter(i => i.type === filter);
 
             if (items.length === 0) {
                 container.innerHTML = '<div class="empty-state">Нет лотов в данной категории</div>';
                 return;
             }
 
-            container.innerHTML = items.map(item => {
-                const platform = item.platform || 'Our P2P';
-                return `
-                    <div class="card">
-                        <div class="skin-image">
-                            ${item.image ? `<img src="${item.image}" class="skin-img">` : `<span class="skin-fallback">🎯</span>`}
-                        </div>
-                        <div class="wear">${item.wear || 'Float: 0.15'}</div>
-                        <h4>${item.name}</h4>
-                        <div class="platform-badge">🌐 ${platform}</div>
-                        <div class="seller-line" onclick="openSellerProfile('${String(item.seller).replace(/'/g, "\\'")}')">
-                            👤 ${item.seller} ⭐ ${item.rating}
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
-                            <div class="price">${item.price} ₽</div>
-                        </div>
-                        <button class="btn-green-glow" onclick="buyItem('${item._id}', ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить</button>
+            container.innerHTML = items.map(item => `
+                <div class="card">
+                    <div class="skin-image">
+                        ${item.image ? `<img src="${item.image}" class="skin-img">` : `<span class="skin-fallback">🎯</span>`}
                     </div>
-                `;
-            }).join('');
+                    <div class="wear">${item.wear || 'Float: 0.15'}</div>
+                    <h4>${item.name}</h4>
+                    <div class="platform-badge">🌐 ${item.platform || 'Our P2P'}</div>
+                    <div class="seller-line">👤 ${item.seller} ⭐ ${item.rating}</div>
+                    <div class="price" style="margin-top: 6px;">${item.price} ₽</div>
+                    <button class="btn-green-glow" onclick="buyItem('${item._id}', ${item.price}, '${String(item.name).replace(/'/g, "\\'")}')">Купить</button>
+                </div>
+            `).join('');
         }
 
         function filterMarket(type) {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            const buttons = document.querySelectorAll('.filter-btn');
-            const labels = { all: 'Все', knife: 'Ножи', rifle: 'Винтовки', gloves: 'Перчатки' };
-            buttons.forEach(btn => {
-                if (labels[type] && btn.textContent.trim() === labels[type]) btn.classList.add('active');
-            });
+            event.target.classList.add('active');
             renderMarket(type);
         }
 
@@ -1394,13 +1366,10 @@
             } else {
                 ourFields.style.display = 'none';
                 externalPriceBox.style.display = 'block';
-                
                 const base = currentSelectedItem ? (currentSelectedItem.basePrice || 2000) : 2000;
                 let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
-                let platformPrice = Math.round(base * multiplier);
-
                 document.getElementById('external-plat-title').innerText = platform;
-                document.getElementById('external-plat-price').innerText = platformPrice + ' ₽';
+                document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
                 actionBtn.innerText = `Перейти на ${platform}`;
             }
         }
@@ -1412,11 +1381,7 @@
             document.getElementById('vip-checkbox').checked = false;
             
             const imgBox = document.getElementById('sell-modal-img-box');
-            if(item.icon_url) {
-                imgBox.innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
-            } else {
-                imgBox.innerHTML = `<span class="skin-fallback">🛡️</span>`;
-            }
+            imgBox.innerHTML = item.icon_url ? `<img src="${item.icon_url}" class="skin-img">` : `<span class="skin-fallback">🛡️</span>`;
 
             selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
@@ -1428,12 +1393,10 @@
                 container.innerHTML = '<div class="empty-state">У вас нет активных лотов</div>';
                 return;
             }
-
             container.innerHTML = myListings.map(item => `
                 <div class="card">
                     ${item.isVip ? `<div class="vip-badge">VIP Лента</div>` : ``}
                     <h4>${item.name}</h4>
-                    <div style="font-size: 10px; color: var(--text-muted);">Площадка: ${item.platform}</div>
                     <div class="price" style="margin: 4px 0;">${item.price} ₽</div>
                     <button class="btn-danger" onclick="cancelListing('${item._id}')">Снять с продажи</button>
                 </div>
@@ -1442,43 +1405,15 @@
 
         function renderDeals() {
             const container = document.getElementById('deals-list');
-            if (pendingDeals.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет активных сделок</div>';
-                return;
-            }
-
-            container.innerHTML = pendingDeals.map(deal => `
-                <div class="history-item">
-                    <div>
-                        <div style="font-weight: bold; color: var(--neon-cyan);">${deal.name}</div>
-                        <div style="font-size: 11px; color: var(--warning-orange);">Ожидание отправки скина продавцом</div>
-                    </div>
-                    <div style="font-weight: bold;">${deal.price} ₽</div>
-                </div>
-            `).join('');
+            container.innerHTML = pendingDeals.length === 0 ? '<div class="empty-state">Нет активных сделок</div>' : '';
         }
 
         function renderTradeHistory() {
-            const container = document.getElementById('trade-history-list');
-            if (tradeHistory.length === 0) {
-                container.innerHTML = '<div class="empty-state">История пуста</div>';
-                return;
-            }
-
-            container.innerHTML = tradeHistory.map(deal => `
-                <div class="history-item">
-                    <div>
-                        <div style="font-weight: bold;">${deal.name}</div>
-                        <div style="font-size: 11px; color: var(--neon-green);">Успешно завершено</div>
-                    </div>
-                    <div style="font-weight: bold;">${deal.price} ₽</div>
-                </div>
-            `).join('');
+            document.getElementById('trade-history-list').innerHTML = '<div class="empty-state">История пуста</div>';
         }
 
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
-        function openSellerProfile(name) { document.getElementById('modal-seller-profile').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
         function selectTopupMethod(type) {
@@ -1492,19 +1427,21 @@
 
             if (type === 'crypto') {
                 symbol.innerText = 'USDT';
-                hint.innerText = 'Сумма в рублях зачислится по актуальному курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.';
-                input.placeholder = 'Сумма (USDT)';
-            } else if (type === 'stars') {
+                hint.innerText = 'Сумма зачислится по курсу (~90 ₽ за 1 USDT). Мин. 10 USDT.';
+                input.placeholder = '10';
+            } else {
                 symbol.innerText = '⭐';
-                hint.innerText = 'Сумма в рублях зачислится по курсу (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
-                input.placeholder = 'Сумма (Звёзды ⭐)';
+                hint.innerText = 'Сумма зачислится по курсу (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
+                input.placeholder = '100';
             }
         }
 
         async function processTopUp() {
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
-            if (isNaN(amount) || amount <= 0) {
-                alert('Введите корректную сумму.');
+            const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
+
+            if (isNaN(amount) || amount < minLimit) {
+                alert(`Минимальная сумма пополнения: ${minLimit} ${selectedTopupType === 'crypto' ? 'USDT' : 'звёзд'}`);
                 return;
             }
 
@@ -1515,12 +1452,12 @@
                 await fetch('/api/billing/invoice', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount: amount, currency: currency, received: Math.round(rublesToAdd) })
+                    body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
                 });
 
                 userBalance += Math.round(rublesToAdd);
                 updateBalanceUI();
-                addNotification(`Счет на пополнение на ${Math.round(rublesToAdd)} ₽ создан.`, 'topup');
+                addNotification(`Создан счет на пополнение ${Math.round(rublesToAdd)} ₽`, 'topup');
                 closeModal('modal-topup');
                 alert('Счет успешно выставлен! Проверьте чат с ботом в Telegram.');
             } catch (err) {
@@ -1533,7 +1470,7 @@
             const cryptoAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
 
             if (isNaN(amount) || amount < 500 || !cryptoAccount) {
-                alert('Введите корректную сумму (мин. 500 ₽) и ваш @username в Crypto Bot.');
+                alert('Минимальная сумма вывода — 500 ₽.');
                 return;
             }
             if (userBalance < amount) {
@@ -1554,15 +1491,14 @@
                 });
 
                 const data = await response.json();
-
                 if (data.success) {
                     userBalance -= amount;
                     updateBalanceUI();
-                    addNotification(`Заявка на вывод ${amount} ₽ на Crypto Bot создана.`, 'withdraw');
+                    addNotification(`Заявка на вывод ${amount} ₽ создана.`, 'withdraw');
                     closeModal('modal-withdraw');
-                    alert('Заявка на вывод в USDT успешно создана!');
+                    alert('Заявка на вывод успешно отправлена администраторам!');
                 } else {
-                    alert(data.error || 'Ошибка при выводе');
+                    alert('Ошибка при выводе');
                 }
             } catch (err) {
                 alert('Ошибка соединения с сервером');
