@@ -52,7 +52,6 @@ let serverMarketItems = [];
 let serverDeals = [];
 let withdrawRequests = {};
 
-// Создание реального инвойса в Crypto Bot с передачей данных в payload
 async function createCryptoInvoice(amountUsdt, description, tgId, received) {
   try {
     const response = await fetch("https://pay.crypt.bot/api/createInvoice", {
@@ -88,7 +87,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // 1. ВЕБХУК ДЛЯ CRYPTO BOT (Реальное подтверждение оплаты USDT)
+  // Вебхук Crypto Bot
   if (req.url === "/api/crypto-webhook" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -101,19 +100,15 @@ const server = http.createServer(async (req, res) => {
             const data = JSON.parse(inv.payload);
             if (data.tgId && data.received) {
               updateUserBalance(data.tgId, data.received);
-              await bot.sendMessage(data.tgId, `🎉 **Оплата получена!**\n\nНа ваш баланс успешно зачислено *${data.received} ₽*.`, { parse_mode: "Markdown" });
+              await bot.sendMessage(data.tgId, `🎉 **Оплата получена!**\n\nНа ваш баланс зачислено *${data.received} ₽*.`, { parse_mode: "Markdown" });
               if (ADMIN_CHAT_ID) {
-                await bot.sendMessage(ADMIN_CHAT_ID, `💎 **Успешное пополнение через Crypto Bot!**\n\nПользователь ID: \`${data.tgId}\`\nЗачислено: *${data.received} ₽*`);
+                await bot.sendMessage(ADMIN_CHAT_ID, `💎 **Успешное пополнение через Crypto Bot!**\n\nПользователь ID: \`${data.tgId}\`\nЗачислено: *${data.received} ₽*`, { parse_mode: "Markdown" });
               }
             }
           }
         }
-        res.writeHead(200);
-        res.end("OK");
-      } catch (e) {
-        res.writeHead(500);
-        res.end();
-      }
+        res.writeHead(200); res.end("OK");
+      } catch (e) { res.writeHead(500); res.end(); }
     });
     return;
   }
@@ -142,7 +137,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Получение профиля пользователя
+  // Профиль пользователя
   if (req.url.startsWith("/api/user/profile")) {
     const url = new URL(req.url, APP_URL);
     const tgId = url.searchParams.get("tgId");
@@ -153,7 +148,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Сохранение данных пользователя
+  // Сохранение юзера
   if (req.url === "/api/user/save" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", () => {
@@ -169,9 +164,7 @@ const server = http.createServer(async (req, res) => {
           saveUsers(users);
         }
         res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        res.writeHead(400); res.end(JSON.stringify({ success: false }));
-      }
+      } catch (e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
     });
     return;
   }
@@ -188,13 +181,8 @@ const server = http.createServer(async (req, res) => {
         const item = JSON.parse(body);
         item._id = Date.now().toString();
         serverMarketItems.unshift(item);
-
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(
-            ADMIN_CHAT_ID,
-            `🏷 **Новый лот на маркете!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец: *${item.seller}* (ID: \`${item.tgId}\`)`,
-            { parse_mode: "Markdown" }
-          );
+          await bot.sendMessage(ADMIN_CHAT_ID, `🏷 **Новый лот на маркете!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец: *${item.seller}*`, { parse_mode: "Markdown" });
         }
         res.end(JSON.stringify({ success: true }));
       } catch(e) { res.writeHead(400); res.end(); }
@@ -223,18 +211,16 @@ const server = http.createServer(async (req, res) => {
             reply_markup: { inline_keyboard: [[{ text: "📤 Я отправил скин", callback_data: `sent_${dealId}` }]] }
           });
         }
-
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(ADMIN_CHAT_ID, `🛍 **Совершена сделка!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец ID: \`${item.tgId}\`\nПокупатель: *${buyerName}* (ID: \`${buyerTgId}\`)`, { parse_mode: "Markdown" });
+          await bot.sendMessage(ADMIN_CHAT_ID, `🛍 **Совершена сделка!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПокупатель: *${buyerName}*`, { parse_mode: "Markdown" });
         }
-
         res.end(JSON.stringify({ success: true, deal: { id: dealId } }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: e.message })); }
     });
     return;
   }
 
-  // Выставление счета на пополнение (Реальный режим: баланс НЕ начисляется сразу)
+  // Пополнение
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -245,37 +231,23 @@ const server = http.createServer(async (req, res) => {
 
         if (currency === "USDT") {
           payUrl = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
-          if (payUrl) {
-            replyMarkup = { inline_keyboard: [[{ text: "💳 Оплатить в Crypto Bot", url: payUrl }]] };
-          }
+          if (payUrl) replyMarkup = { inline_keyboard: [[{ text: "💳 Оплатить в Crypto Bot", url: payUrl }]] };
         } else {
-          const invoiceLink = await bot.createInvoiceLink(
-            "Пополнение баланса",
-            `Зачисление ${received} ₽ на ваш баланс Steam Sales`,
-            `topup_${tgId}_${received}`,
-            "",
-            "XTR",
-            [{ label: "Пополнение баланса", amount: parseInt(amount) }]
-          );
+          const invoiceLink = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
           replyMarkup = { inline_keyboard: [[{ text: `⭐ Оплатить ${amount} звёзд`, url: invoiceLink }]] };
         }
 
-        await bot.sendMessage(tgId, `💡 **Счет на пополнение создан!**\n\nСумма: *${amount} ${currency}*\nК зачислению: *${received} ₽*\n\nБаланс пополнится автоматически сразу после успешной оплаты.`, {
-          parse_mode: "Markdown",
-          reply_markup: replyMarkup
-        });
-
+        await bot.sendMessage(tgId, `💡 **Счет на пополнение создан!**\n\nСумма: *${amount} ${currency}*\nК зачислению: *${received} ₽*`, { parse_mode: "Markdown", reply_markup });
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(ADMIN_CHAT_ID, `💳 **Создан запрос на пополнение!**\n\nПользователь ID: \`${tgId}\`\nСумма: *${amount} ${currency}* (~${received} ₽)`, { parse_mode: "Markdown" });
+          await bot.sendMessage(ADMIN_CHAT_ID, `💳 **Запрос на пополнение!**\nID: \`${tgId}\`\nСумма: *${amount} ${currency}*`, { parse_mode: "Markdown" });
         }
-
         res.end(JSON.stringify({ success: true }));
       } catch(e) { res.writeHead(500); res.end(); }
     });
     return;
   }
 
-  // Запрос на вывод
+  // Вывод
   if (req.url === "/api/billing/withdraw" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -288,32 +260,18 @@ const server = http.createServer(async (req, res) => {
         withdrawRequests[wdId] = { tgId, amount, usdtApprox };
 
         if (ADMIN_CHAT_ID) {
-          await bot.sendMessage(
-            ADMIN_CHAT_ID, 
-            `📤 **Новая заявка на вывод!**\n\nСумма: *${amount} ₽* (~${usdtApprox} USDT)\nПользователь: @${username} (ID: \`${tgId}\`)\nCrypto Bot: \`${recipientAccount}\`\nID заявки: \`${wdId}\``, 
-            {
-              parse_mode: "Markdown",
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: "✅ Выплатить", callback_data: `wd_ok_${wdId}` },
-                    { text: "❌ Отклонить", callback_data: `wd_no_${wdId}` }
-                  ]
-                ]
-              }
-            }
-          );
+          await bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод!**\nСумма: *${amount} ₽* (~${usdtApprox} USDT)\nЮзер: @${username}\nID: \`${wdId}\``, {
+            parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [[{ text: "✅ Выплатить", callback_data: `wd_ok_${wdId}` }, { text: "❌ Отклонить", callback_data: `wd_no_${wdId}` }]] }
+          });
         }
         res.end(JSON.stringify({ success: true }));
-      } catch (err) {
-        res.writeHead(500);
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
+      } catch (err) { res.writeHead(500); res.end(); }
     });
     return;
   }
 
-  // Инвентарь Steam
+  // Загрузка инвентаря Steam + Парсинг аватарки и никнейма через открытый XML профиль
   if (req.url === "/api/steam/inventory" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -322,13 +280,27 @@ const server = http.createServer(async (req, res) => {
         if (!steamId) throw new Error("Нет SteamID");
 
         const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`);
-        if (!response.ok) throw new Error("Профиль Steam закрыт или инвентарь скрыт");
-
+        if (!response.ok) throw new Error("Профиль Steam скрыт");
         const steamData = await response.json();
+
+        // Получаем аватарку и ник из Steam XML профиля
+        let avatarUrl = "";
+        let steamName = "";
+        try {
+          const xmlRes = await fetch(`https://steamcommunity.com/profiles/${steamId}?xml=1`);
+          const xmlText = await xmlRes.text();
+          const avMatch = xmlText.match(/<avatarMedium>([\s\S]*?)<\/avatarMedium>/);
+          if (avMatch) avatarUrl = avMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim();
+          const nameMatch = xmlText.match(/<steamID>([\s\S]*?)<\/steamID>/);
+          if (nameMatch) steamName = nameMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim();
+        } catch(e) {}
+
         res.end(JSON.stringify({
           success: true,
           items: steamData.assets || [],
-          descriptions: steamData.descriptions || []
+          descriptions: steamData.descriptions || [],
+          avatarUrl,
+          steamName
         }));
       } catch (error) {
         res.end(JSON.stringify({ success: false, error: error.message }));
@@ -344,67 +316,46 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Слушатели для Telegram Stars (Реальное подтверждение оплаты Звёздами)
-bot.on("pre_checkout_query", async (query) => {
-  await bot.answerPreCheckoutQuery(query.id, true);
-});
-
+bot.on("pre_checkout_query", async (query) => { await bot.answerPreCheckoutQuery(query.id, true); });
 bot.on("successful_payment", async (msg) => {
   const payment = msg.successful_payment;
-  const payload = payment.invoice_payload; // "topup_tgId_received"
+  const payload = payment.invoice_payload;
   const chatId = msg.chat.id;
-
   if (payload && payload.startsWith("topup_")) {
     const parts = payload.split("_");
     const tgId = parts[1];
     const received = parseInt(parts[2]);
-
     updateUserBalance(tgId, received);
-
-    await bot.sendMessage(chatId, `🎉 **Оплата через Telegram Stars подтверждена!**\n\nНа ваш баланс зачислено *${received} ₽*.`, { parse_mode: "Markdown" });
-    if (ADMIN_CHAT_ID) {
-      await bot.sendMessage(ADMIN_CHAT_ID, `⭐ **Успешное пополнение через Telegram Stars!**\n\nПользователь ID: \`${tgId}\`\nЗачислено: *${received} ₽*`, { parse_mode: "Markdown" });
-    }
+    await bot.sendMessage(chatId, `🎉 **Оплата через Telegram Stars подтверждена!**\nЗачислено *${received} ₽*.`, { parse_mode: "Markdown" });
   }
 });
 
-// Обработка кнопок администратора для вывода
 bot.on("callback_query", async (q) => {
   const data = q.data;
-  if (!data.startsWith("wd_")) {
-    bot.answerCallbackQuery(q.id);
-    return;
-  }
-
+  if (!data.startsWith("wd_")) { bot.answerCallbackQuery(q.id); return; }
   const parts = data.split("_");
   const status = parts[1];
   const wdId = parts[2];
   const reqData = withdrawRequests[wdId];
 
-  if (!reqData) {
-    await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true });
-    return;
-  }
+  if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
 
   if (status === 'ok') {
     const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
     if (resTr) {
-      await bot.sendMessage(reqData.tgId, `✅ **Выплата успешно подтверждена!**\n\nСумма: *${reqData.usdtApprox} USDT* зачислена на ваш аккаунт.`);
-      await bot.editMessageText(`✅ Заявка №${wdId} успешно выплачена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
+      await bot.editMessageText(`✅ Заявка №${wdId} выплачена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
     } else {
-      await bot.sendMessage(reqData.tgId, `✅ Ваш вывод на *${reqData.usdtApprox} USDT* подтвержден администратором.`, { parse_mode: "Markdown" });
-      await bot.editMessageText(`✅ Заявка №${wdId} закрыта (выплачено вручную).`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      await bot.sendMessage(reqData.tgId, `✅ Вывод на *${reqData.usdtApprox} USDT* подтвержден.`, { parse_mode: "Markdown" });
+      await bot.editMessageText(`✅ Заявка №${wdId} закрыта (вручную).`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
     }
   } else {
     updateUserBalance(reqData.tgId, reqData.amount);
-    await bot.sendMessage(reqData.tgId, "❌ Ваш запрос на вывод средств был отклонен администратором. Средства возвращены на баланс.");
+    await bot.sendMessage(reqData.tgId, "❌ Вывод отклонен, средства возвращены на баланс.");
     await bot.editMessageText(`❌ Заявка №${wdId} отклонена.`, { chat_id: q.message.chat.id, message_id: q.message.message_id });
   }
-
   delete withdrawRequests[wdId];
   bot.answerCallbackQuery(q.id);
 });
 
-server.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
+server.listen(PORT, () => { console.log(`Server started on port ${PORT}`); });
