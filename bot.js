@@ -13,8 +13,10 @@ if (!botToken) {
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-// Хранилища в памяти сервера (работают быстро и без ошибок с БД)
-let serverUsers = [];
+// Инициализация Telegram бота
+const bot = new TelegramBot(botToken, { polling: true });
+
+// Хранилища в памяти сервера
 let serverMarketItems = [];
 let serverDeals = [];
 
@@ -55,7 +57,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Добавление товара на маркет
+  // Добавление товара на маркет + уведомление в чат бота
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -68,6 +70,20 @@ const server = http.createServer(async (req, res) => {
           createdAt: new Date()
         };
         serverMarketItems.unshift(newItem);
+
+        // Отправка уведомления продавцу в Telegram
+        if (itemData.tgId) {
+          await bot.sendMessage(
+            itemData.tgId,
+            `✅ **Предмет успешно выставлен на продажу!**\n\n` +
+            `🎯 Предмет: *${newItem.name}*\n` +
+            `💰 Стоимость: *${newItem.price} ₽*\n` +
+            `⏳ Статус: Активен на маркетплейсе\n\n` +
+            `⚠️ *Не удаляйте предмет из инвентаря Steam*, пока он выставлен на продажу.`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, item: newItem }));
       } catch (err) {
@@ -78,13 +94,76 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка товара и создание сделки
+  // Выставление счета на пополнение баланса (как на скриншоте)
+  if (req.url === "/api/billing/invoice" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { tgId, amount, currency, received } = JSON.parse(body);
+        const invoiceId = Math.floor(1000000 + Math.random() * 9000000);
+
+        if (tgId) {
+          await bot.sendMessage(
+            tgId,
+            `💡 **Счет на оплату ${currency} выставлен** 💡\n\n` +
+            `💳 Сумма к оплате: *${amount} ${currency}*\n` +
+            `🆔 ID платежа: *${invoiceId}*\n` +
+            `💎 Получите: *${received} ₽*\n\n` +
+            `❗ **Оплачивайте ровно ту сумму** на которую создали платеж и только на те реквизиты, которые получили. Оплата на другие реквизиты или неверная сумма вызовет потерю платежа.\n\n` +
+            `⏳ Среднее время зачисления депозита — **до 30 минут** после оплаты.`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, invoiceId }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Запрос на вывод средств
+  if (req.url === "/api/billing/withdraw" && req.method === "POST") {
+    let body = "";
+    req.on("data", chunk => body += chunk);
+    req.on("end", async () => {
+      try {
+        const { tgId, amount, recipientId } = JSON.parse(body);
+        const withdrawId = Math.floor(1000000 + Math.random() * 9000000);
+
+        if (tgId) {
+          await bot.sendMessage(
+            tgId,
+            `📤 **Заявка на вывод средств создана**\n\n` +
+            `🆔 ID заявки: *${withdrawId}*\n` +
+            `💵 Сумма: *${amount} ₽*\n` +
+            `👤 Получатель (TG ID): *${recipientId}*\n` +
+            `⏳ Статус: *В обработке администратором*`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, withdrawId }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Покупка товара и уведомления в чат продавцу
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { itemId, buyerName } = JSON.parse(body);
+        const { itemId, buyerName, buyerTgId } = JSON.parse(body);
         const itemIndex = serverMarketItems.findIndex(i => i._id === itemId);
         
         if (itemIndex === -1) {
@@ -98,13 +177,28 @@ const server = http.createServer(async (req, res) => {
           name: purchasedItem.name,
           price: purchasedItem.price,
           seller: purchasedItem.seller,
+          sellerTgId: purchasedItem.tgId,
           buyer: buyerName || "Покупатель",
+          buyerTgId: buyerTgId,
           status: "waiting_transfer",
           image: purchasedItem.image,
           createdAt: new Date()
         };
 
         serverDeals.unshift(newDeal);
+
+        // Уведомление продавцу в Telegram (если известен его tgId)
+        if (purchasedItem.tgId) {
+          await bot.sendMessage(
+            purchasedItem.tgId,
+            `🛒 **У вас купили предмет!**\n\n` +
+            `🎯 Предмет: *${purchasedItem.name}*\n` +
+            `💰 Стоимость: *${purchasedItem.price} ₽*\n` +
+            `👤 Покупатель: *${buyerName}*\n\n` +
+            `⏳ *Статус:* Требуется передача скина в Steam. Зайдите в приложение во вкладку «Сделки».`,
+            { parse_mode: "Markdown" }
+          );
+        }
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, deal: newDeal }));
@@ -113,13 +207,6 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ success: false, error: err.message }));
       }
     });
-    return;
-  }
-
-  // Получение списка сделок
-  if (req.url === "/api/deals/list" && req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ success: true, deals: serverDeals }));
     return;
   }
 
@@ -174,8 +261,6 @@ server.listen(PORT, () => {
 });
 
 // === ТЕЛЕГРАМ БОТ ===
-const bot = new TelegramBot(botToken, { polling: true });
-
 bot.onText(/\/start/, async (msg) => {
   try {
     const chatId = msg.chat.id;
@@ -183,14 +268,9 @@ bot.onText(/\/start/, async (msg) => {
 
     if (!from) return;
 
-    // Сохраняем пользователя в память
-    if (!serverUsers.some(u => u.tgId === from.id)) {
-      serverUsers.push({ tgId: from.id, username: from.username || "" });
-    }
-
     await bot.sendMessage(
       chatId,
-      `Привет, ${from.first_name}! 🎮\n\nДобро пожаловать в P2P маркетплейс скинов CS2. Нажми кнопку ниже, чтобы открыть маркет.`,
+      `Привет, ${from.first_name}! 🎮\n\nДобро пожаловать в P2P маркетплейс скинов CS2. Все уведомления о сделках, выставлении счетов и пополнении баланса будут приходить сюда.`,
       {
         reply_markup: {
           inline_keyboard: [
