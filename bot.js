@@ -134,6 +134,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Получение реальной цены скина из Steam Market API
+  if (req.url.startsWith("/api/steam/price")) {
+    const urlObj = new URL(req.url, APP_URL);
+    const skinName = urlObj.searchParams.get("name");
+    let realPrice = 1500; // запасной вариант
+    try {
+      if (skinName) {
+        const pRes = await fetch(`https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(skinName)}`, { headers: steamHeaders });
+        const pData = await pRes.json();
+        if (pData && pData.success && (pData.lowest_price || pData.median_price)) {
+          const rawPrice = pData.lowest_price || pData.median_price;
+          const parsed = parseFloat(rawPrice.replace(/[^\d,.]/g, '').replace(',', '.'));
+          if (!isNaN(parsed)) realPrice = parsed;
+        }
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, price: realPrice }));
+    } catch (e) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, price: 1500 }));
+    }
+    return;
+  }
+
   if (req.url.startsWith("/api/user/profile")) {
     const url = new URL(req.url, APP_URL);
     const tgId = url.searchParams.get("tgId");
@@ -193,7 +217,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Эндпоинт для отмены / снятия лота с продажи
   if (req.url === "/api/market/cancel" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -205,7 +228,7 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ success: true }));
         } else {
           res.writeHead(400); 
-          res.end(JSON.stringify({ success: false, error: "Лот не найден или не принадлежит вам" }));
+          res.end(JSON.stringify({ success: false, error: "Лот не найден" }));
         }
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
     });
