@@ -134,11 +134,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Получение реальной цены скина из Steam Market API
   if (req.url.startsWith("/api/steam/price")) {
     const urlObj = new URL(req.url, APP_URL);
     const skinName = urlObj.searchParams.get("name");
-    let realPrice = 1500; // запасной вариант
+    let realPrice = 1500;
     try {
       if (skinName) {
         const pRes = await fetch(`https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(skinName)}`, { headers: steamHeaders });
@@ -204,15 +203,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Защита от дубликатов и отправка уведомлений
   if (req.url === "/api/market/add" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const item = JSON.parse(body);
+        
+        // Проверяем, не выставлен ли уже этот же скин по assetid
+        if (item.assetid && serverMarketItems.some(i => i.assetid === item.assetid && String(i.tgId) === String(item.tgId))) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ success: false, error: "Этот предмет уже выставлен на продажу!" }));
+          return;
+        }
+
         item._id = Date.now().toString();
         serverMarketItems.unshift(item);
+
+        // Уведомление в админ-чат
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(
+            ADMIN_CHAT_ID,
+            `🏷 **Новый лот на маркете!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец: *${item.seller}* (ID: \`${item.tgId}\`)`,
+            { parse_mode: "Markdown" }
+          );
+        }
+
         res.end(JSON.stringify({ success: true }));
-      } catch(e) { res.writeHead(400); res.end(); }
+      } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false })); }
     });
     return;
   }
@@ -239,7 +257,7 @@ const server = http.createServer(async (req, res) => {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
-        const { itemId, buyerTgId, buyerTradeUrl } = JSON.parse(body);
+        const { itemId, buyerTgId, buyerTradeUrl, buyerName } = JSON.parse(body);
         const idx = serverMarketItems.findIndex(i => i._id === itemId);
         if (idx === -1) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: "Товар уже куплен" })); return; }
         
@@ -255,9 +273,16 @@ const server = http.createServer(async (req, res) => {
         const dealId = Date.now().toString();
         serverDeals.push({ ...item, id: dealId, buyerTgId, status: 'sent' });
 
+        // Уведомление продавцу в Telegram
         if (item.tgId) {
-          await bot.sendMessage(item.tgId, `🛒 **У вас купили предмет!**\nПредмет: *${item.name}* за *${item.price} ₽*\nСсылка: \`${buyerTradeUrl}\``, { parse_mode: "Markdown" });
+          await bot.sendMessage(item.tgId, `🛒 **У вас купили предмет!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nСсылка покупателя: \`${buyerTradeUrl}\``, { parse_mode: "Markdown" });
         }
+
+        // Уведомление в админ-чат
+        if (ADMIN_CHAT_ID) {
+          await bot.sendMessage(ADMIN_CHAT_ID, `🛍 **Совершена сделка!**\n\nПредмет: *${item.name}*\nЦена: *${item.price} ₽*\nПродавец ID: \`${item.tgId}\`\nПокупатель: *${buyerName}* (ID: \`${buyerTgId}\`)`, { parse_mode: "Markdown" });
+        }
+
         res.end(JSON.stringify({ success: true, deal: { id: dealId } }));
       } catch(e) { res.writeHead(400); res.end(JSON.stringify({ success: false, error: e.message })); }
     });
