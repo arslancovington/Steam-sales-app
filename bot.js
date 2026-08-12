@@ -128,6 +128,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
+  // Вебхук от Crypto Bot при успешной оплате счета -> отправка чека в личные сообщения с ботом
   if (req.url === "/api/crypto-webhook" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -140,7 +141,15 @@ const server = http.createServer(async (req, res) => {
             const data = JSON.parse(inv.payload);
             if (data.tgId && data.received) {
               updateUserBalance(data.tgId, data.received);
-              await bot.sendMessage(data.tgId, `🎉 **Оплата получена!**\nНа баланс зачислено *${data.received} ₽*.`, { parse_mode: "Markdown" });
+              // Чек об оплате от нашего бота в лс
+              await bot.sendMessage(
+                data.tgId, 
+                `🧾 **Чек об успешной оплате**\n\n` +
+                `✅ Баланс успешно пополнен!\n` +
+                `💎 Зачислено: *${data.received} ₽*\n` +
+                `📦 Статус: Выполнено`, 
+                { parse_mode: "Markdown" }
+              );
             }
           }
         }
@@ -397,25 +406,41 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Создание счета и отправка счет-сообщения НАПРЯМУЮ от нашего бота в ЛС
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { tgId, amount, currency, received } = JSON.parse(body);
-        let payUrl = null;
         if (currency === "USDT") {
           const invRes = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
           if (invRes.success) {
-            payUrl = invRes.payUrl;
+            // Отправляем счет на оплату в личные сообщения с нашим ботом
+            await bot.sendMessage(
+              tgId, 
+              `💡 **Счет на оплату USDT выставлен**\n\n` +
+              `💳 Сумма к оплате: *${amount} USDT*\n` +
+              `💎 Получите: *${received} ₽*\n\n` +
+              `Нажмите кнопку ниже для безопасной оплаты:`, 
+              {
+                parse_mode: "Markdown",
+                reply_markup: {
+                  inline_keyboard: [[{ text: "💳 Оплатить в Crypto Bot", url: invRes.payUrl }]]
+                }
+              }
+            ).catch(e => console.error("Error sending invoice to DM:", e));
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
           } else {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ success: false, error: invRes.error }));
-            return;
           }
         } else {
-          payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
+          const payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, payUrl }));
         }
-        res.end(JSON.stringify({ success: true, payUrl }));
       } catch(e) { 
         res.writeHead(500, { "Content-Type": "application/json" }); 
         res.end(JSON.stringify({ success: false, error: e.message })); 
@@ -552,7 +577,6 @@ bot.on("callback_query", async (q) => {
     if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
 
     if (status === 'ok') {
-      // Исправлено название функции на правильное: transferCryptoToUser
       const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
       if (resTr) {
         await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
