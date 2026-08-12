@@ -78,9 +78,71 @@
         .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
+
+        /* Ретро стили загрузки в стиле CS 1.6 (активен по умолчанию с первой секунды) */
+        .cs16-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
+            display: none; align-items: center; justify-content: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .cs16-modal.active { display: flex; }
+        .cs16-dialog {
+            background: #2b332e;
+            border: 2px solid #5a6b60;
+            border-top-color: #7c9484;
+            border-left-color: #7c9484;
+            box-shadow: 6px 6px 15px rgba(0,0,0,0.9);
+            width: 320px;
+            padding: 3px;
+            color: #d0ded4;
+        }
+        .cs16-title {
+            background: #19201c;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 12px;
+            border-bottom: 1px solid #3e4a42;
+            color: #ffffff;
+        }
+        .cs16-body {
+            padding: 12px;
+            font-size: 11px;
+        }
+        .cs16-progress-container {
+            background: #111513;
+            border: 1px solid #455249;
+            border-bottom-color: #7c9484;
+            border-right-color: #7c9484;
+            height: 16px;
+            margin: 6px 0 12px 0;
+            padding: 1px;
+        }
+        .cs16-progress-bar {
+            background: linear-gradient(90deg, #2e7d32, #4caf50);
+            height: 100%;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Ретро модальное окно загрузки в стиле CS 1.6 (включено с первых миллисекунд) -->
+    <div class="cs16-modal active" id="cs16-loading-modal">
+        <div class="cs16-dialog">
+            <div class="cs16-title">Загрузка приложения...</div>
+            <div class="cs16-body">
+                <p id="cs16-status-text">Connecting to P2P Server...</p>
+                <div class="cs16-progress-container">
+                    <div class="cs16-progress-bar" id="cs16-bar-1" style="width: 75%;"></div>
+                </div>
+                <p id="cs16-sub-text">Loading Marketplace & User Profile...</p>
+                <div class="cs16-progress-container">
+                    <div class="cs16-progress-bar" id="cs16-bar-2" style="width: 90%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <header class="top-bar">
         <div class="bot-profile">
@@ -112,7 +174,7 @@
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
             </div>
             <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Войдите через Steam для просмотра инвентаря</div>
+                <div class="empty-state">Войдите через Steam или укажите Trade URL для просмотра инвентаря</div>
             </div>
         </section>
 
@@ -236,27 +298,49 @@
         const myTgId = tgUser?.id || 123456789;
         const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
 
+        // Запуск при открытии приложения: загрузка профиля и рынка, инвентарь грузится в фоне без блокировок
         window.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('my-nick').innerText = myUsername;
-            
-            const withdrawInput = document.getElementById('withdraw-crypto-account-input');
-            if (withdrawInput) {
-                withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
+            const safetyTimeout = setTimeout(() => {
+                hideCs16Loading();
+            }, 6000);
+
+            try {
+                document.getElementById('my-nick').innerText = myUsername;
+                
+                const withdrawInput = document.getElementById('withdraw-crypto-account-input');
+                if (withdrawInput) {
+                    withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
+
+                await Promise.all([
+                    syncUserProfile(),
+                    fetchMarketItems()
+                ]);
+
+                if (steamId) {
+                    localStorage.setItem('user_steam_id', steamId);
+                    const authSection = document.getElementById('auth-section');
+                    if (authSection) authSection.style.display = 'none';
+                    loadSteamData(steamId).catch(e => console.error("Background steam load error:", e));
+                }
+            } catch (err) {
+                console.error("Init error:", err);
+            } finally {
+                clearTimeout(safetyTimeout);
+                hideCs16Loading();
             }
-
-            const urlParams = new URLSearchParams(window.location.search);
-            let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
-
-            if (steamId) {
-                localStorage.setItem('user_steam_id', steamId);
-                const authSection = document.getElementById('auth-section');
-                if (authSection) authSection.style.display = 'none';
-                await loadSteamData(steamId);
-            }
-
-            await syncUserProfile();
-            await fetchMarketItems();
         });
+
+        function hideCs16Loading() {
+            document.getElementById('cs16-bar-1').style.width = '100%';
+            document.getElementById('cs16-bar-2').style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('cs16-loading-modal').classList.remove('active');
+            }, 200);
+        }
 
         async function syncUserProfile() {
             try {
@@ -279,10 +363,42 @@
 
         function loginWithSteam() { window.location.href = `/auth/steam`; }
 
+        function saveTradeUrl() {
+            const url = document.getElementById('trade-url-input').value.trim();
+            localStorage.setItem('user_trade_url', url);
+
+            let steamId = null;
+
+            const profileMatch = url.match(/\/profiles\/(\d{17})/);
+            if (profileMatch && profileMatch[1]) {
+                steamId = profileMatch[1];
+            } else {
+                const partnerMatch = url.match(/partner=(\d+)/);
+                if (partnerMatch && partnerMatch[1]) {
+                    const partnerId = partnerMatch[1];
+                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
+                }
+            }
+
+            if (steamId) {
+                localStorage.setItem('user_steam_id', steamId);
+                const authSection = document.getElementById('auth-section');
+                if (authSection) authSection.style.display = 'none';
+                loadSteamData(steamId);
+            } else {
+                alert('Не удалось распознать SteamID из ссылки. Проверьте правильность введенного Trade URL.');
+            }
+
+            fetch('/api/user/save', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId })
+            });
+        }
+
+        // Загрузка инвентаря в фоне (без модальных окон и прерываний)
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
-            container.innerHTML = '<div class="empty-state">Загрузка инвентаря и профиля Steam...</div>';
-
             try {
                 const response = await fetch('/api/steam/inventory', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -524,16 +640,6 @@
                     <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять с продажи</button>
                 </div>
             `).join('');
-        }
-
-        function saveTradeUrl() {
-            const url = document.getElementById('trade-url-input').value;
-            localStorage.setItem('user_trade_url', url);
-            fetch('/api/user/save', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tgId: myTgId, tradeUrl: url })
-            });
-            alert('Трейд-ссылка сохранена!');
         }
 
         function selectTopupMethod(type) {
