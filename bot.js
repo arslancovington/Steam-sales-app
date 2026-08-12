@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 
 const dbFile = path.join(process.cwd(), "users.json");
+const marketFile = path.join(process.cwd(), "market.json");
 
 function loadUsers() {
   if (!fs.existsSync(dbFile)) return {};
@@ -14,6 +15,16 @@ function loadUsers() {
 
 function saveUsers(data) {
   fs.writeFileSync(dbFile, JSON.stringify(data, null, 2), "utf8");
+}
+
+function loadMarket() {
+  if (!fs.existsSync(marketFile)) return [];
+  try { return JSON.parse(fs.readFileSync(marketFile, "utf8")); }
+  catch (e) { return []; }
+}
+
+function saveMarket(items) {
+  fs.writeFileSync(marketFile, JSON.stringify(items, null, 2), "utf8");
 }
 
 function getUser(tgId, tgUser = "Игрок") {
@@ -47,7 +58,6 @@ const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com"
 const PORT = process.env.PORT || 3000;
 
 const bot = new TelegramBot(botToken, { polling: true });
-let serverMarketItems = [];
 let serverDeals = {};
 let withdrawRequests = {};
 
@@ -206,7 +216,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url === "/api/market/items" && req.method === "GET") {
-    res.end(JSON.stringify({ success: true, items: serverMarketItems }));
+    res.end(JSON.stringify({ success: true, items: loadMarket() }));
     return;
   }
 
@@ -215,17 +225,18 @@ const server = http.createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const item = JSON.parse(body);
+        let items = loadMarket();
         
-        if (item.assetid && serverMarketItems.some(i => i.assetid === item.assetid && String(i.tgId) === String(item.tgId))) {
+        if (item.assetid && items.some(i => i.assetid === item.assetid && String(i.tgId) === String(item.tgId))) {
           res.writeHead(400);
           res.end(JSON.stringify({ success: false, error: "Этот предмет уже выставлен на продажу!" }));
           return;
         }
 
         item._id = Date.now().toString();
-        serverMarketItems.unshift(item);
+        items.unshift(item);
+        saveMarket(items);
 
-        // Уведомление продавцу о выставлении лота
         if (item.tgId) {
           await bot.sendMessage(
             item.tgId,
@@ -253,9 +264,11 @@ const server = http.createServer(async (req, res) => {
     req.on("end", async () => {
       try {
         const { itemId, tgId } = JSON.parse(body);
-        const idx = serverMarketItems.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
+        let items = loadMarket();
+        const idx = items.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
         if (idx !== -1) {
-          serverMarketItems.splice(idx, 1);
+          items.splice(idx, 1);
+          saveMarket(items);
           res.end(JSON.stringify({ success: true }));
         } else {
           res.writeHead(400); 
@@ -266,33 +279,33 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Покупка предмета и отправка уведомлений продавцу и покупателю
   if (req.url === "/api/deals/buy" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { itemId, buyerTgId, buyerTradeUrl, buyerName } = JSON.parse(body);
-        const idx = serverMarketItems.findIndex(i => i._id === itemId);
+        let items = loadMarket();
+        const idx = items.findIndex(i => i._id === itemId);
         if (idx === -1) { 
           res.writeHead(400); 
           res.end(JSON.stringify({ success: false, error: "Товар уже куплен" })); 
           return; 
         }
         
-        const item = serverMarketItems.splice(idx, 1)[0];
+        const item = items.splice(idx, 1)[0];
+        saveMarket(items);
+
         updateUserBalance(buyerTgId, -item.price);
 
         const dealId = Date.now().toString();
         serverDeals[dealId] = { ...item, buyerTgId, buyerTradeUrl, buyerName, status: 'pending_sent' };
 
-        // 1. Уведомление покупателю
         await bot.sendMessage(
           buyerTgId,
           `🎉 **Заказ успешно оформлен!**\n\nПредмет: *${item.name}*\nСумма: *${item.price} ₽*\nПродавец: *${item.seller}*\n\nОжидайте отправки предмета в Steam от продавца.`,
           { parse_mode: "Markdown" }
         ).catch(() => {});
 
-        // 2. Уведомление продавцу с запросом на отправку
         if (item.tgId) {
           await bot.sendMessage(
             item.tgId,
@@ -306,7 +319,6 @@ const server = http.createServer(async (req, res) => {
           ).catch(() => {});
         }
 
-        // 3. Уведомление в админ-чат
         if (ADMIN_CHAT_ID) {
           await bot.sendMessage(
             ADMIN_CHAT_ID,
@@ -427,14 +439,12 @@ bot.on("successful_payment", async (msg) => {
   }
 });
 
-// Обработка интерактивных кнопок сделок и вывода
 bot.on("callback_query", async (q) => {
   const data = q.data;
 
-  // Обработка подтверждения отправки/получения скина в сделках
   if (data.startsWith("deal_sent_") || data.startsWith("deal_received_")) {
     const parts = data.split("_");
-    const action = parts[1]; // sent или received
+    const action = parts[1];
     const dealId = parts[2];
     const deal = serverDeals[dealId];
 
@@ -445,14 +455,12 @@ bot.on("callback_query", async (q) => {
 
     if (action === 'sent') {
       deal.status = 'pending_received';
-      // Уведомление продавцу
       await bot.editMessageText(`✅ Вы подтвердили отправку предмета *${deal.name}*. Ожидайте подтверждения от покупателя.`, {
         chat_id: q.message.chat.id,
         message_id: q.message.message_id,
         parse_mode: "Markdown"
       }).catch(() => {});
 
-      // Уведомление покупателю с кнопкой подтверждения получения
       await bot.sendMessage(
         deal.buyerTgId,
         `📦 **Продавец сообщил об отправке предмета!**\n\nПредмет: *${deal.name}*\n\nПожалуйста, примите обмен в Steam, а затем нажмите кнопку ниже для подтверждения получения:`,
@@ -467,7 +475,6 @@ bot.on("callback_query", async (q) => {
     } else if (action === 'received') {
       deal.status = 'completed';
       
-      // Зачисление средств продавцу
       let users = loadUsers();
       if (users[deal.tgId]) {
         users[deal.tgId]["Balance"] = (users[deal.tgId]["Balance"] || 0) + deal.price;
@@ -475,14 +482,12 @@ bot.on("callback_query", async (q) => {
         saveUsers(users);
       }
 
-      // Уведомление покупателю
       await bot.editMessageText(`✅ Вы подтвердили получение предмета *${deal.name}*. Сделка успешно завершена!`, {
         chat_id: q.message.chat.id,
         message_id: q.message.message_id,
         parse_mode: "Markdown"
       }).catch(() => {});
 
-      // Уведомление продавцу о зачислении средств
       if (deal.tgId) {
         await bot.sendMessage(
           deal.tgId,
@@ -491,7 +496,6 @@ bot.on("callback_query", async (q) => {
         ).catch(() => {});
       }
 
-      // Уведомление в админ-чат
       if (ADMIN_CHAT_ID) {
         await bot.sendMessage(
           ADMIN_CHAT_ID,
@@ -507,7 +511,6 @@ bot.on("callback_query", async (q) => {
     return;
   }
 
-  // Обработка заявок на вывод
   if (data.startsWith("wd_")) {
     const parts = data.split("_");
     const status = parts[1];
