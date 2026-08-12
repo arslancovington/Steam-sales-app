@@ -315,7 +315,8 @@
 
             items.forEach(item => {
                 const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
-                if (!desc || !desc.marketable) return;
+                if (!desc || desc.tradable === 0) return; 
+
                 myInventory.push({
                     assetid: item.assetid,
                     name: desc.market_hash_name || desc.name,
@@ -324,7 +325,7 @@
             });
 
             if (myInventory.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет продаваемых предметов</div>';
+                container.innerHTML = '<div class="empty-state">Нет передаваемых предметов</div>';
                 return;
             }
 
@@ -562,13 +563,20 @@
                     body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
                 });
                 const data = await res.json();
-                if (data.success && data.payUrl) {
+                if (data.success) {
                     closeModal('modal-topup');
-                    window.open(data.payUrl, '_blank');
+                    if (selectedTopupType === 'crypto') {
+                        alert('Счет отправлен в личные сообщения с ботом!');
+                        if (window.Telegram?.WebApp) {
+                            window.Telegram.WebApp.close();
+                        }
+                    } else {
+                        if (data.payUrl) window.open(data.payUrl, '_blank');
+                    }
                 } else {
-                    alert('Ошибка создания счета. Проверьте консоль сервера (токен Crypto Bot).');
+                    alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
                 }
-            } catch (err) { alert('Ошибка соединения'); }
+            } catch (err) { alert('Ошибка соединения с сервером'); }
         }
 
         async function processWithdraw() {
