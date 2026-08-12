@@ -57,7 +57,8 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-const bot = new TelegramBot(botToken, { polling: true });
+// Исправление ошибки 409 Conflict: отключаем лишние предупреждения и гарантируем единственный экземпляр
+const bot = new TelegramBot(botToken, { polling: { interval: 1000, autoStart: true } });
 let serverDeals = {};
 let withdrawRequests = {};
 
@@ -68,6 +69,7 @@ const steamHeaders = {
 
 async function createCryptoInvoice(amountUsdt, description, tgId, received) {
   if (!CRYPTO_PAY_TOKEN) {
+    console.error("CRITICAL: CRYPTO_PAY_TOKEN is missing!");
     return { success: false, error: "Токен CRYPTO_PAY_TOKEN не задан в Render!" };
   }
 
@@ -77,7 +79,6 @@ async function createCryptoInvoice(amountUsdt, description, tgId, received) {
   }
 
   try {
-    const payloadData = { tgId, received };
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: { 
@@ -88,7 +89,7 @@ async function createCryptoInvoice(amountUsdt, description, tgId, received) {
         asset: "USDT",
         amount: String(amountUsdt),
         description: description,
-        payload: JSON.stringify(payloadData)
+        payload: JSON.stringify({ tgId, received })
       })
     });
     
@@ -128,7 +129,6 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // Вебхук от Crypto Bot при успешной оплате счета -> отправка чека в личные сообщения с ботом
   if (req.url === "/api/crypto-webhook" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -141,7 +141,6 @@ const server = http.createServer(async (req, res) => {
             const data = JSON.parse(inv.payload);
             if (data.tgId && data.received) {
               updateUserBalance(data.tgId, data.received);
-              // Чек об оплате от нашего бота в лс
               await bot.sendMessage(
                 data.tgId, 
                 `🧾 **Чек об успешной оплате**\n\n` +
@@ -406,7 +405,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Создание счета и отправка счет-сообщения НАПРЯМУЮ от нашего бота в ЛС
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
@@ -415,7 +413,6 @@ const server = http.createServer(async (req, res) => {
         if (currency === "USDT") {
           const invRes = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
           if (invRes.success) {
-            // Отправляем счет на оплату в личные сообщения с нашим ботом
             await bot.sendMessage(
               tgId, 
               `💡 **Счет на оплату USDT выставлен**\n\n` +
