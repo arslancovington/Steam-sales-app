@@ -66,49 +66,53 @@ const steamHeaders = {
   "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
 };
 
-// Исправленная функция с логированием ошибок
 async function createCryptoInvoice(amountUsdt, description, tgId, received) {
   if (!CRYPTO_PAY_TOKEN) {
-    console.error("CRITICAL ERROR: CRYPTO_PAY_TOKEN is missing in Environment Variables!");
-    return null;
+    return { success: false, error: "Токен CRYPTO_PAY_TOKEN не задан в Render!" };
+  }
+
+  let apiUrl = "https://pay.crypt.bot/api/createInvoice";
+  if (CRYPTO_PAY_TOKEN.includes("test") || CRYPTO_PAY_TOKEN.startsWith("t")) {
+    apiUrl = "https://testnet-pay.crypt.bot/api/createInvoice";
   }
 
   try {
     const payloadData = { tgId, received };
-    const requestBody = {
-        asset: "USDT",
-        amount: String(amountUsdt),
-        description: description,
-        payload: JSON.stringify(payloadData)
-    };
-
-    const response = await fetch("https://pay.crypt.bot/api/createInvoice", {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json", 
         "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN 
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        asset: "USDT",
+        amount: String(amountUsdt),
+        description: description,
+        payload: JSON.stringify(payloadData)
+      })
     });
     
     const data = await response.json();
-    
-    // ВАЖНО: Смотрим в консоли Render, что ответил API
     if (!data.ok) {
-      console.error("CRYPTO PAY API ERROR:", JSON.stringify(data));
-      return null;
+      const errName = data.error?.name || JSON.stringify(data);
+      console.error("CRYPTO PAY API ERROR:", errName);
+      return { success: false, error: `CryptoBot: ${errName}` };
     }
     
-    return data.result.pay_url;
+    return { success: true, payUrl: data.result.pay_url };
   } catch (e) {
     console.error("FETCH EXCEPTION:", e);
-    return null; 
+    return { success: false, error: e.message };
   }
 }
 
 async function transferCryptoToUser(tgId, amountUsdt, comment) {
+  let apiUrl = "https://pay.crypt.bot/api/transfer";
+  if (CRYPTO_PAY_TOKEN && (CRYPTO_PAY_TOKEN.includes("test") || CRYPTO_PAY_TOKEN.startsWith("t"))) {
+    apiUrl = "https://testnet-pay.crypt.bot/api/transfer";
+  }
   try {
-    const response = await fetch("https://pay.crypt.bot/api/transfer", {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN },
       body: JSON.stringify({ user_id: Number(tgId), asset: "USDT", amount: String(amountUsdt), spend_id: `wd_${Date.now()}`, comment })
@@ -400,12 +404,22 @@ const server = http.createServer(async (req, res) => {
         const { tgId, amount, currency, received } = JSON.parse(body);
         let payUrl = null;
         if (currency === "USDT") {
-          payUrl = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
+          const invRes = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
+          if (invRes.success) {
+            payUrl = invRes.payUrl;
+          } else {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: invRes.error }));
+            return;
+          }
         } else {
           payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
         }
         res.end(JSON.stringify({ success: true, payUrl }));
-      } catch(e) { res.writeHead(500); res.end(JSON.stringify({ success: false })); }
+      } catch(e) { 
+        res.writeHead(500, { "Content-Type": "application/json" }); 
+        res.end(JSON.stringify({ success: false, error: e.message })); 
+      }
     });
     return;
   }
@@ -538,6 +552,7 @@ bot.on("callback_query", async (q) => {
     if (!reqData) { await bot.answerCallbackQuery(q.id, { text: "Заявка не найдена", show_alert: true }); return; }
 
     if (status === 'ok') {
+      // Исправлено название функции на правильное: transferCryptoToUser
       const resTr = await transferCryptoToUser(reqData.tgId, reqData.usdtApprox, `Выплата #${wdId}`);
       if (resTr) {
         await bot.sendMessage(reqData.tgId, `✅ **Выплата подтверждена!**\n💎 ${reqData.usdtApprox} USDT зачислено.`);
