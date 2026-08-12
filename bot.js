@@ -57,7 +57,6 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 const APP_URL = process.env.WEBAPP_URL || "https://steam-sales-app.onrender.com";
 const PORT = process.env.PORT || 3000;
 
-// Исправление ошибки 409 Conflict: отключаем лишние предупреждения и гарантируем единственный экземпляр
 const bot = new TelegramBot(botToken, { polling: { interval: 1000, autoStart: true } });
 let serverDeals = {};
 let withdrawRequests = {};
@@ -100,7 +99,7 @@ async function createCryptoInvoice(amountUsdt, description, tgId, received) {
       return { success: false, error: `CryptoBot: ${errName}` };
     }
     
-    return { success: true, payUrl: data.result.pay_url };
+    return { success: true, payUrl: data.result.pay_url, invoiceId: data.result.invoice_id };
   } catch (e) {
     console.error("FETCH EXCEPTION:", e);
     return { success: false, error: e.message };
@@ -129,6 +128,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
+  // Вебхук оплаты Crypto Bot
   if (req.url === "/api/crypto-webhook" && req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -149,6 +149,19 @@ const server = http.createServer(async (req, res) => {
                 `📦 Статус: Выполнено`, 
                 { parse_mode: "Markdown" }
               );
+
+              // Уведомление в Админ-чат об успешной оплате
+              if (ADMIN_CHAT_ID) {
+                await bot.sendMessage(
+                  ADMIN_CHAT_ID,
+                  `✅ **Успешная оплата счета!**\n\n` +
+                  `👤 Пользователь ID: \`${data.tgId}\`\n` +
+                  `💰 Сумма: *${inv.amount} ${inv.asset}*\n` +
+                  `Зачисление: *${data.received} ₽*\n` +
+                  `🆔 ID платежа: \`${inv.invoice_id}\``,
+                  { parse_mode: "Markdown" }
+                ).catch(() => {});
+              }
             }
           }
         }
@@ -405,14 +418,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Создание счета + отправка сообщения о СОЗДАНИИ счета в админ-чат
   if (req.url === "/api/billing/invoice" && req.method === "POST") {
     let body = ""; req.on("data", chunk => body += chunk);
     req.on("end", async () => {
       try {
         const { tgId, amount, currency, received } = JSON.parse(body);
+        let paymentId = Math.floor(1000000 + Math.random() * 9000000).toString();
+
         if (currency === "USDT") {
           const invRes = await createCryptoInvoice(amount, "Пополнение баланса", tgId, received);
           if (invRes.success) {
+            paymentId = invRes.invoiceId || paymentId;
+
+            // Отправляем счет пользователю в ЛС
             await bot.sendMessage(
               tgId, 
               `💡 **Счет на оплату USDT выставлен**\n\n` +
@@ -425,7 +444,20 @@ const server = http.createServer(async (req, res) => {
                   inline_keyboard: [[{ text: "💳 Оплатить в Crypto Bot", url: invRes.payUrl }]]
                 }
               }
-            ).catch(e => console.error("Error sending invoice to DM:", e));
+            ).catch(() => {});
+
+            // Оповещение в АДМИН-ЧАТ о создании счета
+            if (ADMIN_CHAT_ID) {
+              await bot.sendMessage(
+                ADMIN_CHAT_ID,
+                `💳 **Создан счет на пополнение**\n\n` +
+                `👤 **Пользователь ID:** \`${tgId}\`\n` +
+                `💰 **Сумма:** *${amount} USDT*\n` +
+                `(Зачисление: *${received} ₽*)\n` +
+                `🆔 **ID платежа:** \`${paymentId}\``,
+                { parse_mode: "Markdown" }
+              ).catch(e => console.error("Admin chat notify error:", e));
+            }
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ success: true }));
@@ -434,7 +466,21 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify({ success: false, error: invRes.error }));
           }
         } else {
+          // Выставление счета через Telegram Stars
           const payUrl = await bot.createInvoiceLink("Пополнение", `Зачисление ${received} ₽`, `topup_${tgId}_${received}`, "", "XTR", [{label: "Пополнение", amount: parseInt(amount)}]);
+          
+          if (ADMIN_CHAT_ID) {
+            await bot.sendMessage(
+              ADMIN_CHAT_ID,
+              `💳 **Создан счет на пополнение**\n\n` +
+              `👤 **Пользователь ID:** \`${tgId}\`\n` +
+              `💰 **Сумма:** *${amount} Звёзды ⭐*\n` +
+              `(Зачисление: *${received} ₽*)\n` +
+              `🆔 **ID платежа:** \`${paymentId}\``,
+              { parse_mode: "Markdown" }
+            ).catch(() => {});
+          }
+
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, payUrl }));
         }
