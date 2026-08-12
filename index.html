@@ -50,9 +50,12 @@
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
-        .nav-item { background: none; border: none; font-size: 26px; filter: grayscale(100%); opacity: 0.5; cursor: pointer; }
-        .active-nav { filter: none; opacity: 1; text-shadow: 0 0 10px var(--neon-cyan); transform: scale(1.1); }
+        /* Нижняя навигация с векторными SVG-иконками */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
+        .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
+        .nav-item svg { width: 24px; height: 24px; fill: var(--text-muted); transition: 0.2s; }
+        .active-nav { opacity: 1; transform: scale(1.08); }
+        .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
 
         .seller-head { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 14px; }
         .seller-avatar { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0,255,255,0.08); border: 1px solid var(--neon-cyan); overflow: hidden; flex-shrink: 0; }
@@ -79,7 +82,7 @@
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
-        /* Ретро стили загрузки в стиле CS 1.6 (активен по умолчанию с первой секунды) */
+        /* Ретро стили загрузки в стиле CS 1.6 */
         .cs16-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
             display: none; align-items: center; justify-content: center;
@@ -127,7 +130,7 @@
 </head>
 <body>
 
-    <!-- Ретро модальное окно загрузки в стиле CS 1.6 (включено с первых миллисекунд) -->
+    <!-- Ретро модальное окно загрузки в стиле CS 1.6 -->
     <div class="cs16-modal active" id="cs16-loading-modal">
         <div class="cs16-dialog">
             <div class="cs16-title">Загрузка приложения...</div>
@@ -146,7 +149,10 @@
 
     <header class="top-bar">
         <div class="bot-profile">
-            <span style="font-size:24px;">🤖</span>
+            <!-- Кастомный аватар вместо робота с обрезкой нижней надписи через CSS -->
+            <div style="width: 38px; height: 38px; border-radius: 50%; overflow: hidden; border: 1px solid var(--neon-green); flex-shrink: 0; background: #0b1110;">
+                <img src="logo.png" style="width: 100%; height: 160%; object-fit: cover; object-position: top center;">
+            </div>
             <div class="bot-info">
                 <span class="bot-name">p2p skin sales ✔️</span>
                 <span class="bot-status">Активен</span>
@@ -206,12 +212,28 @@
         </section>
     </main>
 
+    <!-- Нижняя панель с кастомными SVG иконками -->
     <nav class="bottom-nav">
-        <button class="nav-item active-nav" onclick="switchTab('market', this)">🛒</button>
-        <button class="nav-item" onclick="switchTab('inventory', this)">🎒</button>
-        <button class="nav-item" onclick="switchTab('deals', this)">🤝</button>
-        <button class="nav-item" onclick="switchTab('notifications', this)">🔔</button>
-        <button class="nav-item" onclick="switchTab('profile', this)">👤</button>
+        <!-- Маркет (Корзина) -->
+        <button class="nav-item active-nav" onclick="switchTab('market', this)">
+            <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        </button>
+        <!-- Инвентарь (Рюкзак/Кейс) -->
+        <button class="nav-item" onclick="switchTab('inventory', this)">
+            <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
+        </button>
+        <!-- Сделки (Рукопожатие) -->
+        <button class="nav-item" onclick="switchTab('deals', this)">
+            <svg viewBox="0 0 24 24"><path d="M18.84 5.37c-.77-.49-1.74-.27-2.24.5l-1.09 1.63c-.34.5-.96.72-1.54.52l-2.07-.69c-.91-.3-1.91.13-2.31 1.01l-2.1 4.67-1.7-1.13c-.62-.41-1.47-.23-1.87.39-.41.62-.23 1.47.39 1.87l3 2c.4.27.91.31 1.35.1l3.51-1.76c.4-.2.66-.6.67-1.05l.07-1.57 1.41.47c.54.18 1.13-.05 1.43-.54l1.37-2.27c.49-.77.27-1.74-.5-2.24zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+        </button>
+        <!-- Уведомления (Колокольчик) -->
+        <button class="nav-item" onclick="switchTab('notifications', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+        </button>
+        <!-- Профиль (Пользователь) -->
+        <button class="nav-item" onclick="switchTab('profile', this)">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg>
+        </button>
     </nav>
 
     <!-- Модалка продажи -->
@@ -396,7 +418,7 @@
             });
         }
 
-        // Загрузка инвентаря в фоне (без модальных окон и прерываний)
+        // Загрузка инвентаря в фоне (включая капсулы и контейнеры)
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
             try {
@@ -431,7 +453,7 @@
 
             items.forEach(item => {
                 const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
-                if (!desc || desc.tradable === 0) return; 
+                if (!desc) return; 
 
                 myInventory.push({
                     assetid: item.assetid,
@@ -441,7 +463,7 @@
             });
 
             if (myInventory.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет передаваемых предметов</div>';
+                container.innerHTML = '<div class="empty-state">Нет предметов в инвентаре</div>';
                 return;
             }
 
