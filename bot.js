@@ -66,24 +66,42 @@ const steamHeaders = {
   "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
 };
 
+// Исправленная функция с логированием ошибок
 async function createCryptoInvoice(amountUsdt, description, tgId, received) {
+  if (!CRYPTO_PAY_TOKEN) {
+    console.error("CRITICAL ERROR: CRYPTO_PAY_TOKEN is missing in Environment Variables!");
+    return null;
+  }
+
   try {
+    const payloadData = { tgId, received };
+    const requestBody = {
+        asset: "USDT",
+        amount: String(amountUsdt),
+        description: description,
+        payload: JSON.stringify(payloadData)
+    };
+
     const response = await fetch("https://pay.crypt.bot/api/createInvoice", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN },
-      body: JSON.stringify({ 
-        asset: "USDT", amount: String(amountUsdt), description, 
-        payload: JSON.stringify({ tgId, received }) 
-      })
+      headers: { 
+        "Content-Type": "application/json", 
+        "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN 
+      },
+      body: JSON.stringify(requestBody)
     });
+    
     const data = await response.json();
+    
+    // ВАЖНО: Смотрим в консоли Render, что ответил API
     if (!data.ok) {
-      console.error("Crypto Pay API Error:", data);
+      console.error("CRYPTO PAY API ERROR:", JSON.stringify(data));
       return null;
     }
+    
     return data.result.pay_url;
   } catch (e) {
-    console.error("Crypto Invoice Exception:", e);
+    console.error("FETCH EXCEPTION:", e);
     return null; 
   }
 }
@@ -354,7 +372,7 @@ const server = http.createServer(async (req, res) => {
           if (nameMatch) steamName = nameMatch[1].replace('<![CDATA[', '').replace(']]>', '').trim();
         } catch(e) {}
 
-        const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=100`, { headers: steamHeaders });
+        const response = await fetch(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=500`, { headers: steamHeaders });
         if (!response.ok) {
           res.end(JSON.stringify({ success: true, items: [], descriptions: [], avatarUrl, steamName }));
           return;
