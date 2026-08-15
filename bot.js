@@ -11,7 +11,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хранилище данных
 let users = {};
 let marketItems = [];
 let giveaways = [
@@ -26,7 +25,6 @@ let giveaways = [
     }
 ];
 
-// API: Профиль пользователя
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!users[tgId]) {
@@ -45,7 +43,6 @@ app.post('/api/user/save', (req, res) => {
     res.json({ success: true });
 });
 
-// API: Маркетплейс лотов
 app.get('/api/market/items', (req, res) => {
     res.json({ success: true, items: marketItems });
 });
@@ -63,7 +60,6 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-// API: Розыгрыши
 app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways });
 });
@@ -82,7 +78,6 @@ app.post('/api/giveaways/join', (req, res) => {
     res.json({ success: true });
 });
 
-// API: Steam и Сделки (Заглушки для предотвращения ошибок)
 app.post('/api/steam/inventory', (req, res) => {
     res.json({ success: false, items: [], descriptions: [] });
 });
@@ -111,7 +106,6 @@ app.post('/api/inventory/instant-sell', (req, res) => {
     res.json({ success: true });
 });
 
-// Telegram Bot: Управление розыгрышами через команду /newgiveaway
 bot.on('message', async (msg) => {
     if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
     
