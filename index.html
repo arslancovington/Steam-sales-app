@@ -317,17 +317,40 @@
         let currentSelectedItem = null;
         let myInventory = [], marketItems = [], myListings = [];
 
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        // Безопасное получение данных пользователя с защитой от сбоев
+        let tgUser = null;
+        try {
+            tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        } catch (e) {
+            console.error("Telegram WebApp init error:", e);
+        }
+
         const myTgId = tgUser?.id || 123456789;
         const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
 
-        window.addEventListener('DOMContentLoaded', async () => {
+        // Гарантированное скрытие загрузчика при любых ошибках
+        function hideCs16Loading() {
+            const modal = document.getElementById('cs16-loading-modal');
+            if (modal) {
+                const bar1 = document.getElementById('cs16-bar-1');
+                const bar2 = document.getElementById('cs16-bar-2');
+                if (bar1) bar1.style.width = '100%';
+                if (bar2) bar2.style.width = '100%';
+                setTimeout(() => {
+                    modal.classList.remove('active');
+                }, 50);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Аварийный таймер: через 2 секунды экран гарантированно разблокируется, даже если сеть упала
             const safetyTimeout = setTimeout(() => {
                 hideCs16Loading();
-            }, 3000);
+            }, 2000);
 
             try {
-                document.getElementById('my-nick').innerText = myUsername;
+                const nickEl = document.getElementById('my-nick');
+                if (nickEl) nickEl.innerText = myUsername;
                 
                 const withdrawInput = document.getElementById('withdraw-crypto-account-input');
                 if (withdrawInput) {
@@ -337,11 +360,15 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
 
-                await Promise.allSettled([
+                // Параллельный запуск запросов с обработкой ошибок, чтобы не вешать приложение
+                Promise.allSettled([
                     syncUserProfile(),
                     fetchMarketItems(),
                     fetchGiveaways()
-                ]);
+                ]).finally(() => {
+                    clearTimeout(safetyTimeout);
+                    hideCs16Loading();
+                });
 
                 if (steamId) {
                     localStorage.setItem('user_steam_id', steamId);
@@ -351,22 +378,10 @@
                 }
             } catch (err) {
                 console.error("Init error:", err);
-            } finally {
                 clearTimeout(safetyTimeout);
                 hideCs16Loading();
             }
         });
-
-        function hideCs16Loading() {
-            const modal = document.getElementById('cs16-loading-modal');
-            if (modal) {
-                document.getElementById('cs16-bar-1').style.width = '100%';
-                document.getElementById('cs16-bar-2').style.width = '100%';
-                setTimeout(() => {
-                    modal.classList.remove('active');
-                }, 100);
-            }
-        }
 
         async function syncUserProfile() {
             try {
@@ -391,7 +406,9 @@
         function loginWithSteam() { window.location.href = `/auth/steam`; }
 
         function saveTradeUrl() {
-            const url = document.getElementById('trade-url-input').value.trim();
+            const urlInput = document.getElementById('trade-url-input');
+            if (!urlInput) return;
+            const url = urlInput.value.trim();
             localStorage.setItem('user_trade_url', url);
 
             let steamId = null;
@@ -402,7 +419,9 @@
                 const partnerMatch = url.match(/partner=(\d+)/);
                 if (partnerMatch && partnerMatch[1]) {
                     const partnerId = partnerMatch[1];
-                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
+                    try {
+                        steamId = (BigInt(partnerId) + 76561197960265728n).toString();
+                    } catch (e) {}
                 }
             }
 
@@ -451,6 +470,7 @@
 
         function renderInventory(items, descriptions) {
             const container = document.getElementById('steam-inventory-grid');
+            if (!container) return;
             myInventory = [];
             const descMap = {};
             if (descriptions) descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
@@ -487,6 +507,7 @@
                 const data = await res.json();
                 if (data.success && data.giveaways) {
                     const container = document.getElementById('giveaways-container');
+                    if (!container) return;
                     if (data.giveaways.length === 0) {
                         container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
                         return;
@@ -694,7 +715,8 @@
                 if (data.success) {
                     marketItems = data.items;
                     myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
-                    document.getElementById('profile-listings').innerText = myListings.length;
+                    const profileListings = document.getElementById('profile-listings');
+                    if (profileListings) profileListings.innerText = myListings.length;
                     renderMarket();
                     renderMyListings();
                 }
@@ -703,6 +725,7 @@
 
         function renderMarket() {
             const container = document.getElementById('market-listings');
+            if (!container) return;
             container.innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
                 <div class="card">
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
@@ -715,6 +738,7 @@
 
         function renderMyListings() {
             const container = document.getElementById('my-listings');
+            if (!container) return;
             container.innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
                 <div class="card">
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
@@ -728,18 +752,23 @@
         function selectTopupMethod(type) {
             selectedTopupType = type;
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
-            document.getElementById('method-' + type).classList.add('active');
+            const methodEl = document.getElementById('method-' + type);
+            if (methodEl) methodEl.classList.add('active');
             const symbol = document.getElementById('topup-symbol');
             const hint = document.getElementById('topup-hint');
             if (type === 'crypto') {
-                symbol.innerText = 'USDT'; hint.innerText = 'Сумма зачислится после оплаты (~90 ₽ за 1 USDT). Мин. 10 USDT.';
+                if (symbol) symbol.innerText = 'USDT'; 
+                if (hint) hint.innerText = 'Сумма зачислится после оплаты (~90 ₽ за 1 USDT). Мин. 10 USDT.';
             } else {
-                symbol.innerText = '⭐'; hint.innerText = 'Сумма зачислится после оплаты (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
+                if (symbol) symbol.innerText = '⭐'; 
+                if (hint) hint.innerText = 'Сумма зачислится после оплаты (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
             }
         }
 
         async function processTopUp() {
-            const amount = parseFloat(document.getElementById('topup-amount-input').value);
+            const amountInput = document.getElementById('topup-amount-input');
+            if (!amountInput) return;
+            const amount = parseFloat(amountInput.value);
             const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
             if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
 
@@ -777,8 +806,12 @@
         }
 
         async function processWithdraw() {
-            const amount = parseFloat(document.getElementById('withdraw-amount-input').value);
-            const cryptoAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
+            const amountInput = document.getElementById('withdraw-amount-input');
+            const cryptoAccountInput = document.getElementById('withdraw-crypto-account-input');
+            if (!amountInput || !cryptoAccountInput) return;
+
+            const amount = parseFloat(amountInput.value);
+            const cryptoAccount = cryptoAccountInput.value.trim();
 
             if (isNaN(amount) || amount < 500) { alert('Мин. сумма вывода — 500 ₽.'); return; }
             if (userBalance < amount) { alert('Недостаточно средств на балансе.'); return; }
@@ -791,8 +824,10 @@
                 const data = await response.json();
                 if (data.success) {
                     userBalance = data.newBalance;
-                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
-                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    const userBalanceEl = document.getElementById('user-balance');
+                    const profileBalanceEl = document.getElementById('profile-balance');
+                    if (userBalanceEl) userBalanceEl.innerText = userBalance + ' ₽';
+                    if (profileBalanceEl) profileBalanceEl.innerText = userBalance + ' ₽';
                     closeModal('modal-withdraw');
                     alert('Заявка на вывод успешно отправлена администраторам!');
                 } else {
@@ -803,14 +838,24 @@
 
         function switchTab(id, btn) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + id).classList.add('active');
+            const tabEl = document.getElementById('tab-' + id);
+            if (tabEl) tabEl.classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-            btn.classList.add('active-nav');
+            if (btn) btn.classList.add('active-nav');
         }
 
-        function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
-        function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function openTopUpModal() { 
+            const modal = document.getElementById('modal-topup');
+            if (modal) modal.classList.add('active'); 
+        }
+        function openWithdrawModal() { 
+            const modal = document.getElementById('modal-withdraw');
+            if (modal) modal.classList.add('active'); 
+        }
+        function closeModal(id) { 
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('active'); 
+        }
     </script>
 </body>
 </html>
