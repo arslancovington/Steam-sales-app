@@ -7,17 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
-        :root {
-            --bg-color: #0b1110;
-            --neon-green: #7cfc00;
-            --neon-cyan: #00ffff;
-            --neon-purple: #bf00ff;
-            --card-bg: rgba(20, 30, 25, 0.7);
-            --text-main: #ffffff;
-            --text-muted: #889988;
-            --danger-red: #ff4d4d;
-        }
-
+        :root { --bg-color: #0b1110; --neon-green: #7cfc00; --neon-cyan: #00ffff; --neon-purple: #bf00ff; --card-bg: rgba(20, 30, 25, 0.7); --text-main: #ffffff; --text-muted: #889988; --danger-red: #ff4d4d; }
         * { box-sizing: border-box; }
         body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
 
@@ -35,7 +25,6 @@
         .section-title { margin-top: 22px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 15px; }
         .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; }
 
-        .steam-login-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: #171a21; border: 1px solid #66c0f4; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 15px; }
         .trade-url-box { display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
         .trade-url-box input { flex: 1; padding: 10px; background: #111; border: 1px solid #333; color: white; border-radius: 6px; }
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 6px; cursor: pointer; }
@@ -50,7 +39,7 @@
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 0 10px rgba(191,0,255,0.15); }
+        .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
         .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
@@ -85,69 +74,9 @@
         .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
-
-        .cs16-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
-            display: none; align-items: center; justify-content: center;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        .cs16-modal.active { display: flex; }
-        .cs16-dialog {
-            background: #2b332e;
-            border: 2px solid #5a6b60;
-            border-top-color: #7c9484;
-            border-left-color: #7c9484;
-            box-shadow: 6px 6px 15px rgba(0,0,0,0.9);
-            width: 320px;
-            padding: 3px;
-            color: #d0ded4;
-        }
-        .cs16-title {
-            background: #19201c;
-            padding: 4px 8px;
-            font-weight: bold;
-            font-size: 12px;
-            border-bottom: 1px solid #3e4a42;
-            color: #ffffff;
-        }
-        .cs16-body {
-            padding: 12px;
-            font-size: 11px;
-        }
-        .cs16-progress-container {
-            background: #111513;
-            border: 1px solid #455249;
-            border-bottom-color: #7c9484;
-            border-right-color: #7c9484;
-            height: 16px;
-            margin: 6px 0 12px 0;
-            padding: 1px;
-        }
-        .cs16-progress-bar {
-            background: linear-gradient(90deg, #2e7d32, #4caf50);
-            height: 100%;
-            width: 0%;
-            transition: width 0.2s ease;
-        }
     </style>
 </head>
 <body>
-
-    <div class="cs16-modal active" id="cs16-loading-modal">
-        <div class="cs16-dialog">
-            <div class="cs16-title">Загрузка приложения...</div>
-            <div class="cs16-body">
-                <p id="cs16-status-text">Connecting to P2P Server...</p>
-                <div class="cs16-progress-container">
-                    <div class="cs16-progress-bar" id="cs16-bar-1" style="width: 75%;"></div>
-                </div>
-                <p id="cs16-sub-text">Loading Marketplace & User Profile...</p>
-                <div class="cs16-progress-container">
-                    <div class="cs16-progress-bar" id="cs16-bar-2" style="width: 90%;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <header class="top-bar">
         <div class="bot-profile">
@@ -175,23 +104,18 @@
 
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Твой Steam инвентарь</h2>
-            <div id="auth-section">
-                <button class="steam-login-btn" onclick="loginWithSteam()">Войти через Steam</button>
-            </div>
             <div class="trade-url-box">
-                <input type="text" id="trade-url-input" placeholder="Trade URL...">
+                <input type="text" id="trade-url-input" placeholder="Trade URL с partner=...">
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
             </div>
             <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Войдите через Steam или укажите Trade URL для просмотра инвентаря</div>
+                <div class="empty-state">Введите Trade URL для загрузки инвентаря</div>
             </div>
         </section>
 
-        <section id="tab-deals" class="tab"><h2 class="neon-text">Сделки</h2><div class="empty-state">Нет активных сделок</div></section>
-
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
-            <p class="hint-text" style="margin-bottom: 15px;">Участвуйте в розыгрышах скинов от наших спонсоров и партнеров!</p>
+            <p class="hint-text" style="margin-bottom: 15px;">Участвуйте в розыгрышах скинов от наших спонсоров!</p>
             <div id="giveaways-container">
                 <div class="empty-state">Нет активных розыгрышей</div>
             </div>
@@ -229,9 +153,6 @@
         <button class="nav-item" onclick="switchTab('inventory', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
         </button>
-        <button class="nav-item" onclick="switchTab('deals', this)">
-            <svg viewBox="0 0 24 24"><path d="M18.84 5.37c-.77-.49-1.74-.27-2.24.5l-1.09 1.63c-.34.5-.96.72-1.54.52l-2.07-.69c-.91-.3-1.91.13-2.31 1.01l-2.1 4.67-1.7-1.13c-.62-.41-1.47-.23-1.87.39-.41.62-.23 1.47.39 1.87l3 2c.4.27.91.31 1.35.1l3.51-1.76c.4-.2.66-.6.67-1.05l.07-1.57 1.41.47c.54.18 1.13-.05 1.43-.54l1.37-2.27c.49-.77.27-1.74-.5-2.24zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-        </button>
         <button class="nav-item" onclick="switchTab('giveaways', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
         </button>
@@ -240,32 +161,28 @@
         </button>
     </nav>
 
+    <!-- Модальные окна -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Выставить скин</h3>
             <div class="skin-image" id="sell-modal-img-box">🛡️</div>
             <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px; margin-bottom: 5px;"></p>
-            
-            <div style="font-size: 11px; color: var(--text-muted); text-align: left; margin-top: 5px;">Выберите площадку для продажи:</div>
             <div class="platform-select-group">
                 <button type="button" class="platform-option-btn active" id="plat-our" onclick="selectSellPlatform('Our P2P')">Наша площадка</button>
                 <button type="button" class="platform-option-btn" id="plat-lis" onclick="selectSellPlatform('Lis-Skins')">Lis-Skins</button>
                 <button type="button" class="platform-option-btn" id="plat-csmoney" onclick="selectSellPlatform('CS.MONEY')">CS.MONEY</button>
             </div>
-
             <div id="our-platform-fields">
-                <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Введите цену"></div>
-                <label style="display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer; text-align: left;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽ / 48 часов)</label>
+                <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Цена"></div>
+                <label style="display: flex; gap: 8px; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP (245 ₽)</label>
             </div>
-
-            <div id="external-platform-price-box" style="display: none; margin: 12px 0; padding: 12px; background: rgba(0, 255, 255, 0.05); border: 1px solid var(--neon-cyan); border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; color: var(--text-muted);">Оценочная цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
-                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan); margin-top: 4px;">Загрузка цены...</div>
+            <div id="external-platform-price-box" style="display: none; padding: 12px; background: rgba(0,255,255,0.05); border: 1px solid var(--neon-cyan); border-radius: 8px;">
+                <div style="font-size: 11px; color: var(--text-muted);">Цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
+                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan);">Загрузка...</div>
             </div>
-
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="width:auto; flex:1; margin-top:0;">Продать</button>
+                <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="flex:1;">Продать</button>
             </div>
         </div>
     </div>
@@ -275,24 +192,19 @@
             <h3 class="neon-text">Пополнить баланс</h3>
             <div class="topup-methods">
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
-                    <div style="font-size: 18px;">💎</div>
-                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Crypto Bot</div>
-                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 10 USDT</div>
+                    <div style="font-size: 18px;">💎</div><div style="font-size: 11px; font-weight: bold;">Crypto Bot</div>
                 </div>
                 <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">
-                    <div style="font-size: 18px;">⭐</div>
-                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Telegram Stars</div>
-                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 100 звёзд</div>
+                    <div style="font-size: 18px;">⭐</div><div style="font-size: 11px; font-weight: bold;">Telegram Stars</div>
                 </div>
             </div>
             <div class="price-input-container">
                 <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
                 <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
             </div>
-            <p class="hint-text" id="topup-hint">Сумма зачислится после оплаты (~90 ₽ за 1 USDT).</p>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processTopUp()" style="width:auto; flex:1; margin-top:0;">Оплатить</button>
+                <button class="btn-green-glow" onclick="processTopUp()" style="flex:1;">Оплатить</button>
             </div>
         </div>
     </div>
@@ -300,12 +212,11 @@
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
-            <p class="hint-text">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
-            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
-            <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" readonly></div>
+            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма (мин 500)"></div>
+            <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;"></div>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
+                <button class="btn-green-glow" onclick="processWithdraw()" style="flex:1;">Вывести</button>
             </div>
         </div>
     </div>
@@ -317,545 +228,232 @@
         let currentSelectedItem = null;
         let myInventory = [], marketItems = [], myListings = [];
 
-        let tgUser = null;
-        try {
-            tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-        } catch (e) {
-            console.error("Telegram WebApp init error:", e);
-        }
-
-        const myTgId = tgUser?.id || 123456789;
-        const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
-
-        function hideCs16Loading() {
-            const modal = document.getElementById('cs16-loading-modal');
-            if (modal) {
-                const bar1 = document.getElementById('cs16-bar-1');
-                const bar2 = document.getElementById('cs16-bar-2');
-                if (bar1) bar1.style.width = '100%';
-                if (bar2) bar2.style.width = '100%';
-                setTimeout(() => {
-                    modal.classList.remove('active');
-                }, 50);
-            }
-        }
+        let tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
+        const myTgId = tgUser.id || 123456789;
+        const myUsername = tgUser.username || `User_${myTgId}`;
 
         window.addEventListener('DOMContentLoaded', () => {
-            const safetyTimeout = setTimeout(() => {
-                hideCs16Loading();
-            }, 2000);
+            document.getElementById('my-nick').innerText = myUsername;
+            document.getElementById('withdraw-crypto-account-input').value = `@${myUsername}`;
 
-            try {
-                const nickEl = document.getElementById('my-nick');
-                if (nickEl) nickEl.innerText = myUsername;
-                
-                const withdrawInput = document.getElementById('withdraw-crypto-account-input');
-                if (withdrawInput) {
-                    withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
-                }
+            const savedTradeUrl = localStorage.getItem('user_trade_url');
+            if (savedTradeUrl) document.getElementById('trade-url-input').value = savedTradeUrl;
 
-                const savedTradeUrl = localStorage.getItem('user_trade_url');
-                if (savedTradeUrl) {
-                    const tradeInput = document.getElementById('trade-url-input');
-                    if (tradeInput) tradeInput.value = savedTradeUrl;
-                }
+            let steamId = localStorage.getItem('user_steam_id');
+            if (steamId) loadSteamData(steamId);
 
-                let steamId = localStorage.getItem('user_steam_id');
-                if (steamId) {
-                    const authSection = document.getElementById('auth-section');
-                    if (authSection) authSection.style.display = 'none';
-                    loadSteamData(steamId).catch(e => console.error("Background steam load error:", e));
-                }
-
-                Promise.allSettled([
-                    syncUserProfile(),
-                    fetchMarketItems(),
-                    fetchGiveaways()
-                ]).finally(() => {
-                    clearTimeout(safetyTimeout);
-                    hideCs16Loading();
-                });
-            } catch (err) {
-                console.error("Init error:", err);
-                clearTimeout(safetyTimeout);
-                hideCs16Loading();
-            }
+            syncUserProfile();
+            fetchMarketItems();
+            fetchGiveaways();
         });
 
         async function syncUserProfile() {
             try {
-                const response = await fetch(`/api/user/profile?tgId=${myTgId}&tgUser=${encodeURIComponent(myUsername)}`);
-                if (!response.ok) return;
-                const data = await response.json();
+                const res = await fetch(`/api/user/profile?tgId=${myTgId}&tgUser=${myUsername}`);
+                const data = await res.json();
                 if (data.success) {
                     userBalance = data.balance;
                     document.getElementById('user-balance').innerText = userBalance + ' ₽';
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                     document.getElementById('my-rating').innerText = data.rating;
                     document.getElementById('completed-deals-count').innerText = data.completedDeals;
-                    
-                    if (data.tradeUrl && !localStorage.getItem('user_trade_url')) {
-                        document.getElementById('trade-url-input').value = data.tradeUrl;
-                        localStorage.setItem('user_trade_url', data.tradeUrl);
-                    }
                 }
             } catch (err) {}
         }
 
-        function loginWithSteam() { window.location.href = `/auth/steam`; }
-
         function saveTradeUrl() {
             const urlInput = document.getElementById('trade-url-input');
-            if (!urlInput) return;
             const url = urlInput.value.trim();
             localStorage.setItem('user_trade_url', url);
 
             let steamId = null;
             const partnerMatch = url.match(/partner=(\d+)/);
             if (partnerMatch && partnerMatch[1]) {
-                const partnerId = partnerMatch[1];
-                try {
-                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
-                } catch (e) {}
+                try { steamId = (BigInt(partnerMatch[1]) + 76561197960265728n).toString(); } catch (e) {}
             } else {
                 const profileMatch = url.match(/\/profiles\/(\d{17})/);
-                if (profileMatch && profileMatch[1]) {
-                    steamId = profileMatch[1];
-                }
+                if (profileMatch && profileMatch[1]) steamId = profileMatch[1];
             }
 
             if (steamId) {
                 localStorage.setItem('user_steam_id', steamId);
-                const authSection = document.getElementById('auth-section');
-                if (authSection) authSection.style.display = 'none';
                 loadSteamData(steamId);
-                alert('Trade URL успешно сохранен!');
+                fetch('/api/user/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId }) });
             } else {
-                alert('Не удалось распознать SteamID. Убедитесь, что ссылка содержит параметр partner= или /profiles/');
+                alert('Не удалось найти SteamID в ссылке. Используйте ссылку с partner=');
             }
-
-            fetch('/api/user/save', {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId })
-            }).catch(() => {});
         }
 
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
-            container.innerHTML = '<div class="empty-state">Загрузка инвентаря...</div>';
+            container.innerHTML = '<div class="empty-state">Загрузка...</div>';
             try {
-                const response = await fetch('/api/steam/inventory', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ steamId })
-                });
-                if (!response.ok) throw new Error();
+                const response = await fetch('/api/steam/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ steamId }) });
                 const data = await response.json();
 
-                if (data.success && data.items && data.items.length > 0) {
-                    renderInventory(data.items, data.descriptions);
+                if (data.success && data.items.length > 0) {
+                    myInventory = [];
+                    const descMap = {};
+                    data.descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
+
+                    data.items.forEach(item => {
+                        const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
+                        if (desc) myInventory.push({ assetid: item.assetid, name: desc.market_hash_name, icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}` });
+                    });
+
+                    container.innerHTML = myInventory.map(item => `
+                        <div class="card">
+                            <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
+                            <h4>${item.name}</h4>
+                            <button class="btn-green-glow" onclick="openSellModal('${item.assetid}')">Продать</button>
+                        </div>
+                    `).join('');
                 } else {
-                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль закрыт</div>';
+                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или скрыт настройками приватности Steam</div>';
                 }
-            } catch (e) {
-                container.innerHTML = '<div class="empty-state">Ошибка загрузки инвентаря Steam</div>';
-            }
+            } catch (e) { container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
         }
 
-        function renderInventory(items, descriptions) {
-            const container = document.getElementById('steam-inventory-grid');
-            if (!container) return;
-            myInventory = [];
-            const descMap = {};
-            if (descriptions) descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
-
-            items.forEach(item => {
-                const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
-                if (!desc) return; 
-
-                myInventory.push({
-                    assetid: item.assetid,
-                    name: desc.market_hash_name || desc.name,
-                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`
-                });
-            });
-
-            if (myInventory.length === 0) {
-                container.innerHTML = '<div class="empty-state">Нет предметов в инвентаре</div>';
-                return;
-            }
-
-            container.innerHTML = myInventory.map(item => `
-                <div class="card">
-                    <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
-                    <h4>${item.name}</h4>
-                    <button class="btn-green-glow" onclick="openSellModal('${item.assetid}')">Продать</button>
-                </div>
-            `).join('');
+        async function fetchMarketItems() {
+            try {
+                const res = await fetch('/api/market/items');
+                const data = await res.json();
+                if (data.success) {
+                    marketItems = data.items;
+                    myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
+                    document.getElementById('profile-listings').innerText = myListings.length;
+                    
+                    document.getElementById('market-listings').innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
+                        <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4><div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick="buyItem('${i._id}')">Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}</div>
+                    `).join('');
+                    
+                    document.getElementById('my-listings').innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
+                        <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4><div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div><button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button></div>
+                    `).join('');
+                }
+            } catch (e) {}
         }
 
         async function fetchGiveaways() {
             try {
                 const res = await fetch('/api/giveaways/list');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (data.success && data.giveaways) {
-                    const container = document.getElementById('giveaways-container');
-                    if (!container) return;
-                    if (data.giveaways.length === 0) {
-                        container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
-                        return;
-                    }
-                    container.innerHTML = data.giveaways.map(g => {
-                        let sponsorLink = g.sponsor || '';
-                        if (sponsorLink && !sponsorLink.startsWith('http')) {
-                            sponsorLink = 'https://t.me/' + sponsorLink.replace('@', '');
-                        }
-
-                        return `
-                            <div class="giveaway-card">
-                                <div class="giveaway-header">
-                                    <span class="giveaway-sponsor" style="font-size: 11px; color: var(--neon-purple);">🎁 Спонсор: ${g.sponsor || 'Партнер'}</span>
-                                    <span class="giveaway-timer">⏳ ${g.timer || 'Скоро'}</span>
-                                </div>
-                                <div style="display: flex; gap: 10px; align-items: center;">
-                                    <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
-                                    <div>
-                                        <p class="giveaway-title">${g.title}</p>
-                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount || 0}</div>
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                    ${sponsorLink ? `<button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 8px 4px;" onclick="window.open('${sponsorLink}', '_blank')">📢 Подписаться</button>` : ''}
-                                    <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-            } catch (e) {}
-        }
-
-        async function joinGiveaway(giveawayId) {
-            try {
-                const res = await fetch('/api/giveaways/join', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, giveawayId })
-                });
                 const data = await res.json();
                 if (data.success) {
-                    alert('Вы успешно зарегистрированы в розыгрыше!');
-                    fetchGiveaways();
-                } else {
-                    alert(data.error || 'Не удалось принять участие');
+                    const c = document.getElementById('giveaways-container');
+                    c.innerHTML = data.giveaways.length === 0 ? '<div class="empty-state">Нет активных розыгрышей</div>' : data.giveaways.map(g => `
+                        <div class="giveaway-card">
+                            <div class="giveaway-header"><span style="font-size: 11px; color: var(--neon-purple);">🎁 Спонсор: ${g.sponsor}</span><span class="giveaway-timer">⏳ ${g.timer}</span></div>
+                            <div style="display: flex; gap: 10px; align-items: center;"><div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div><div><p class="giveaway-title">${g.title}</p><div style="font-size: 11px; color: var(--text-muted);">Участников: ${g.participantsCount}</div></div></div>
+                            <div style="display: flex; gap: 8px; margin-top: 6px;"><button class="btn-cyan" style="flex: 1; padding: 8px 4px;" onclick="window.open('${g.sponsor.startsWith('http') ? g.sponsor : 'https://t.me/'+g.sponsor.replace('@','')}', '_blank')">📢 Подписаться</button><button class="btn-green-glow" style="flex: 1;" onclick="joinGiveaway('${g._id}')">Участвовать</button></div>
+                        </div>
+                    `).join('');
                 }
-            } catch (e) {
-                alert('Ошибка соединения');
-            }
-        }
-
-        async function selectSellPlatform(platform) {
-            selectedSellPlatform = platform;
-            document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
-            if (platform === 'Our P2P') document.getElementById('plat-our').classList.add('active');
-            if (platform === 'Lis-Skins') document.getElementById('plat-lis').classList.add('active');
-            if (platform === 'CS.MONEY') document.getElementById('plat-csmoney').classList.add('active');
-
-            const ourFields = document.getElementById('our-platform-fields');
-            const externalPriceBox = document.getElementById('external-platform-price-box');
-            const actionBtn = document.getElementById('sell-action-btn');
-
-            if (platform === 'Our P2P') {
-                ourFields.style.display = 'block'; 
-                externalPriceBox.style.display = 'none'; 
-                actionBtn.innerText = 'Продать';
-            } else {
-                ourFields.style.display = 'none'; 
-                externalPriceBox.style.display = 'block';
-                document.getElementById('external-plat-title').innerText = platform;
-                document.getElementById('external-plat-price').innerText = 'Загрузка цены...';
-
-                try {
-                    const res = await fetch(`/api/steam/price?name=${encodeURIComponent(currentSelectedItem.name)}`);
-                    const data = await res.json();
-                    let base = (data.success && data.price) ? data.price : 1500;
-                    let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
-                    document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
-                } catch (e) {
-                    document.getElementById('external-plat-price').innerText = '1395 ₽';
-                }
-                actionBtn.innerText = `Перейти на ${platform}`;
-            }
+            } catch (e) {}
         }
 
         async function openSellModal(assetid) {
             const item = myInventory.find(i => i.assetid === assetid);
             if (!item) return;
-
-            if (myListings.some(l => l.assetid === item.assetid)) {
-                alert('Этот предмет уже выставлен на продажу!');
-                return;
-            }
-
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
-            document.getElementById('vip-checkbox').checked = false;
             document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
             
             try {
                 const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
                 const data = await res.json();
-                document.getElementById('sale-price-input').value = (data.success && data.price) ? data.price : 1500;
-            } catch(e) {
-                document.getElementById('sale-price-input').value = 1500;
-            }
-
+                document.getElementById('sale-price-input').value = data.price || 1500;
+            } catch(e) { document.getElementById('sale-price-input').value = 1500; }
+            
             selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
         }
 
         async function confirmSellItem() {
             if (selectedSellPlatform !== 'Our P2P') {
-                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
-                closeModal('modal-sell'); 
-                window.open(targetUrl, '_blank'); 
-                return;
+                window.open(selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com', '_blank');
+                return closeModal('modal-sell');
             }
-
             const price = parseFloat(document.getElementById('sale-price-input').value);
             const isVip = document.getElementById('vip-checkbox').checked;
-
-            if (!price || price <= 0) { alert('Введите корректную цену!'); return; }
-            if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (требуется 245 ₽).'); return; }
-            if (isVip) userBalance -= 245;
-
-            const listing = {
-                assetid: currentSelectedItem.assetid,
-                name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url,
-                seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', 
-                rating: document.getElementById('my-rating').innerText, isVip, platform: selectedSellPlatform
-            };
-
-            const res = await fetch('/api/market/add', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(listing)
-            });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('modal-sell').classList.remove('active');
-                alert('Выставлено на продажу!');
-                fetchMarketItems();
-                syncUserProfile();
-            } else {
-                alert(data.error || 'Ошибка при выставлении');
-            }
+            if (!price) return alert('Введите цену!');
+            if (isVip && userBalance < 245) return alert('Недостаточно средств для VIP');
+            
+            await fetch('/api/market/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assetid: currentSelectedItem.assetid, name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url, seller: myUsername, tgId: myTgId, isVip }) });
+            closeModal('modal-sell');
+            alert('Выставлено на продажу!');
+            fetchMarketItems();
+            syncUserProfile();
         }
 
         async function buyItem(itemId) {
-            const item = marketItems.find(i => (i._id === itemId || i.id === itemId));
-            if (!item) return;
-
-            const tradeUrl = localStorage.getItem('user_trade_url');
-            if (!tradeUrl) {
-                alert('Сначала укажите свою Trade URL в инвентаре!');
-                switchTab('inventory', document.querySelectorAll('.nav-item')[1]);
-                return;
-            }
-            if (userBalance < item.price) {
-                alert('Недостаточно средств на балансе!');
-                openTopUpModal();
-                return;
-            }
-
+            const item = marketItems.find(i => i._id === itemId);
+            if (userBalance < item.price) return alert('Недостаточно средств!');
             if (!confirm(`Купить "${item.name}" за ${item.price} ₽?`)) return;
-
-            try {
-                const res = await fetch('/api/deals/buy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ itemId: item._id || item.id, tgId: myTgId })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Заказ успешно оформлен!');
-                    syncUserProfile();
-                    fetchMarketItems();
-                } else {
-                    alert(data.error || 'Ошибка при покупке');
-                }
-            } catch (e) {
-                alert('Ошибка соединения');
-            }
+            const res = await fetch('/api/deals/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: item._id, tgId: myTgId }) });
+            const data = await res.json();
+            if (data.success) { alert('Успешно куплено!'); syncUserProfile(); fetchMarketItems(); }
         }
 
         async function cancelListing(itemId) {
-            try {
-                const res = await fetch('/api/market/cancel', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ itemId, tgId: myTgId })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('Лот снят с продажи!');
-                    fetchMarketItems();
-                } else {
-                    alert(data.error || 'Не удалось снять лот');
-                }
-            } catch (err) {
-                alert('Ошибка соединения');
-            }
+            await fetch('/api/market/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, tgId: myTgId }) });
+            alert('Лот снят!'); fetchMarketItems();
         }
 
-        async function fetchMarketItems() {
-            try {
-                const res = await fetch('/api/market/items');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (data.success) {
-                    marketItems = data.items;
-                    myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
-                    const profileListings = document.getElementById('profile-listings');
-                    if (profileListings) profileListings.innerText = myListings.length;
-                    renderMarket();
-                    renderMyListings();
-                }
-            } catch (e) {}
+        async function joinGiveaway(giveawayId) {
+            const res = await fetch('/api/giveaways/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, giveawayId }) });
+            const data = await res.json();
+            alert(data.success ? 'Успешно!' : data.error);
+            if (data.success) fetchGiveaways();
         }
 
-        function renderMarket() {
-            const container = document.getElementById('market-listings');
-            if (!container) return;
-            container.innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
-                <div class="card">
-                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
-                    <h4>${i.name}</h4>
-                    <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
-                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick="buyItem('${i._id || i.id}')">Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
-                </div>
-            `).join('');
+        function switchTab(id, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + id).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+            btn.classList.add('active-nav');
         }
 
-        function renderMyListings() {
-            const container = document.getElementById('my-listings');
-            if (!container) return;
-            container.innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
-                <div class="card">
-                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
-                    <h4>${i.name}</h4>
-                    <div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div>
-                    <button class="btn-danger" onclick="cancelListing('${i._id || i.id}')">Снять с продажи</button>
-                </div>
-            `).join('');
+        function selectSellPlatform(plat) {
+            selectedSellPlatform = plat;
+            document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(plat === 'Our P2P' ? 'plat-our' : plat === 'Lis-Skins' ? 'plat-lis' : 'plat-csmoney').classList.add('active');
+            document.getElementById('our-platform-fields').style.display = plat === 'Our P2P' ? 'block' : 'none';
+            document.getElementById('external-platform-price-box').style.display = plat === 'Our P2P' ? 'none' : 'block';
+            document.getElementById('external-plat-title').innerText = plat;
+            document.getElementById('sell-action-btn').innerText = plat === 'Our P2P' ? 'Продать' : `Перейти на ${plat}`;
+            if(plat !== 'Our P2P') document.getElementById('external-plat-price').innerText = Math.round(document.getElementById('sale-price-input').value * 0.95) + ' ₽';
         }
 
         function selectTopupMethod(type) {
             selectedTopupType = type;
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
-            const methodEl = document.getElementById('method-' + type);
-            if (methodEl) methodEl.classList.add('active');
-            const symbol = document.getElementById('topup-symbol');
-            const hint = document.getElementById('topup-hint');
-            if (type === 'crypto') {
-                if (symbol) symbol.innerText = 'USDT'; 
-                if (hint) hint.innerText = 'Сумма зачислится после оплаты (~90 ₽ за 1 USDT). Мин. 10 USDT.';
-            } else {
-                if (symbol) symbol.innerText = '⭐'; 
-                if (hint) hint.innerText = 'Сумма зачислится после оплаты (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
-            }
+            document.getElementById('method-' + type).classList.add('active');
+            document.getElementById('topup-symbol').innerText = type === 'crypto' ? 'USDT' : '⭐';
         }
 
         async function processTopUp() {
-            const amountInput = document.getElementById('topup-amount-input');
-            if (!amountInput) return;
-            const amount = parseFloat(amountInput.value);
-            const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
-            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
-
-            const method = selectedTopupType;
-
-            try {
-                const res = await fetch('/api/billing/invoice', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        tgId: myTgId, 
-                        method: method, 
-                        amount: amount 
-                    })
-                });
-                const data = await res.json();
-                if (data.success && data.invoiceUrl) {
-                    closeModal('modal-topup');
-                    if (selectedTopupType === 'stars' && window.Telegram?.WebApp?.openInvoice) {
-                        window.Telegram.WebApp.openInvoice(data.invoiceUrl, (status) => {
-                            if (status === 'paid') {
-                                alert('Оплата успешно проведена!');
-                                syncUserProfile();
-                            }
-                        });
-                    } else {
-                        window.open(data.invoiceUrl, '_blank');
-                    }
-                } else {
-                    alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
-                }
-            } catch (err) { 
-                alert('Ошибка соединения с сервером'); 
-            }
+            const amount = parseFloat(document.getElementById('topup-amount-input').value);
+            const res = await fetch('/api/billing/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, method: selectedTopupType, amount }) });
+            const data = await res.json();
+            if (data.success) {
+                closeModal('modal-topup');
+                if (selectedTopupType === 'stars' && window.Telegram?.WebApp?.openInvoice) window.Telegram.WebApp.openInvoice(data.invoiceUrl, () => syncUserProfile());
+                else window.open(data.invoiceUrl, '_blank');
+            } else alert(data.error);
         }
 
         async function processWithdraw() {
-            const amountInput = document.getElementById('withdraw-amount-input');
-            const cryptoAccountInput = document.getElementById('withdraw-crypto-account-input');
-            if (!amountInput || !cryptoAccountInput) return;
-
-            const amount = parseFloat(amountInput.value);
-            const cryptoAccount = cryptoAccountInput.value.trim();
-
-            if (isNaN(amount) || amount < 500) { alert('Мин. сумма вывода — 500 ₽.'); return; }
-            if (userBalance < amount) { alert('Недостаточно средств на балансе.'); return; }
-
-            try {
-                const response = await fetch('/api/billing/withdraw', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount, address: cryptoAccount })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    userBalance = data.newBalance;
-                    const userBalanceEl = document.getElementById('user-balance');
-                    const profileBalanceEl = document.getElementById('profile-balance');
-                    if (userBalanceEl) userBalanceEl.innerText = userBalance + ' ₽';
-                    if (profileBalanceEl) profileBalanceEl.innerText = userBalance + ' ₽';
-                    closeModal('modal-withdraw');
-                    alert('Заявка на вывод успешно отправлена администраторам!');
-                } else {
-                    alert('Ошибка: ' + (data.error || 'Не удалось отправить заявку'));
-                }
-            } catch (err) { alert('Ошибка соединения'); }
+            const amount = document.getElementById('withdraw-amount-input').value;
+            const address = document.getElementById('withdraw-crypto-account-input').value;
+            const res = await fetch('/api/billing/withdraw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount, address }) });
+            const data = await res.json();
+            alert(data.success ? 'Заявка на вывод создана' : data.error);
+            if (data.success) { closeModal('modal-withdraw'); syncUserProfile(); }
         }
 
-        function switchTab(id, btn) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            const tabEl = document.getElementById('tab-' + id);
-            if (tabEl) tabEl.classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-            if (btn) btn.classList.add('active-nav');
-        }
-
-        function openTopUpModal() { 
-            const modal = document.getElementById('modal-topup');
-            if (modal) modal.classList.add('active'); 
-        }
-        function openWithdrawModal() { 
-            const modal = document.getElementById('modal-withdraw');
-            if (modal) modal.classList.add('active'); 
-        }
-        function closeModal(id) { 
-            const modal = document.getElementById(id);
-            if (modal) modal.classList.remove('active'); 
-        }
+        function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
+        function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
     </script>
 </body>
 </html>
