@@ -19,7 +19,6 @@ app.get('/', (req, res) => {
 let users = {};
 let marketItems = [];
 let giveaways = [];
-// Временное хранилище состояний для админов (ожидание ввода номера карты)
 let adminStates = {};
 
 function getOrCreateUser(tgId, username = 'Игрок') {
@@ -205,7 +204,6 @@ app.post('/api/deals/buy', (req, res) => {
     res.json({ success: true });
 });
 
-// Пополнение (Crypto Bot, Stars, P2P UZ)
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     let rubles = currency === 'USDT' ? amount * 80 : (currency === 'Stars' ? amount * 1.5 : amount);
@@ -240,7 +238,6 @@ app.post('/api/billing/invoice', async (req, res) => {
     }
 });
 
-// Вывод средств (в т.ч. P2P UZ на карту)
 app.post('/api/billing/withdraw', async (req, res) => {
     const { tgId, amount, recipientAccount, username, method } = req.body;
     const user = getOrCreateUser(tgId, username);
@@ -281,7 +278,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-// Обработка кликов админа по кнопкам в Телеграме
 bot.on('callback_query', async (query) => {
     const data = query.data;
     const adminId = query.from.id;
@@ -292,8 +288,9 @@ bot.on('callback_query', async (query) => {
         const amount = parts[3];
         const sumAmount = parts[4];
 
-        adminStates[adminId] = { action: 'awaiting_card', targetTgId, amount, sumAmount, messageId: query.message.message_id };
-        await bot.sendMessage(adminId, `✍️ Отправьте номер карты (текстом в чат), на который пользователь должен перевести ${sumAmount} сум для пополнения на ${amount} ₽:`);
+        adminStates[adminId] = { action: 'awaiting_card', targetTgId, amount, sumAmount };
+        
+        await bot.sendMessage(query.message.chat.id, `✍️ Отправьте номер карты (текстом), на который пользователь должен перевести **${sumAmount} сум** для пополнения на **${amount} ₽**:`, { parse_mode: 'Markdown' });
         await bot.answerCallbackQuery(query.id);
     } 
     else if (data.startsWith('p2p_confirm_pay_')) {
@@ -325,72 +322,36 @@ bot.on('callback_query', async (query) => {
         });
         await bot.answerCallbackQuery(query.id, { text: 'Вывод подтвержден!' });
     }
+    else if (data.startsWith('user_paid_')) {
+        const parts = data.split('_');
+        const targetTgId = parts[3];
+        const amount = parts[4];
+
+        if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+            await bot.sendMessage(ADMIN_CHAT_ID, `🔔 Пользователь \`${targetTgId}\` нажал кнопку **"Я оплатил"** для пополнения на ${amount} ₽! Проверьте поступление денег и нажмите подтверждение.`, { parse_mode: 'Markdown' });
+        }
+        await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено администратору!' });
+        await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения администратора.`, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id
+        });
+    }
 });
 
-// Обработка текстового ввода админа (когда он вводит номер карты)
 bot.on('message', async (msg) => {
     const adminId = msg.from.id;
     const text = msg.text;
 
-    if (adminStates[adminId] && adminStates[adminId].action === 'awaiting_card') {
-        const state = adminStates[adminId];
-        delete adminStates[adminId];
+    if (!text) return;
 
-        const cardNumber = text.trim();
-        const targetTgId = state.targetTgId;
-        const amount = state.amount;
-        const sumAmount = state.sumAmount;
-
-        try {
-            // Отправляем пользователю реквизиты карты и кнопку подтверждения
-            await bot.sendMessage(targetTgId, 
-                `💳 **Реквизиты для оплаты P2P UZ**\n\n` +
-                `Сумма к оплате: **${sumAmount} сум** (${amount} ₽)\n` +
-                `Номер карты для перевода:\n\`${cardNumber}\`\n\n` +
-                `После перевода нажмите кнопку ниже, чтобы администратор проверил поступление.`, 
-                {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${adminId}_${targetTgId}_${amount}` }]
-                        ]
-                    }
-                }
-            );
-
-            // Уведомляем админа
-            await bot.sendMessage(adminId, `✅ Номер карты отправлен пользователю. Ожидайте подтверждения оплаты от него.`);
-            
-            // Также продублируем в админ чат кнопку подтверждения зачисления для удобства админа
-            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                await bot.sendMessage(ADMIN_CHAT_ID, 
-                    `⏳ Ожидание оплаты P2P UZ от пользователя \`${targetTgId}\` на ${amount} ₽ (${sumAmount} сум).\nКарта: \`${cardNumber}\``,
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: `✅ Подтвердить зачисление (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` }]
-                            ]
-                        }
-                    }
-                );
-            }
-        } catch (e) {
-            await bot.sendMessage(adminId, `❌ Не удалось отправить реквизиты пользователю (возможно, он не запустил бота в ЛС).`);
-        }
-        return;
-    }
-
-    // Обработка кнопки "Я оплатил" от юзера
-    if (msg.text && msg.text.startsWith('/newgiveaway')) {
-        // Логика розыгрышей
-        const lines = msg.text.split('\n');
+    if (text.startsWith('/newgiveaway')) {
+        const lines = text.split('\n');
         let title = '', sponsor = '', timer = '', image = '';
         lines.forEach(line => {
-            if (line.startsWith('Приз:')) title = line.replace('Приз:', '').trim();
-            if (line.startsWith('Спонсор:')) sponsor = line.replace('Спонсор:', '').trim();
-            if (line.startsWith('Таймер:')) timer = line.replace('Таймер:', '').trim();
-            if (line.startsWith('Картинка:')) image = line.replace('Картинка:', '').trim();
+            if (line.startsWith('Prize:') || line.startsWith('Приз:')) title = line.replace(/^(Prize:|Приз:)/, '').trim();
+            if (line.startsWith('Sponsor:') || line.startsWith('Спонсор:')) sponsor = line.replace(/^(Sponsor:|Спонсор:)/, '').trim();
+            if (line.startsWith('Timer:') || line.startsWith('Таймер:')) timer = line.replace(/^(Timer:|Таймер:)/, '').trim();
+            if (line.startsWith('Image:') || line.startsWith('Картинка:')) image = line.replace(/^(Image:|Картинка:)/, '').trim();
         });
         if (!title || !sponsor) return;
         let sponsorUsername = sponsor.trim();
@@ -408,22 +369,54 @@ bot.on('message', async (msg) => {
             participantsCount: 0, participants: []
         });
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" добавлен!`);
+        return;
     }
-});
 
-// Клик юзера "Я оплатил"
-bot.on('callback_query', async (query) => {
-    if (query.data && query.data.startsWith('user_paid_')) {
-        const parts = query.data.split('_');
-        const targetTgId = parts[3];
-        const amount = parts[4];
+    if (adminStates[adminId] && adminStates[adminId].action === 'awaiting_card') {
+        const state = adminStates[adminId];
+        delete adminStates[adminId];
 
-        await bot.sendMessage(ADMIN_CHAT_ID, `🔔 Пользователь \`${targetTgId}\` нажал кнопку **"Я оплатил"** для пополнения на ${amount} ₽! Проверьте поступление денег и нажмите подтверждение.`);
-        await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено администратору!' });
-        await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения администратора.`, {
-            chat_id: query.message.chat.id,
-            message_id: query.message.message_id
-        });
+        const cardNumber = text.trim();
+        const targetTgId = state.targetTgId;
+        const amount = state.amount;
+        const sumAmount = state.sumAmount;
+
+        try {
+            await bot.sendMessage(targetTgId, 
+                `💳 **Реквизиты для оплаты P2P UZ**\n\n` +
+                `Сумма к оплате: **${sumAmount} сум** (${amount} ₽)\n` +
+                `Номер карты для перевода:\n\`${cardNumber}\`\n\n` +
+                `После перевода нажмите кнопку ниже, чтобы администратор проверил поступление.`, 
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${adminId}_${targetTgId}_${amount}` }]
+                        ]
+                    }
+                }
+            );
+
+            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `✅ **Номер карты отправлен пользователю.**\n` +
+                    `👤 Пользователь ID: \`${targetTgId}\`\n` +
+                    `💳 Карта: \`${cardNumber}\`\n` +
+                    `⏳ Ожидайте подтверждения оплаты от него.`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: `✅ Подтвердить зачисление (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` }]
+                            ]
+                        }
+                    }
+                );
+            }
+        } catch (e) {
+            await bot.sendMessage(msg.chat.id, `❌ Ошибка отправки: пользователь не запустил бота в личных сообщениях.`);
+        }
+        return;
     }
 });
 
