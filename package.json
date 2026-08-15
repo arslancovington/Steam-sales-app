@@ -1,14 +1,14 @@
 {
-  "name": "steam-sales-pro",
+  "name": "steam-sales-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "bot.js",
-  "scripts": { "start": "node bot.js" },
+  "scripts": {
+    "start": "node bot.js"
+  },
   "dependencies": {
-    "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.66.0",
     "dotenv": "^16.4.5",
-    "cors": "^2.8.5",
-    "axios": "^1.7.2"
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
   }
 }
