@@ -270,6 +270,7 @@
         </div>
     </div>
 
+    <!-- Обновленное модальное окно пополнения (мин. 5 USDT / 100 звезд, курс скрыт) -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -277,7 +278,7 @@
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
                     <div style="font-size: 18px;">💎</div>
                     <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Crypto Bot</div>
-                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 10 USDT</div>
+                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 5 USDT</div>
                 </div>
                 <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">
                     <div style="font-size: 18px;">⭐</div>
@@ -287,9 +288,9 @@
             </div>
             <div class="price-input-container">
                 <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
-                <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
+                <input type="number" id="topup-amount-input" class="topup-input" placeholder="5" style="padding-left: 55px;">
             </div>
-            <p class="hint-text" id="topup-hint">Сумма зачислится после оплаты (~90 ₽ за 1 USDT).</p>
+            <p class="hint-text" id="topup-hint">Сумма зачислится автоматически после подтверждения оплаты.</p>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" onclick="processTopUp()" style="width:auto; flex:1; margin-top:0;">Оплатить</button>
@@ -384,6 +385,12 @@
                         document.getElementById('trade-url-input').value = data.tradeUrl;
                         localStorage.setItem('user_trade_url', data.tradeUrl);
                     }
+                    if (data.steamId) {
+                        localStorage.setItem('user_steam_id', data.steamId);
+                        const authSection = document.getElementById('auth-section');
+                        if (authSection) authSection.style.display = 'none';
+                        loadSteamData(data.steamId);
+                    }
                 }
             } catch (err) {}
         }
@@ -431,13 +438,6 @@
                 });
                 if (!response.ok) throw new Error();
                 const data = await response.json();
-
-                if (data.avatarUrl) {
-                    document.getElementById('user-avatar-box').innerHTML = `<img src="${data.avatarUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                }
-                if (data.steamName) {
-                    document.getElementById('my-nick').innerText = data.steamName;
-                }
 
                 if (data.success && data.items && data.items.length > 0) {
                     renderInventory(data.items, data.descriptions);
@@ -730,36 +730,33 @@
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
             document.getElementById('method-' + type).classList.add('active');
             const symbol = document.getElementById('topup-symbol');
-            const hint = document.getElementById('topup-hint');
+            const input = document.getElementById('topup-amount-input');
             if (type === 'crypto') {
-                symbol.innerText = 'USDT'; hint.innerText = 'Сумма зачислится после оплаты (~90 ₽ за 1 USDT). Мин. 10 USDT.';
+                symbol.innerText = 'USDT';
+                input.placeholder = '5';
             } else {
-                symbol.innerText = '⭐'; hint.innerText = 'Сумма зачислится после оплаты (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
+                symbol.innerText = '⭐';
+                input.placeholder = '100';
             }
         }
 
         async function processTopUp() {
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
-            const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
-            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
+            const minLimit = selectedTopupType === 'crypto' ? 5 : 100;
+            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit} ${selectedTopupType === 'crypto' ? 'USDT' : 'звёзд'}`); return; }
 
-            let rublesToAdd = selectedTopupType === 'crypto' ? amount * 90 : amount * 1.8;
             let currency = selectedTopupType === 'crypto' ? 'USDT' : 'Звёзды ⭐';
 
             try {
                 const res = await fetch('/api/billing/invoice', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
+                    body: JSON.stringify({ tgId: myTgId, amount, currency })
                 });
                 const data = await res.json();
                 if (data.success) {
                     closeModal('modal-topup');
-                    if (selectedTopupType === 'crypto') {
-                        alert('Счет отправлен в личные сообщения с ботом!');
-                        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-                    } else {
-                        if (data.payUrl) window.open(data.payUrl, '_blank');
-                    }
+                    alert('Счет отправлен в личные сообщения с ботом!');
+                    if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
                 } else {
                     alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
                 }
@@ -780,12 +777,14 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    userBalance -= amount;
+                    userBalance = data.newBalance;
                     document.getElementById('user-balance').innerText = userBalance + ' ₽';
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                     closeModal('modal-withdraw');
                     alert('Заявка на вывод успешно отправлена администраторам!');
-                }
+                } else {
+                    alert(data.error || 'Ошибка вывода');
+          0      }
             } catch (err) { alert('Ошибка соединения'); }
         }
 
