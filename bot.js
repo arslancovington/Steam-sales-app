@@ -24,29 +24,26 @@ const db = {
     pendingPayments: {} 
 };
 
-// Функция расчета рейтинга на основе успешных сделок
 function calculateRating(successfulDeals) {
     if (!successfulDeals || successfulDeals === 0) return 5.0;
     let rating = 5.0 + (successfulDeals * 0.1);
-    return Math.min(rating, 5.0).toFixed(1); // Максимум 5.0, растет с опытом
+    return Math.min(rating, 5.0).toFixed(1);
 }
 
 // --- API МАРШРУТЫ ---
 
-// Надежная загрузка инвентаря с обходом ограничений Steam
+// Надежная загрузка инвентаря через открытый прокси
 app.post('/api/steam/inventory', async (req, res) => {
     const { tradeUrl } = req.body;
     try {
         const partnerId = tradeUrl.split('partner=')[1]?.split('&')[0];
         if (!partnerId) return res.json({ success: false, error: 'Неверная трейд-ссылка' });
         
-        // Запрос через публичный прокси Steam, чтобы обойти блокировку IP хостинга
         const url = `https://steamcommunity.com/inventory/${partnerId}/730/2?l=russian&count=75`;
         const resp = await fetch(url, { 
             headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'ru-RU,ru;q=0.9',
-                'Cookie': 'sessionid=dummy;'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*'
             } 
         });
         const data = await resp.json();
@@ -102,7 +99,6 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-// Профиль пользователя (Баланс, успешные сделки и динамический рейтинг)
 app.get('/api/user/profile', (req, res) => {
     const { tgId } = req.query;
     if (!db.users[tgId]) {
@@ -148,15 +144,20 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, dealId });
 });
 
-// P2P Запрос с лимитом от 200 рублей
-app.post('/api/billing/p2p', (req, res) => {
+// P2P Запрос с гарантированной отправкой админу
+app.post('/api/billing/p2p', async (req, res) => {
     const { tgId, amountRub, username } = req.body;
     const rub = Number(amountRub);
     if (!rub || rub < 200) return res.json({ success: false, error: 'Минимальная сумма пополнения P2P UZ: 200 рублей' });
 
     db.pendingPayments[tgId] = { amountRub: rub };
-    bot.sendMessage(process.env.ADMIN_ID, `💸 ЗАПРОС НА P2P UZ ПОПОЛНЕНИЕ\nЮзер: ${username || 'Без имени'} (@${tgId})\nСумма: ${rub} ₽\n\nОтправьте номер карты в ответ на это сообщение.`);
-    res.json({ success: true, message: 'Запрос отправлен, ожидайте реквизиты' });
+    
+    try {
+        await bot.sendMessage(process.env.ADMIN_ID, `💸 ЗАПРОС НА P2P UZ ПОПОЛНЕНИЕ\nЮзер: ${username || 'Без имени'} (@${tgId})\nID: ${tgId}\nСумма: ${rub} ₽\n\nОтправьте номер карты в ответ на это сообщение.`);
+        res.json({ success: true, message: 'Запрос отправлен, ожидайте реквизиты' });
+    } catch (e) {
+        res.json({ success: false, error: 'Ошибка отправки запроса администратору' });
+    }
 });
 
 app.post('/api/billing/invoice', async (req, res) => {
@@ -271,14 +272,12 @@ bot.on('callback_query', async (query) => {
         if (status === 'yes') {
             deal.status = 'SUCCESS';
             
-            // Начисление успешной сделки продавцу и покупателю
             [deal.sellerTgId, deal.buyerTgId].forEach(id => {
                 if (!db.users[id]) db.users[id] = { balance: 0, successfulDeals: 0, history: [] };
                 db.users[id].successfulDeals++;
                 db.users[id].history.push(`Успешная сделка: ${deal.item.name}`);
             });
 
-            // Начисление средств продавцу
             db.users[deal.sellerTgId].balance += deal.item.price;
 
             bot.answerCallbackQuery(query.id, { text: 'Сделка завершена!' });
@@ -302,17 +301,20 @@ bot.on('callback_query', async (query) => {
 async function notifyAdminDispute(deal, reason) {
     const adminId = process.env.ADMIN_ID;
     if (!adminId) return;
-
     bot.sendMessage(adminId, `🚨 СПОР ПО СДЕЛКЕ\nПредмет: ${deal.item.name}\nПричина: ${reason}`, { parse_mode: 'Markdown' });
 }
+
+// --- TELEGRAM BOT MESSAGES ---
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text || '';
 
+    // Обработка ответа администратора (универсальный поиск ID пользователя)
     if (chatId == process.env.ADMIN_ID && msg.reply_to_message) {
         const replyText = msg.reply_to_message.text;
-        const targetMatch = replyText.match(/@(\d+)/);
+        const targetMatch = replyText.match(/ID:\s*(\d+)/) || replyText.match(/@(\d+)/);
+        
         if (targetMatch && targetMatch[1]) {
             const targetTgId = targetMatch[1];
             const paymentInfo = db.pendingPayments[targetTgId];
@@ -322,7 +324,7 @@ bot.on('message', async (msg) => {
                 const uzs = Math.round(rub * 175).toLocaleString();
 
                 bot.sendMessage(targetTgId, `💳 Реквизиты для оплаты P2P UZ:\n\n🏦 Карта: ${text}\n💵 Сумма: *${uzs} сўм* (${rub} ₽)`, { parse_mode: 'Markdown' });
-                bot.sendMessage(chatId, `✅ Реквизиты отправлены. Сумма: ${uzs} сўм (${rub} ₽).\n\nНажмите для зачисления:`, {
+                bot.sendMessage(chatId, `✅ Реквизиты отправлены пользователю. Сумма: ${uzs} сўм (${rub} ₽).\n\nНажмите для зачисления:`, {
                     reply_markup: {
                         inline_keyboard: [
                             [{ text: `✅ Подтвердить зачисление (${rub} ₽)`, callback_data: `p2p_approve_${targetTgId}_${rub}` }]
@@ -330,6 +332,9 @@ bot.on('message', async (msg) => {
                     }
                 });
                 delete db.pendingPayments[targetTgId];
+            } else {
+                bot.sendMessage(targetTgId, `💳 Реквизиты для оплаты: ${text}`);
+                bot.sendMessage(chatId, `✅ Реквизиты отправлены (сумма не найдена в базе).`);
             }
         }
     }
@@ -350,4 +355,4 @@ bot.on('message', async (msg) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server fully running on port ${PORT}`));
