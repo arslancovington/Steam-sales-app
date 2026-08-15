@@ -4,7 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bot from './bot.js';
-import { db, loadDatabaseFromTelegram, saveDatabaseToTelegram } from './database.js';
+import { db } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,29 +27,26 @@ app.get('/api/user/profile', (req, res) => {
     res.json({ success: true, ...db.users[tgId] });
 });
 
-app.post('/api/user/save', async (req, res) => {
+app.post('/api/user/save', (req, res) => {
     const { tgId, tradeUrl, steamId } = req.body;
     if (!db.users[tgId]) db.users[tgId] = { tgId, balance: 0, rating: 5.0, completedDeals: 0 };
     db.users[tgId].tradeUrl = tradeUrl;
     db.users[tgId].steamId = steamId;
-    await saveDatabaseToTelegram();
     res.json({ success: true });
 });
 
 // Маркет
 app.get('/api/market/items', (req, res) => res.json({ success: true, items: db.marketItems }));
 
-app.post('/api/market/add', async (req, res) => {
+app.post('/api/market/add', (req, res) => {
     const item = { ...req.body, _id: Date.now().toString() };
     db.marketItems.push(item);
-    await saveDatabaseToTelegram();
     res.json({ success: true, item });
 });
 
-app.post('/api/market/cancel', async (req, res) => {
+app.post('/api/market/cancel', (req, res) => {
     const { itemId, tgId } = req.body;
     db.marketItems = db.marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
-    await saveDatabaseToTelegram();
     res.json({ success: true });
 });
 
@@ -72,17 +69,14 @@ app.post('/api/giveaways/join', async (req, res) => {
             if (!['creator', 'administrator', 'member'].includes(chatMember.status)) {
                 return res.json({ success: false, error: `Подпишитесь на спонсора: ${sponsorUsername}` });
             }
-        } catch (e) {
-            console.error("Проверка подписки пропущена:", e.message);
-        }
+        } catch (e) {}
     }
 
     giveaway.participants.push(String(tgId));
-    await saveDatabaseToTelegram();
     res.json({ success: true });
 });
 
-// Steam API (Инвентарь и Цены)
+// Steam API (Цены и Инвентарь)
 app.get('/api/steam/price', async (req, res) => {
     const { name } = req.query;
     if (!name) return res.json({ success: true, price: 50 });
@@ -117,7 +111,7 @@ app.post('/api/steam/inventory', async (req, res) => {
 });
 
 // Сделки
-app.post('/api/deals/buy', async (req, res) => {
+app.post('/api/deals/buy', (req, res) => {
     const { tgId, itemId } = req.body;
     const index = db.marketItems.findIndex(i => i._id === itemId);
     if (index === -1) return res.json({ success: false, error: 'Лот не найден' });
@@ -132,11 +126,10 @@ app.post('/api/deals/buy', async (req, res) => {
     }
 
     db.marketItems.splice(index, 1);
-    await saveDatabaseToTelegram();
     res.json({ success: true, newBalance: db.users[tgId].balance });
 });
 
-// Оплата и Вывод
+// Оплата и вывод
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, method, amount } = req.body;
     if (method === 'stars' && bot) {
@@ -162,14 +155,12 @@ app.post('/api/billing/invoice', async (req, res) => {
     res.json({ success: false, error: 'Ошибка создания счета' });
 });
 
-app.post('/api/billing/withdraw', async (req, res) => {
+app.post('/api/billing/withdraw', (req, res) => {
     const { tgId, amount, address } = req.body;
     const withdrawAmount = Number(amount);
     if (!db.users[tgId] || db.users[tgId].balance < withdrawAmount) return res.json({ success: false, error: 'Недостаточно средств' });
     
     db.users[tgId].balance -= withdrawAmount;
-    await saveDatabaseToTelegram();
-
     if (bot && process.env.ADMIN_CHAT_ID) {
         bot.sendMessage(process.env.ADMIN_CHAT_ID, `💸 Заявка на вывод:\nUser: ${tgId}\nСумма: ${withdrawAmount} ₽\nРеквизиты: ${address}`).catch(()=>{});
     }
@@ -177,9 +168,4 @@ app.post('/api/billing/withdraw', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
-// Сначала загружаем базу из Telegram-чата, затем запускаем сервер
-loadDatabaseFromTelegram().then(() => {
-    app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
-});
-        
+app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
