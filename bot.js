@@ -1,11 +1,12 @@
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
-const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || ''; // Опционально для автоматических ссылок Crypto Pay
+const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -17,10 +18,31 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-let users = {};
-let marketItems = [];
-let giveaways = [];
+// Система постоянного хранения данных в файле database.json
+const dbFile = path.join(__dirname, 'database.json');
+let db = { users: {}, marketItems: [], giveaways: [] };
+
+if (fs.existsSync(dbFile)) {
+    try {
+        const fileData = fs.readFileSync(dbFile, 'utf8');
+        db = JSON.parse(fileData);
+    } catch (e) {
+        console.error("Ошибка чтения базы данных, создана новая:", e.message);
+    }
+}
+
+let users = db.users || {};
+let marketItems = db.marketItems || [];
+let giveaways = db.giveaways || [];
 let adminStates = {};
+
+function saveData() {
+    try {
+        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2));
+    } catch (e) {
+        console.error("Ошибка сохранения базы данных:", e.message);
+    }
+}
 
 function getOrCreateUser(tgId, username = 'Игрок') {
     if (!users[tgId]) {
@@ -33,8 +55,10 @@ function getOrCreateUser(tgId, username = 'Игрок') {
             tradeUrl: '', 
             steamId: '' 
         };
-    } else if (username && username !== 'Игрок') {
+        saveData();
+    } else if (username && username !== 'Игрок' && users[tgId].username !== username) {
         users[tgId].username = username;
+        saveData();
     }
     return users[tgId];
 }
@@ -42,15 +66,11 @@ function getOrCreateUser(tgId, username = 'Игрок') {
 function extractSteamIdFromTradeUrl(url) {
     if (!url) return null;
     const profileMatch = url.match(/\/profiles\/(\d{17})/);
-    if (profileMatch && profileMatch[1]) {
-        return profileMatch[1];
-    }
+    if (profileMatch && profileMatch[1]) return profileMatch[1];
     const partnerMatch = url.match(/partner=(\d+)/);
     if (partnerMatch && partnerMatch[1]) {
-        const partnerId = partnerMatch[1];
         try {
-            const steamId64 = (BigInt(partnerId) + 76561197960265728n).toString();
-            return steamId64;
+            return (BigInt(partnerMatch[1]) + 76561197960265728n).toString();
         } catch (e) {
             return null;
         }
@@ -78,6 +98,7 @@ app.post('/api/user/save', (req, res) => {
         user.steamId = steamId;
     }
 
+    saveData();
     res.json({ success: true, steamId: user.steamId });
 });
 
@@ -89,12 +110,14 @@ app.post('/api/market/add', (req, res) => {
     const item = req.body;
     item._id = Date.now().toString();
     marketItems.push(item);
+    saveData();
     res.json({ success: true });
 });
 
 app.post('/api/market/cancel', (req, res) => {
     const { itemId, tgId } = req.body;
     marketItems = marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
+    saveData();
     res.json({ success: true });
 });
 
@@ -133,6 +156,7 @@ app.post('/api/giveaways/join', async (req, res) => {
 
     giveaway.participants.push(String(tgId));
     giveaway.participantsCount = giveaway.participants.length;
+    saveData();
     res.json({ success: true });
 });
 
@@ -169,7 +193,6 @@ app.post('/api/steam/inventory', async (req, res) => {
             res.json({ success: false, items: [], descriptions: [] });
         }
     } catch (e) {
-        console.error("Steam API Error:", e.message);
         res.json({ success: false, items: [], descriptions: [] });
     }
 });
@@ -244,9 +267,7 @@ app.post('/api/billing/invoice', async (req, res) => {
                     if (cryptoRes.data && cryptoRes.data.ok) {
                         payUrl = cryptoRes.data.result.pay_url;
                     }
-                } catch (err) {
-                    console.error('CryptoBot API error:', err.message);
-                }
+                } catch (err) {}
             }
 
             await bot.sendMessage(tgId, 
@@ -281,6 +302,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 
     user.balance -= amount;
+    saveData();
 
     try {
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
@@ -308,6 +330,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
         res.json({ success: true, newBalance: user.balance });
     } catch (e) {
         user.balance += amount;
+        saveData();
         res.json({ success: false, error: 'Ошибка отправки чека администраторам' });
     }
 });
@@ -334,6 +357,7 @@ bot.on('callback_query', async (query) => {
 
         const user = getOrCreateUser(targetTgId);
         user.balance += amount;
+        saveData();
 
         await bot.sendMessage(targetTgId, `✅ Ваша оплата на сумму ${amount} ₽ подтверждена! Баланс успешно пополнен.`);
         await bot.editMessageText(`✅ Пополнение на ${amount} ₽ для игрока \`${targetTgId}\` успешно подтверждено!`, {
@@ -402,6 +426,7 @@ bot.on('message', async (msg) => {
             image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
             participantsCount: 0, participants: []
         });
+        saveData();
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" добавлен!`);
         return;
     }
@@ -458,4 +483,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Bot and Server are running on port ${PORT}`);
 });
-    
