@@ -1,7 +1,6 @@
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
-const fetch = require('node-fetch');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || 'YOUR_CRYPTO_BOT_TOKEN';
@@ -71,7 +70,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Умная цена для предметов
+// Умная цена для предметов через встроенный fetch
 app.get('/api/steam/price', async (req, res) => {
     const { name } = req.query;
     if (!name) return res.json({ success: true, price: 50 });
@@ -87,7 +86,6 @@ app.get('/api/steam/price', async (req, res) => {
         }
     } catch (e) { console.error("Price fetch error:", e.message); }
 
-    // Базовая цена для наклеек/граффити или если Steam API недоступен
     const isCheap = name.toLowerCase().includes('sticker') || name.toLowerCase().includes('graffiti');
     res.json({ success: true, price: isCheap ? 30 : 250 });
 });
@@ -127,15 +125,15 @@ app.post('/api/billing/invoice', async (req, res) => {
             const link = await bot.createInvoiceLink('Пополнение', 'Steam Sales', JSON.stringify({tgId, amount}), '', 'XTR', [{label: 'Stars', amount: Number(amount)}]);
             return res.json({ success: true, invoiceUrl: link });
         }
-        res.json({ success: true, invoiceUrl: 'https://crypt.bot/pay/test' }); // Заглушка для примера
+        res.json({ success: true, invoiceUrl: 'https://crypt.bot/pay/test' });
     } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
 bot.on('message', async (msg) => {
     if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
     const lines = msg.text.split('\n');
-    let title = lines.find(l => l.startsWith('Приз:'))?.replace('Приз:', '').trim();
-    let sponsor = lines.find(l => l.startsWith('Спонсор:'))?.replace('Спонсор:', '').trim();
+    let title = lines.find(l => l.startsWith('Prize:') || l.startsWith('Приз:'))?.replace(/(Prize:|Приз:)/, '').trim();
+    let sponsor = lines.find(l => l.startsWith('Sponsor:') || l.startsWith('Спонсор:'))?.replace(/(Sponsor:|Спонсор:)/, '').trim();
     
     if (!title || !sponsor) return bot.sendMessage(msg.chat.id, 'Используй формат:\nПриз: Скин\nСпонсор: @канал');
 
