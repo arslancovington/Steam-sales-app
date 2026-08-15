@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Backend and Bot for P2P Steam Sales",
   "main": "bot.js",
+  "type": "module",
   "scripts": {
     "start": "node bot.js"
   },
