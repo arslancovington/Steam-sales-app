@@ -91,7 +91,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Steam API (Цены и инвентарь)
+// Steam API (Цены)
 app.get('/api/steam/price', async (req, res) => {
     const { name } = req.query;
     if (!name) return res.json({ success: true, price: 50 });
@@ -109,19 +109,37 @@ app.get('/api/steam/price', async (req, res) => {
     res.json({ success: true, price: isCheap ? 30 : 250 });
 });
 
+// Обновленный Steam API (Инвентарь с обходом защиты)
 app.post('/api/steam/inventory', async (req, res) => {
     try {
         const { steamId } = req.body;
         if (!steamId) return res.json({ success: false, error: 'Steam ID не указан', items: [], descriptions: [] });
         
         const url = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`;
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (!response.ok) throw new Error("Steam API error");
+        
+        const response = await fetch(url, { 
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'X-Requested-With': 'XMLHttpRequest'
+            } 
+        });
+
+        if (!response.ok) {
+            console.log(`Steam API status: ${response.status}`);
+            throw new Error("Steam API error");
+        }
         
         const data = await response.json();
-        res.json({ success: true, items: data.assets || [], descriptions: data.descriptions || [] });
+        
+        if (data && data.success) {
+            res.json({ success: true, items: data.assets || [], descriptions: data.descriptions || [] });
+        } else {
+            res.json({ success: false, error: 'Инвентарь пуст или скрыт', items: [], descriptions: [] });
+        }
     } catch (e) {
-        res.json({ success: false, error: 'Профиль закрыт или инвентарь недоступен', items: [], descriptions: [] });
+        console.error("Inventory fetch error:", e.message);
+        res.json({ success: false, error: 'Ошибка загрузки. Убедитесь, что профиль и инвентарь полностью открыты в настройках Steam.', items: [], descriptions: [] });
     }
 });
 
@@ -221,3 +239,4 @@ bot.on('message', async (msg) => {
 app.listen(PORT, () => {
     console.log(`🚀 Bot and Server running together on port ${PORT}`);
 });
+        
