@@ -1,11 +1,21 @@
 import express from 'express';
 import TelegramBot from 'node-telegram-bot-api';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import 'dotenv/config';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+
+// Раздача статики и главного файла из корневой папки
+app.use(express.static(__dirname));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const db = { 
     users: {}, 
@@ -60,6 +70,17 @@ app.get('/api/steam/price', async (req, res) => {
     res.json({ success: true, price: 200 });
 });
 
+// Добавление товара на маркет
+app.get('/api/market/items', (req, res) => {
+    res.json({ success: true, items: db.marketItems });
+});
+
+app.post('/api/market/add', (req, res) => {
+    const item = { ...req.body, _id: Date.now().toString() };
+    db.marketItems.push(item);
+    res.json({ success: true, item });
+});
+
 // 3. Покупка предмета и запуск процесса сделки
 app.post('/api/deals/buy', async (req, res) => {
     const { buyerTgId, buyerTradeUrl, itemId } = req.body;
@@ -67,7 +88,7 @@ app.post('/api/deals/buy', async (req, res) => {
     if (itemIndex === -1) return res.json({ success: false, error: 'Предмет не найден' });
 
     const item = db.marketItems[itemIndex];
-    db.marketItems.splice(itemIndex, 1); // Удаляем с витрины
+    db.marketItems.splice(itemIndex, 1);
 
     const dealId = Date.now().toString();
     db.deals[dealId] = {
@@ -80,7 +101,6 @@ app.post('/api/deals/buy', async (req, res) => {
         status: 'PENDING'
     };
 
-    // Уведомление продавцу с кнопкой и трейд-ссылкой покупателя
     await bot.sendMessage(item.tgId, `🔔 Пользователь (${buyerTgId}) купил ваш предмет: *${item.name}*`, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -105,7 +125,7 @@ app.post('/api/billing/p2p', (req, res) => {
     res.json({ success: true, message: 'Запрос отправлен, ожидайте реквизиты' });
 });
 
-// 5. Оплата CryptoBot (мин. 3 USDT) и Stars с уведомлением админа
+// 5. Оплата CryptoBot и Stars
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, method, amount } = req.body;
     const val = Number(amount);
@@ -153,7 +173,7 @@ app.post('/api/promo/apply', (req, res) => {
     res.status(400).json({ success: false, error: 'Промокод недействителен или исчерпан' });
 });
 
-// --- CALLBACK QUERY (Кнопки подтверждения сделок) ---
+// --- CALLBACK QUERY ---
 
 bot.on('callback_query', async (query) => {
     const data = query.data;
@@ -172,7 +192,6 @@ bot.on('callback_query', async (query) => {
                 chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
             });
 
-            // Запрашиваем подтверждение у покупателя
             bot.sendMessage(deal.buyerTgId, `📦 Продавец подтвердил отправку предмета *${deal.item.name}*. Вы получили скин?`, {
                 parse_mode: 'Markdown',
                 reply_markup: {
@@ -205,7 +224,6 @@ bot.on('callback_query', async (query) => {
             bot.editMessageText(`🎉 Сделка по предмету *${deal.item.name}* успешно завершена!`, {
                 chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
             });
-            // Уведомление обеим сторонам
             bot.sendMessage(deal.sellerTgId, `🎉 Сделка по предмету *${deal.item.name}* успешно завершена! Средства зачислены.`, { parse_mode: 'Markdown' });
             bot.sendMessage(deal.buyerTgId, `🎉 Сделка успешно завершена! Приятной игры.`);
         } else if (status === 'no') {
@@ -220,7 +238,6 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Функция отправки отчета в админ-чат при проблемах со сделкой
 async function notifyAdminDispute(deal, reason) {
     const adminId = process.env.ADMIN_ID;
     if (!adminId) return;
@@ -249,13 +266,12 @@ async function notifyAdminDispute(deal, reason) {
     bot.sendMessage(adminId, report, { parse_mode: 'Markdown' });
 }
 
-// --- ЛОГИКА TELEGRAM БОТА (Сообщения) ---
+// --- TELEGRAM BOT MESSAGES ---
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text || '';
 
-    // Ответ админа на P2P запрос реплаем
     if (chatId == process.env.ADMIN_ID && msg.reply_to_message) {
         const replyText = msg.reply_to_message.text;
         const targetMatch = replyText.match(/@(\d+)/);
@@ -266,7 +282,6 @@ bot.on('message', async (msg) => {
         }
     }
 
-    // Создание промокода администратором
     if (text.startsWith('/createpromo')) {
         const lines = text.split('\n');
         let code = '', count = 0;
