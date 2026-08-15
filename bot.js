@@ -20,6 +20,22 @@ let users = {};
 let marketItems = [];
 let giveaways = [];
 
+// Безопасное получение или создание пользователя
+function getOrCreateUser(tgId, username = 'Игрок') {
+    if (!users[tgId]) {
+        users[tgId] = { 
+            tgId, 
+            username: username || 'Игрок', 
+            balance: 0, 
+            rating: 5.0, 
+            completedDeals: 0, 
+            tradeUrl: '', 
+            steamId: '' 
+        };
+    }
+    return users[tgId];
+}
+
 // Функция для извлечения и конвертации SteamID64 из Trade URL
 function extractSteamIdFromTradeUrl(url) {
     if (!url) return null;
@@ -40,28 +56,50 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
+// Парсинг никнейма и аватара из публичного профиля Steam (XML)
+async function getSteamProfileInfo(steamId) {
+    try {
+        const res = await axios.get(`https://steamcommunity.com/profiles/${steamId}/?xml=1`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 5000
+        });
+        const xml = res.data;
+        const nameMatch = xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/) || xml.match(/<steamID>(.*?)<\/steamID>/);
+        const avatarMatch = xml.match(/<avatarMedium><!\[CDATA\[(.*?)\]\]><\/avatarMedium>/) || xml.match(/<avatarMedium>(.*?)<\/avatarMedium>/);
+        
+        return {
+            steamName: nameMatch ? nameMatch[1] : null,
+            avatarUrl: avatarMatch ? avatarMatch[1] : null
+        };
+    } catch (e) {
+        return { steamName: null, avatarUrl: null };
+    }
+}
+
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
-    if (!users[tgId]) {
-        users[tgId] = { tgId, username: tgUser, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '', steamId: '' };
+    if (!tgId) return res.json({ success: false, error: 'No tgId provided' });
+    
+    const user = getOrCreateUser(tgId, tgUser);
+    if (tgUser && user.username === 'Игрок') {
+        user.username = tgUser;
     }
-    res.json({ success: true, ...users[tgId] });
+    res.json({ success: true, ...user });
 });
 
 app.post('/api/user/save', (req, res) => {
     const { tgId, tradeUrl } = req.body;
-    if (!users[tgId]) {
-        users[tgId] = { tgId, balance: 0, rating: 5.0, completedDeals: 0 };
-    }
-    users[tgId].tradeUrl = tradeUrl;
+    if (!tgId) return res.json({ success: false, error: 'No tgId provided' });
+
+    const user = getOrCreateUser(tgId);
+    user.tradeUrl = tradeUrl || '';
     
-    // Автоматически определяем SteamID64 через хелпер
     const steamId = extractSteamIdFromTradeUrl(tradeUrl);
     if (steamId) {
-        users[tgId].steamId = steamId;
+        user.steamId = steamId;
     }
 
-    res.json({ success: true, steamId: users[tgId].steamId });
+    res.json({ success: true, steamId: user.steamId });
 });
 
 app.get('/api/market/items', (req, res) => {
@@ -119,7 +157,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Запрос инвентаря Steam с использованием сохраненного или переданного steamId
+// Запрос инвентаря Steam + подгрузка аватара и никнейма
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     
@@ -132,24 +170,36 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 
     try {
-        const response = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
-            },
-            timeout: 10000
-        });
+        const [invRes, profileInfo] = await Promise.all([
+            axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Accept-Language': 'ru-RU,ru;q=0.9',
+                    'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
+                },
+                timeout: 10000
+            }).catch(() => ({ data: null })),
+            getSteamProfileInfo(steamId)
+        ]);
 
-        if (response.data && response.data.success) {
+        const invData = invRes?.data;
+        if (invData && invData.success) {
             res.json({
                 success: true,
-                items: response.data.assets || [],
-                descriptions: response.data.descriptions || []
+                items: invData.assets || [],
+                descriptions: invData.descriptions || [],
+                steamName: profileInfo.steamName,
+                avatarUrl: profileInfo.avatarUrl
             });
         } else {
-            res.json({ success: false, items: [], descriptions: [] });
+            res.json({ 
+                success: false, 
+                items: [], 
+                descriptions: [], 
+                steamName: profileInfo.steamName, 
+                avatarUrl: profileInfo.avatarUrl 
+            });
         }
     } catch (e) {
         console.error("Steam API Error:", e.message);
@@ -157,15 +207,39 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-app.get('/api/steam/price', (req, res) => {
-    res.json({ success: true, price: 1500 });
+// Получение реальной цены скина со Steam Community Market (в рублях)
+app.get('/api/steam/price', async (req, res) => {
+    const skinName = req.query.name;
+    if (!skinName) return res.json({ success: false, price: 100 });
+
+    try {
+        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(skinName)}`;
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept-Language': 'ru-RU,ru;q=0.9'
+            },
+            timeout: 5000
+        });
+
+        if (response.data && response.data.success && response.data.lowest_price) {
+            let priceStr = response.data.lowest_price.replace(/[^\d,.]/g, '').replace(/\s/g, '').replace(',', '.');
+            let price = parseFloat(priceStr);
+            if (!isNaN(price) && price > 0) {
+                return res.json({ success: true, price: Math.round(price) });
+            }
+        }
+        res.json({ success: true, price: 150 });
+    } catch (e) {
+        res.json({ success: true, price: 150 });
+    }
 });
 
 app.post('/api/deals/buy', (req, res) => {
     res.json({ success: true });
 });
 
-// Пополнение (USDT по 80₽, Stars по 1.5₽)
+// Пополнение баланса
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     let rubles = currency === 'USDT' ? amount * 80 : amount * 1.5;
@@ -178,31 +252,32 @@ app.post('/api/billing/invoice', async (req, res) => {
     }
 });
 
-// Вывод средств (чек в админ-чат)
+// Вывод средств (с защитой от списания при ошибке отправки)
 app.post('/api/billing/withdraw', async (req, res) => {
     const { tgId, amount, recipientAccount, username } = req.body;
+    const user = getOrCreateUser(tgId, username);
     
-    if (!users[tgId] || users[tgId].balance < amount) {
+    if (user.balance < amount) {
         return res.json({ success: false, error: 'Недостаточно средств на балансе' });
     }
 
-    users[tgId].balance -= amount;
+    user.balance -= amount;
 
     try {
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств!**\n\n👤 Игрок: @${username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
+            await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств!**\n\n👤 Игрок: @${username || user.username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
         }
-        res.json({ success: true, newBalance: users[tgId].balance });
+        res.json({ success: true, newBalance: user.balance });
     } catch (e) {
+        user.balance += amount; // Возвращаем баланс в случае ошибки сети/телеграма
         res.json({ success: false, error: 'Ошибка отправки чека администраторам' });
     }
 });
 
 app.post('/api/inventory/instant-sell', (req, res) => {
     const { tgId, payout } = req.body;
-    if (users[tgId]) {
-        users[tgId].balance += (payout || 0);
-    }
+    const user = getOrCreateUser(tgId);
+    user.balance += (payout || 0);
     res.json({ success: true });
 });
 
