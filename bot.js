@@ -18,7 +18,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Система постоянного хранения данных в файле database.json
 const dbFile = path.join(__dirname, 'database.json');
 let db = { users: {}, marketItems: [], giveaways: [] };
 
@@ -281,14 +280,21 @@ app.post('/api/billing/invoice', async (req, res) => {
                     }
                 }
             );
-        } else {
-            await bot.sendMessage(tgId, 
-                `🧾 **Счет на пополнение баланса**\n\nСумма: **${amount} ⭐**\nК зачислению: **${Math.round(rubles)} ₽**\n\nПожалуйста, завершите оплату через Telegram Stars.`,
-                { parse_mode: 'Markdown' }
+        } else if (currency === 'Stars') {
+            // Отправка нативного инвойса Telegram Stars (XTR)
+            await bot.sendInvoice(
+                tgId,
+                'Пополнение баланса',
+                `Пополнение баланса на ${Math.round(rubles)} ₽`,
+                `topup_${tgId}_${amount}_${Math.round(rubles)}`,
+                '', // Пустой провайдер токен для Telegram Stars
+                'XTR',
+                [{ label: `${amount} ⭐ Звёзд`, amount: parseInt(amount) }]
             );
         }
         res.json({ success: true });
     } catch (e) {
+        console.error("Invoice Error:", e.message);
         res.json({ success: false, error: 'Не удалось отправить счет. Напишите боту /start в личные сообщения.' });
     }
 });
@@ -333,6 +339,13 @@ app.post('/api/billing/withdraw', async (req, res) => {
         saveData();
         res.json({ success: false, error: 'Ошибка отправки чека администраторам' });
     }
+});
+
+// Обязательный ответ на пре-чекаут для Telegram Stars
+bot.on('pre_checkout_query', async (query) => {
+    try {
+        await bot.answerPreCheckoutQuery(query.id, true);
+    } catch (e) {}
 });
 
 bot.on('callback_query', async (query) => {
@@ -397,6 +410,23 @@ bot.on('callback_query', async (query) => {
 });
 
 bot.on('message', async (msg) => {
+    // Обработка успешной оплаты Telegram Stars
+    if (msg.successful_payment) {
+        const payload = msg.successful_payment.invoice_payload;
+        if (payload && payload.startsWith('topup_')) {
+            const parts = payload.split('_');
+            const tgId = parts[1];
+            const rubles = parseFloat(parts[3]);
+            
+            const user = getOrCreateUser(tgId);
+            user.balance += rubles;
+            saveData();
+
+            await bot.sendMessage(tgId, `✅ Оплата через Telegram Stars прошла успешно! Баланс пополнен на ${Math.round(rubles)} ₽.`);
+        }
+        return;
+    }
+
     const adminId = msg.from.id;
     const text = msg.text;
 
