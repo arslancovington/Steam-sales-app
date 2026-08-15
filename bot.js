@@ -11,7 +11,6 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const app = express();
 app.use(express.json());
 
-// Раздача статики и главного файла из корневой папки
 app.use(express.static(__dirname));
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -25,9 +24,11 @@ const db = {
     pendingPayments: {} 
 };
 
+// Курс конвертации
+const RATE = 175;
+
 // --- API МАРШРУТЫ ---
 
-// 1. Загрузка инвентаря по трейд-ссылке
 app.post('/api/steam/inventory', async (req, res) => {
     const { tradeUrl } = req.body;
     try {
@@ -44,7 +45,6 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-// 2. Получение цен с учетом провайдеров или Steam
 app.get('/api/steam/price', async (req, res) => {
     let { name, provider } = req.query;
     if (!name) return res.json({ success: true, price: 100 });
@@ -70,7 +70,6 @@ app.get('/api/steam/price', async (req, res) => {
     res.json({ success: true, price: 200 });
 });
 
-// Добавление товара на маркет
 app.get('/api/market/items', (req, res) => {
     res.json({ success: true, items: db.marketItems });
 });
@@ -81,7 +80,21 @@ app.post('/api/market/add', (req, res) => {
     res.json({ success: true, item });
 });
 
-// 3. Покупка предмета и запуск процесса сделки
+app.post('/api/market/cancel', (req, res) => {
+    const { itemId, tgId } = req.body;
+    db.marketItems = db.marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
+    res.json({ success: true });
+});
+
+// Получение данных пользователя (баланс)
+app.get('/api/user/profile', (req, res) => {
+    const { tgId } = req.query;
+    if (!db.users[tgId]) {
+        db.users[tgId] = { balance: 0, rating: 5.0 };
+    }
+    res.json({ success: true, balance: db.users[tgId].balance });
+});
+
 app.post('/api/deals/buy', async (req, res) => {
     const { buyerTgId, buyerTradeUrl, itemId } = req.body;
     const itemIndex = db.marketItems.findIndex(i => i._id === itemId);
@@ -117,15 +130,17 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, dealId });
 });
 
-// 4. P2P Пополнение (Узбекистан)
+// P2P Запрос пополнения
 app.post('/api/billing/p2p', (req, res) => {
-    const { tgId, amount, username } = req.body;
-    db.pendingPayments[tgId] = { amount, step: 'WAITING_CARD' };
-    bot.sendMessage(process.env.ADMIN_ID, `💸 ЗАПРОС НА P2P ПОПОЛНЕНИЕ\nЮзер: ${username || 'Без имени'} (@${tgId})\nСумма: ${amount} сум\n\nОтправьте номер карты в ответ на это сообщение.`);
+    const { tgId, amountRub, username } = req.body;
+    const rub = Number(amountRub);
+    if (!rub || rub <= 0) return res.json({ success: false, error: 'Неверная сумма' });
+
+    db.pendingPayments[tgId] = { amountRub: rub };
+    bot.sendMessage(process.env.ADMIN_ID, `💸 ЗАПРОС НА P2P ПОПОЛНЕНИЕ\nЮзер: ${username || 'Без имени'} (@${tgId})\nСумма: ${rub} ₽\n\nОтправьте номер карты в ответ на это сообщение.`);
     res.json({ success: true, message: 'Запрос отправлен, ожидайте реквизиты' });
 });
 
-// 5. Оплата CryptoBot и Stars
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, method, amount } = req.body;
     const val = Number(amount);
@@ -156,14 +171,12 @@ app.post('/api/billing/invoice', async (req, res) => {
     res.status(400).json({ success: false, error: 'Ошибка создания счета' });
 });
 
-// 6. Запрос на вывод средств
 app.post('/api/billing/withdraw', (req, res) => {
     const { tgId, amount, details } = req.body;
     bot.sendMessage(process.env.ADMIN_ID, `📤 ЗАПРОС НА ВЫВОД СРЕДСТВ\nЮзер: ${tgId}\nСумма: ${amount}\nРеквизиты: ${details}`);
     res.json({ success: true, message: 'Запрос на вывод отправлен администратору' });
 });
 
-// 7. Промокоды
 app.post('/api/promo/apply', (req, res) => {
     const { code } = req.body;
     if (db.promos[code] && db.promos[code].used < db.promos[code].count) {
@@ -179,6 +192,26 @@ bot.on('callback_query', async (query) => {
     const data = query.data;
     const chatId = query.message.chat.id;
     const msgId = query.message.message_id;
+
+    // Подтверждение зачисления P2P платежа администратором
+    if (data.startsWith('p2p_approve_')) {
+        const [_, __, targetTgId, rubStr] = data.split('_');
+        const rub = Number(rubStr);
+
+        if (!db.users[targetTgId]) {
+            db.users[targetTgId] = { balance: 0, rating: 5.0 };
+        }
+        db.users[targetTgId].balance += rub; // Пополняем баланс в рублях
+
+        bot.answerCallbackQuery(query.id, { text: 'Платеж подтвержден, баланс пополнен!' });
+        bot.editMessageText(query.message.text + `\n\n✅ *СТАТУС: Оплачено и зачислено (${rub} ₽)*`, {
+            chat_id: chatId, message_id: msgId, parse_mode: 'Markdown'
+        });
+
+        // Уведомление пользователю
+        bot.sendMessage(targetTgId, `🎉 Ваш платеж на сумму *${rub} ₽* подтвержден администратором! Баланс успешно пополнен.`, { parse_mode: 'Markdown' });
+        return;
+    }
 
     if (data.startsWith('deal_')) {
         const [_, status, dealId] = data.split('_');
@@ -272,13 +305,37 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text || '';
 
+    // Шаг 1: Админ отвечает на P2P запрос номером карты
     if (chatId == process.env.ADMIN_ID && msg.reply_to_message) {
         const replyText = msg.reply_to_message.text;
         const targetMatch = replyText.match(/@(\d+)/);
         if (targetMatch && targetMatch[1]) {
             const targetTgId = targetMatch[1];
-            bot.sendMessage(targetTgId, `💳 Реквизиты для оплаты: ${text}`);
-            bot.sendMessage(chatId, `✅ Реквизиты успешно отправлены пользователю.`);
+            const paymentInfo = db.pendingPayments[targetTgId];
+
+            if (paymentInfo && paymentInfo.amountRub) {
+                const rub = paymentInfo.amountRub;
+                const uzs = Math.round(rub * RATE).toLocaleString(); // Расчет по курсу 175
+
+                // Отправляем реквизиты пользователю И добавляем админу кнопку подтверждения
+                bot.sendMessage(targetTgId, `💳 Реквизиты для оплаты:\n\n` +
+                                            `🏦 Карточный счет: ${text}\n` +
+                                            `💵 Сумма к оплате: *${uzs} сўм* (${rub} ₽)\n\n` +
+                                            `После оплаты ожидайте подтверждения администратора.`, { parse_mode: 'Markdown' });
+                
+                bot.sendMessage(chatId, `✅ Реквизиты и сумма (${uzs} сўм / ${rub} ₽) отправлены пользователю.\n\nКогда деньги поступят, нажмите кнопку ниже, чтобы зачислить баланс:`, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: `✅ Подтвердить зачисление (${rub} ₽)`, callback_data: `p2p_approve_${targetTgId}_${rub}` }]
+                        ]
+                    }
+                });
+
+                delete db.pendingPayments[targetTgId];
+            } else {
+                bot.sendMessage(targetTgId, `💳 Реквизиты для оплаты: ${text}`);
+                bot.sendMessage(chatId, `✅ Реквизиты отправлены (сумма не найдена в базе).`);
+            }
         }
     }
 
