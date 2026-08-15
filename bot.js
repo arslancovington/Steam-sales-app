@@ -17,17 +17,7 @@ app.get('/', (req, res) => {
 
 let users = {};
 let marketItems = [];
-let giveaways = [
-    {
-        _id: 'giveaway_1',
-        title: 'AK-47 | Neon Rider (Field-Tested)',
-        sponsor: '@PartnerChannel',
-        timer: 'До 20 авг',
-        image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
-        participantsCount: 142,
-        participants: []
-    }
-];
+let giveaways = []; // Тестовые предметы удалены, список пуст
 
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
