@@ -317,7 +317,6 @@
         let currentSelectedItem = null;
         let myInventory = [], marketItems = [], myListings = [];
 
-        // Безопасное получение данных пользователя с защитой от сбоев
         let tgUser = null;
         try {
             tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -328,7 +327,6 @@
         const myTgId = tgUser?.id || 123456789;
         const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
 
-        // Гарантированное скрытие загрузчика при любых ошибках
         function hideCs16Loading() {
             const modal = document.getElementById('cs16-loading-modal');
             if (modal) {
@@ -343,7 +341,6 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            // Аварийный таймер: через 2 секунды экран гарантированно разблокируется, даже если сеть упала
             const safetyTimeout = setTimeout(() => {
                 hideCs16Loading();
             }, 2000);
@@ -360,7 +357,6 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
 
-                // Параллельный запуск запросов с обработкой ошибок, чтобы не вешать приложение
                 Promise.allSettled([
                     syncUserProfile(),
                     fetchMarketItems(),
@@ -495,7 +491,7 @@
                 <div class="card">
                     <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
                     <h4>${item.name}</h4>
-                    <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
+                    <button class="btn-green-glow" onclick="openSellModal('${item.assetid}')">Продать</button>
                 </div>
             `).join('');
         }
@@ -595,7 +591,10 @@
             }
         }
 
-        async function openSellModal(item) {
+        async function openSellModal(assetid) {
+            const item = myInventory.find(i => i.assetid === assetid);
+            if (!item) return;
+
             if (myListings.some(l => l.assetid === item.assetid)) {
                 alert('Этот предмет уже выставлен на продажу!');
                 return;
@@ -654,7 +653,10 @@
             }
         }
 
-        async function buyItem(item) {
+        async function buyItem(itemId) {
+            const item = marketItems.find(i => (i._id === itemId || i.id === itemId));
+            if (!item) return;
+
             const tradeUrl = localStorage.getItem('user_trade_url');
             if (!tradeUrl) {
                 alert('Сначала укажите свою Trade URL в инвентаре!');
@@ -673,7 +675,7 @@
                 const res = await fetch('/api/deals/buy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ itemId: item._id, tgId: myTgId })
+                    body: JSON.stringify({ itemId: item._id || item.id, tgId: myTgId })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -731,7 +733,7 @@
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
                     <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
-                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
+                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick="buyItem('${i._id || i.id}')">Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
                 </div>
             `).join('');
         }
@@ -744,7 +746,7 @@
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
                     <div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div>
-                    <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять с продажи</button>
+                    <button class="btn-danger" onclick="cancelListing('${i._id || i.id}')">Снять с продажи</button>
                 </div>
             `).join('');
         }
