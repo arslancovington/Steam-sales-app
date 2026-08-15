@@ -509,33 +509,35 @@
                         return;
                     }
                     container.innerHTML = data.giveaways.map(g => {
-                        let sponsorLink = g.sponsor;
-                        if (!sponsorLink.startsWith('http')) {
+                        let sponsorLink = g.sponsor || '';
+                        if (sponsorLink && !sponsorLink.startsWith('http')) {
                             sponsorLink = 'https://t.me/' + sponsorLink.replace('@', '');
                         }
 
                         return `
                             <div class="giveaway-card">
                                 <div class="giveaway-header">
-                                    <span class="giveaway-sponsor">🎁 Розыгрыш скина</span>
-                                    <span class="giveaway-timer">⏳ ${g.timer}</span>
+                                    <span class="giveaway-sponsor" style="font-size: 11px; color: var(--neon-purple);">🎁 Спонсор: ${g.sponsor || 'Партнер'}</span>
+                                    <span class="giveaway-timer">⏳ ${g.timer || 'Скоро'}</span>
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
                                     <div>
                                         <p class="giveaway-title">${g.title}</p>
-                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount}</div>
+                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount || 0}</div>
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                    <button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 8px 4px;" onclick="window.open('${sponsorLink}', '_blank')">📢 Подписаться</button>
+                                    ${sponsorLink ? `<button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 8px 4px;" onclick="window.open('${sponsorLink}', '_blank')">📢 Подписаться</button>` : ''}
                                     <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
                                 </div>
                             </div>
                         `;
                     }).join('');
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("Fetch giveaways error:", e);
+            }
         }
 
         async function joinGiveaway(giveawayId) {
