@@ -1,6 +1,7 @@
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
+const axios = require('axios');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
@@ -92,8 +93,27 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/steam/inventory', (req, res) => {
-    res.json({ success: false, items: [], descriptions: [] });
+// Реальная загрузка инвентаря Steam
+app.post('/api/steam/inventory', async (req, res) => {
+    const { steamId } = req.body;
+    if (!steamId) return res.json({ success: false, items: [], descriptions: [] });
+
+    try {
+        const response = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        if (response.data && response.data.success) {
+            res.json({
+                success: true,
+                items: response.data.assets || [],
+                descriptions: response.data.descriptions || []
+            });
+        } else {
+            res.json({ success: false, items: [], descriptions: [] });
+        }
+    } catch (e) {
+        res.json({ success: false, items: [], descriptions: [] });
+    }
 });
 
 app.get('/api/steam/price', (req, res) => {
@@ -104,12 +124,37 @@ app.post('/api/deals/buy', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/billing/invoice', (req, res) => {
-    res.json({ success: true });
+// Отправка счета на пополнение в личные сообщения пользователю (Курс USDT: 80₽, Stars: 1.5₽)
+app.post('/api/billing/invoice', async (req, res) => {
+    const { tgId, amount, currency } = req.body;
+    let rubles = currency === 'USDT' ? amount * 80 : amount * 1.5;
+
+    try {
+        await bot.sendMessage(tgId, `🧾 **Счет на пополнение баланса**\n\nСумма: ${amount} ${currency}\nК зачислению: ${Math.round(rubles)} ₽\n\nПожалуйста, завершите оплату через @CryptoBot или Telegram Stars.`);
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false, error: 'Не удалось отправить счет. Напишите боту /start в личные сообщения.' });
+    }
 });
 
-app.post('/api/billing/withdraw', (req, res) => {
-    res.json({ success: true });
+// Отправка чека на вывод администраторам в админ-чат
+app.post('/api/billing/withdraw', async (req, res) => {
+    const { tgId, amount, recipientAccount, username } = req.body;
+    
+    if (!users[tgId] || users[tgId].balance < amount) {
+        return res.json({ success: false, error: 'Недостаточно средств на балансе' });
+    }
+
+    users[tgId].balance -= amount;
+
+    try {
+        if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+            await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств!**\n\n👤 Игрок: @${username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
+        }
+        res.json({ success: true, newBalance: users[tgId].balance });
+    } catch (e) {
+        res.json({ success: false, error: 'Ошибка отправки чека администраторам' });
+    }
 });
 
 app.post('/api/inventory/instant-sell', (req, res) => {
