@@ -86,7 +86,6 @@ app.post('/api/giveaways/join', async (req, res) => {
             }
         } catch (err) {
             console.error("Subscription check error:", err.message);
-            // Если бот не админ в канале, можно выдать предупреждение или пропустить проверку
         }
     }
 
@@ -95,8 +94,49 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/steam/inventory', (req, res) => {
-    res.json({ success: false, items: [], descriptions: [] });
+// Исправленный эндпоинт получения инвентаря Steam
+app.post('/api/steam/inventory', async (req, res) => {
+    try {
+        const { tgId, steamId } = req.body;
+        
+        let targetSteamId = steamId;
+        if (!targetSteamId && tgId && users[tgId]) {
+            targetSteamId = users[tgId].steamId;
+        }
+
+        if (!targetSteamId) {
+            return res.json({ success: false, error: 'Steam ID не указан', items: [], descriptions: [] });
+        }
+
+        const url = `https://steamcommunity.com/inventory/${targetSteamId}/730/2?l=russian&count=75`;
+        
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
+            }
+        });
+
+        if (!response.ok) {
+            return res.json({ success: false, error: 'Профиль закрыт или инвентарь недоступен', items: [], descriptions: [] });
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.success) {
+            return res.json({ success: false, error: 'Не удалось загрузить инвентарь', items: [], descriptions: [] });
+        }
+
+        res.json({
+            success: true,
+            items: data.assets || [],
+            descriptions: data.descriptions || []
+        });
+
+    } catch (error) {
+        console.error('Steam inventory fetch error:', error.message);
+        res.json({ success: false, error: 'Ошибка сервера при запросе инвентаря', items: [], descriptions: [] });
+    }
 });
 
 app.get('/api/steam/price', (req, res) => {
@@ -142,7 +182,6 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Извлекаем username канала из ссылки (например, из https://t.me/tizzycs2 делает @tizzycs2)
     let sponsorUsername = sponsor.trim();
     if (sponsorUsername.includes('t.me/')) {
         const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
