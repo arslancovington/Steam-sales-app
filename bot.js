@@ -6,13 +6,8 @@ const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || 'YOUR_CRYPTO_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 
-// Безопасная инициализация с очисткой вебхука для предотвращения 409 ошибки
-const bot = new TelegramBot(TOKEN, { polling: false });
-bot.deleteWebhook().then(() => {
-    bot.startPolling();
-}).catch(() => {
-    bot.startPolling();
-});
+// Запуск бота с автоматическим поллингом без вызова отсутствующих функций
+const bot = new TelegramBot(TOKEN, { polling: true });
 
 const app = express();
 
@@ -67,7 +62,7 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-// Список розыгрышей (с актуальным количеством участников)
+// Список розыгрышей
 app.get('/api/giveaways/list', (req, res) => {
     const formattedGiveaways = giveaways.map(g => ({
         ...g,
@@ -76,7 +71,7 @@ app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways: formattedGiveaways });
 });
 
-// Участие в розыгрыше с мягкой проверкой подписки
+// Участие в розыгрыше с безопасной проверкой подписки
 app.post('/api/giveaways/join', async (req, res) => {
     const { tgId, giveawayId } = req.body;
     const giveaway = giveaways.find(g => g._id === giveawayId);
@@ -107,7 +102,6 @@ app.post('/api/giveaways/join', async (req, res) => {
             }
         } catch (err) {
             console.error("Subscription check error (bypassed for safety):", err.message);
-            // Если бот не админ в канале спонсора, пропускаем проверку, чтобы у пользователей не ломался функционал
         }
     }
 
@@ -316,7 +310,7 @@ bot.on('successful_payment', (msg) => {
     }
 });
 
-// Обработка создания розыгрыша через админ-чат (с поддержкой фото)
+// Обработка создания розыгрыша через админ-чат
 bot.on('message', async (msg) => {
     const text = msg.text || msg.caption;
     if (!text || !text.startsWith('/newgiveaway')) return;
@@ -368,7 +362,7 @@ bot.on('message', async (msg) => {
     };
 
     giveaways.push(newGiveaway);
-    await bot.sendMessage(msg.chat.id, `✅ Обязательный розыгрыш приза "${title}" успешно добавлен! Проверка подписки на ${sponsorUsername} активна.`);
+    await bot.sendMessage(msg.chat.id, `✅ Розыгрыш приза "${title}" успешно добавлен!`);
 });
 
 const PORT = process.env.PORT || 3000;
