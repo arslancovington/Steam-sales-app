@@ -5,6 +5,7 @@ const axios = require('axios');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
+const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || ''; // Опционально для автоматических ссылок Crypto Pay
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -229,8 +230,41 @@ app.post('/api/billing/invoice', async (req, res) => {
                 );
             }
             await bot.sendMessage(tgId, `💳 **Запрос на пополнение P2P UZ создан**\n\nСумма: ${amount} ₽ (${sumAmount} сум).\nОжидайте реквизиты карты от администратора.`);
+        } else if (currency === 'USDT') {
+            let payUrl = 'https://t.me/CryptoBot';
+            if (CRYPTO_BOT_TOKEN) {
+                try {
+                    const cryptoRes = await axios.post('https://pay.crypt.bot/api/createInvoice', {
+                        asset: 'USDT',
+                        amount: amount.toString(),
+                        description: `Пополнение баланса на ${Math.round(rubles)} ₽`
+                    }, {
+                        headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN }
+                    });
+                    if (cryptoRes.data && cryptoRes.data.ok) {
+                        payUrl = cryptoRes.data.result.pay_url;
+                    }
+                } catch (err) {
+                    console.error('CryptoBot API error:', err.message);
+                }
+            }
+
+            await bot.sendMessage(tgId, 
+                `🧾 **Счет на пополнение баланса**\n\nСумма: **${amount} USDT**\nК зачислению: **${Math.round(rubles)} ₽**\n\nНажмите кнопку ниже для оплаты:`, 
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '💎 Оплатить в CryptoBot', url: payUrl }]
+                        ]
+                    }
+                }
+            );
         } else {
-            await bot.sendMessage(tgId, `🧾 **Счет на пополнение баланса**\n\nСумма: ${amount} ${currency}\nК зачислению: ${Math.round(rubles)} ₽\n\nПожалуйста, завершите оплату.`);
+            await bot.sendMessage(tgId, 
+                `🧾 **Счет на пополнение баланса**\n\nСумма: **${amount} ⭐**\nК зачислению: **${Math.round(rubles)} ₽**\n\nПожалуйста, завершите оплату через Telegram Stars.`,
+                { parse_mode: 'Markdown' }
+            );
         }
         res.json({ success: true });
     } catch (e) {
@@ -424,3 +458,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Bot and Server are running on port ${PORT}`);
 });
+    
