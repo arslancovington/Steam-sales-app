@@ -107,10 +107,19 @@ app.get('/api/market/items', (req, res) => {
 
 app.post('/api/market/add', (req, res) => {
     const item = req.body;
+    const user = getOrCreateUser(item.tgId);
+
+    if (item.isVip) {
+        if (user.balance < 245) {
+            return res.json({ success: false, error: 'Недостаточно средств для VIP (требуется 245 ₽)' });
+        }
+        user.balance -= 245;
+    }
+
     item._id = Date.now().toString();
     marketItems.push(item);
     saveData();
-    res.json({ success: true });
+    res.json({ success: true, newBalance: user.balance });
 });
 
 app.post('/api/market/cancel', (req, res) => {
@@ -281,20 +290,18 @@ app.post('/api/billing/invoice', async (req, res) => {
                 }
             );
         } else if (currency === 'Stars') {
-            // Отправка нативного инвойса Telegram Stars (XTR)
             await bot.sendInvoice(
                 tgId,
                 'Пополнение баланса',
                 `Пополнение баланса на ${Math.round(rubles)} ₽`,
                 `topup_${tgId}_${amount}_${Math.round(rubles)}`,
-                '', // Пустой провайдер токен для Telegram Stars
+                '',
                 'XTR',
                 [{ label: `${amount} ⭐ Звёзд`, amount: parseInt(amount) }]
             );
         }
         res.json({ success: true });
     } catch (e) {
-        console.error("Invoice Error:", e.message);
         res.json({ success: false, error: 'Не удалось отправить счет. Напишите боту /start в личные сообщения.' });
     }
 });
@@ -341,7 +348,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-// Обязательный ответ на пре-чекаут для Telegram Stars
 bot.on('pre_checkout_query', async (query) => {
     try {
         await bot.answerPreCheckoutQuery(query.id, true);
@@ -410,7 +416,6 @@ bot.on('callback_query', async (query) => {
 });
 
 bot.on('message', async (msg) => {
-    // Обработка успешной оплаты Telegram Stars
     if (msg.successful_payment) {
         const payload = msg.successful_payment.invoice_payload;
         if (payload && payload.startsWith('topup_')) {
@@ -428,20 +433,24 @@ bot.on('message', async (msg) => {
     }
 
     const adminId = msg.from.id;
-    const text = msg.text;
+    const text = msg.text || msg.caption;
 
     if (!text) return;
 
     if (text.startsWith('/newgiveaway')) {
         const lines = text.split('\n');
-        let title = '', sponsor = '', timer = '', image = '';
+        let title = '', sponsor = '', timer = '';
         lines.forEach(line => {
             if (line.startsWith('Prize:') || line.startsWith('Приз:')) title = line.replace(/^(Prize:|Приз:)/, '').trim();
             if (line.startsWith('Sponsor:') || line.startsWith('Спонсор:')) sponsor = line.replace(/^(Sponsor:|Спонсор:)/, '').trim();
             if (line.startsWith('Timer:') || line.startsWith('Таймер:')) timer = line.replace(/^(Timer:|Таймер:)/, '').trim();
-            if (line.startsWith('Image:') || line.startsWith('Картинка:')) image = line.replace(/^(Image:|Картинка:)/, '').trim();
         });
-        if (!title || !sponsor) return;
+
+        if (!title || !sponsor) {
+            await bot.sendMessage(msg.chat.id, '❌ Ошибка! Укажите поля "Приз:" и "Спонсор:".');
+            return;
+        }
+
         let sponsorUsername = sponsor.trim();
         if (sponsorUsername.includes('t.me/')) {
             const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
@@ -449,15 +458,29 @@ bot.on('message', async (msg) => {
         } else if (!sponsorUsername.startsWith('@') && !sponsorUsername.startsWith('http')) {
             sponsorUsername = '@' + sponsorUsername;
         }
+
+        let imageUrl = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f';
+        
+        if (msg.photo && msg.photo.length > 0) {
+            const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+            try {
+                const fileLink = await bot.getFileLink(photoFileId);
+                imageUrl = fileLink;
+            } catch (err) {
+                console.error("Не удалось получить ссылку на фото:", err.message);
+            }
+        }
+
         giveaways.push({
             _id: Date.now().toString(),
             title, sponsor, sponsorUsername,
             timer: timer || 'Скоро',
-            image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
+            image: imageUrl,
             participantsCount: 0, participants: []
         });
         saveData();
-        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" добавлен!`);
+
+        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" с картинкой успешно добавлен!`);
         return;
     }
 
