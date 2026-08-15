@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
 
 let users = {};
 let marketItems = [];
-let giveaways = []; // Тестовые предметы удалены, список пуст
+let giveaways = [];
 
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
@@ -58,15 +58,38 @@ app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways });
 });
 
-app.post('/api/giveaways/join', (req, res) => {
+// Проверка подписки перед участием в розыгрыше
+app.post('/api/giveaways/join', async (req, res) => {
     const { tgId, giveawayId } = req.body;
     const giveaway = giveaways.find(g => g._id === giveawayId);
+    
     if (!giveaway) {
         return res.json({ success: false, error: 'Розыгрыш не найден' });
     }
+
     if (giveaway.participants.includes(String(tgId))) {
         return res.json({ success: false, error: 'Вы уже участвуете в этом розыгрыше!' });
     }
+
+    // Проверяем подписку на спонсорский канал, если указан username (например, @channel)
+    if (giveaway.sponsorUsername) {
+        try {
+            const chatMember = await bot.getChatMember(giveaway.sponsorUsername, tgId);
+            const status = chatMember.status;
+            const isMember = ['creator', 'administrator', 'member'].includes(status);
+            
+            if (!isMember) {
+                return res.json({ 
+                    success: false, 
+                    error: `Для участия необходимо подписаться на канал спонсора: ${giveaway.sponsor}` 
+                });
+            }
+        } catch (err) {
+            console.error("Subscription check error:", err.message);
+            // Если бот не админ в канале, можно выдать предупреждение или пропустить проверку
+        }
+    }
+
     giveaway.participants.push(String(tgId));
     giveaway.participantsCount = giveaway.participants.length;
     res.json({ success: true });
@@ -100,6 +123,7 @@ app.post('/api/inventory/instant-sell', (req, res) => {
     res.json({ success: true });
 });
 
+// Обработка создания розыгрыша через админ-чат
 bot.on('message', async (msg) => {
     if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
     
@@ -118,10 +142,20 @@ bot.on('message', async (msg) => {
         return;
     }
 
+    // Извлекаем username канала из ссылки (например, из https://t.me/tizzycs2 делает @tizzycs2)
+    let sponsorUsername = sponsor.trim();
+    if (sponsorUsername.includes('t.me/')) {
+        const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
+        sponsorUsername = '@' + clean;
+    } else if (!sponsorUsername.startsWith('@') && !sponsorUsername.startsWith('http')) {
+        sponsorUsername = '@' + sponsorUsername;
+    }
+
     const newGiveaway = {
         _id: Date.now().toString(),
         title,
         sponsor,
+        sponsorUsername,
         timer: timer || 'Скоро',
         image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
         participantsCount: 0,
@@ -129,7 +163,7 @@ bot.on('message', async (msg) => {
     };
 
     giveaways.push(newGiveaway);
-    await bot.sendMessage(msg.chat.id, `✅ Розыгрыш приза "${title}" от ${sponsor} успешно добавлен в приложение!`);
+    await bot.sendMessage(msg.chat.id, `✅ Обязательный розыгрыш приза "${title}" успешно добавлен! Проверка подписки на ${sponsorUsername} активна.`);
 });
 
 const PORT = process.env.PORT || 3000;
