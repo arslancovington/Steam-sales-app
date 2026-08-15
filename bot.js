@@ -20,22 +20,48 @@ let users = {};
 let marketItems = [];
 let giveaways = [];
 
+// Функция для извлечения и конвертации SteamID64 из Trade URL
+function extractSteamIdFromTradeUrl(url) {
+    if (!url) return null;
+    const profileMatch = url.match(/\/profiles\/(\d{17})/);
+    if (profileMatch && profileMatch[1]) {
+        return profileMatch[1];
+    }
+    const partnerMatch = url.match(/partner=(\d+)/);
+    if (partnerMatch && partnerMatch[1]) {
+        const partnerId = partnerMatch[1];
+        try {
+            const steamId64 = (BigInt(partnerId) + 76561197960265728n).toString();
+            return steamId64;
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+}
+
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!users[tgId]) {
-        users[tgId] = { tgId, username: tgUser, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '' };
+        users[tgId] = { tgId, username: tgUser, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '', steamId: '' };
     }
     res.json({ success: true, ...users[tgId] });
 });
 
 app.post('/api/user/save', (req, res) => {
-    const { tgId, tradeUrl, steamId } = req.body;
+    const { tgId, tradeUrl } = req.body;
     if (!users[tgId]) {
         users[tgId] = { tgId, balance: 0, rating: 5.0, completedDeals: 0 };
     }
     users[tgId].tradeUrl = tradeUrl;
-    users[tgId].steamId = steamId;
-    res.json({ success: true });
+    
+    // Автоматически определяем SteamID64 через хелпер
+    const steamId = extractSteamIdFromTradeUrl(tradeUrl);
+    if (steamId) {
+        users[tgId].steamId = steamId;
+    }
+
+    res.json({ success: true, steamId: users[tgId].steamId });
 });
 
 app.get('/api/market/items', (req, res) => {
@@ -93,15 +119,29 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Реальная загрузка инвентаря Steam
+// Запрос инвентаря Steam с использованием сохраненного или переданного steamId
 app.post('/api/steam/inventory', async (req, res) => {
-    const { steamId } = req.body;
-    if (!steamId) return res.json({ success: false, items: [], descriptions: [] });
+    let { steamId, tgId } = req.body;
+    
+    if (!steamId && tgId && users[tgId]) {
+        steamId = users[tgId].steamId;
+    }
+
+    if (!steamId) {
+        return res.json({ success: false, items: [], descriptions: [] });
+    }
 
     try {
         const response = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
+            },
+            timeout: 10000
         });
+
         if (response.data && response.data.success) {
             res.json({
                 success: true,
@@ -112,6 +152,7 @@ app.post('/api/steam/inventory', async (req, res) => {
             res.json({ success: false, items: [], descriptions: [] });
         }
     } catch (e) {
+        console.error("Steam API Error:", e.message);
         res.json({ success: false, items: [], descriptions: [] });
     }
 });
@@ -124,7 +165,7 @@ app.post('/api/deals/buy', (req, res) => {
     res.json({ success: true });
 });
 
-// Отправка счета на пополнение в личные сообщения пользователю (Курс USDT: 80₽, Stars: 1.5₽)
+// Пополнение (USDT по 80₽, Stars по 1.5₽)
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     let rubles = currency === 'USDT' ? amount * 80 : amount * 1.5;
@@ -137,7 +178,7 @@ app.post('/api/billing/invoice', async (req, res) => {
     }
 });
 
-// Отправка чека на вывод администраторам в админ-чат
+// Вывод средств (чек в админ-чат)
 app.post('/api/billing/withdraw', async (req, res) => {
     const { tgId, amount, recipientAccount, username } = req.body;
     
