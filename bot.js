@@ -441,13 +441,19 @@ bot.on('message', async (msg) => {
         const lines = text.split('\n');
         let title = '', sponsor = '', timer = '';
         lines.forEach(line => {
-            if (line.startsWith('Prize:') || line.startsWith('Приз:')) title = line.replace(/^(Prize:|Приз:)/, '').trim();
-            if (line.startsWith('Sponsor:') || line.startsWith('Спонсор:')) sponsor = line.replace(/^(Sponsor:|Спонсор:)/, '').trim();
-            if (line.startsWith('Timer:') || line.startsWith('Таймер:')) timer = line.replace(/^(Timer:|Таймер:)/, '').trim();
+            if (line.toLowerCase().startsWith('prize:') || line.toLowerCase().startsWith('приз:')) {
+                title = line.replace(/^(prize:|приз:)/i, '').trim();
+            }
+            if (line.toLowerCase().startsWith('sponsor:') || line.toLowerCase().startsWith('спонсор:')) {
+                sponsor = line.replace(/^(sponsor:|спонсор:)/i, '').trim();
+            }
+            if (line.toLowerCase().startsWith('timer:') || line.toLowerCase().startsWith('таймер:')) {
+                timer = line.replace(/^(timer:|таймер:)/i, '').trim();
+            }
         });
 
         if (!title || !sponsor) {
-            await bot.sendMessage(msg.chat.id, '❌ Ошибка! Укажите поля "Приз:" и "Спонсор:".');
+            await bot.sendMessage(msg.chat.id, '❌ Ошибка! Не удалось распознать поля "Приз:" или "Спонсор:". Проверьте правильность написания.');
             return;
         }
 
@@ -473,14 +479,18 @@ bot.on('message', async (msg) => {
 
         giveaways.push({
             _id: Date.now().toString(),
-            title, sponsor, sponsorUsername,
+            title, 
+            sponsor, 
+            sponsorUsername,
             timer: timer || 'Скоро',
             image: imageUrl,
-            participantsCount: 0, participants: []
+            participantsCount: 0, 
+            participants: []
         });
+        
         saveData();
 
-        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" с картинкой успешно добавлен!`);
+        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" с картинкой успешно добавлен и появился в приложении!`);
         return;
     }
 
