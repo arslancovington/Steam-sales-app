@@ -10,14 +10,8 @@ const __dirname = path.dirname(__filename);
 const TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
 
-// Инициализация бота с безопасным поллингом
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-bot.on('polling_error', (error) => {
-    console.error("⚠️ Поллинг ошибка:", error.message);
-});
-
-// База данных в памяти
 const db = {
     users: {},
     marketItems: [],
@@ -28,12 +22,11 @@ const app = express();
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Отдача фронтенда
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Профиль пользователя
+// Профиль
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!db.users[tgId]) {
@@ -50,15 +43,13 @@ app.post('/api/user/save', (req, res) => {
     res.json({ success: true });
 });
 
-// Маркетплейс
+// Маркет
 app.get('/api/market/items', (req, res) => res.json({ success: true, items: db.marketItems }));
-
 app.post('/api/market/add', (req, res) => {
     const item = { ...req.body, _id: Date.now().toString() };
     db.marketItems.push(item);
     res.json({ success: true, item });
 });
-
 app.post('/api/market/cancel', (req, res) => {
     const { itemId, tgId } = req.body;
     db.marketItems = db.marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
@@ -76,167 +67,77 @@ app.post('/api/giveaways/join', async (req, res) => {
     const giveaway = db.giveaways.find(g => g._id === giveawayId);
     if (!giveaway) return res.json({ success: false, error: 'Розыгрыш не найден' });
     if (giveaway.participants.includes(String(tgId))) return res.json({ success: false, error: 'Вы уже участвуете!' });
-
-    if (giveaway.sponsor.includes('@')) {
-        try {
-            const sponsorUsername = giveaway.sponsor.match(/@[\w\d_]+/)[0];
-            const chatMember = await bot.getChatMember(sponsorUsername, tgId);
-            if (!['creator', 'administrator', 'member'].includes(chatMember.status)) {
-                return res.json({ success: false, error: `Подпишитесь на спонсора: ${sponsorUsername}` });
-            }
-        } catch (e) {}
-    }
-
     giveaway.participants.push(String(tgId));
     res.json({ success: true });
 });
 
-// Steam API (Цены)
+// Steam API (Цены с провайдерами)
 app.get('/api/steam/price', async (req, res) => {
-    const { name } = req.query;
-    if (!name) return res.json({ success: true, price: 50 });
+    let { name, provider } = req.query;
+    if (!name) return res.json({ success: true, price: 100 });
 
     try {
-        const response = await fetch(`https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(name)}`);
+        let cleanName = name.replace(/™|★/g, '').trim();
+        if (provider === 'csmoney') {
+            const resp = await fetch(`https://cs.money/2.0/market/search?limit=1&search=${encodeURIComponent(cleanName)}`);
+            const data = await resp.json();
+            if (data.items?.length > 0) return res.json({ success: true, price: Math.round(data.items[0].price * 95) });
+        }
+        if (provider === 'lisskins') {
+            const resp = await fetch(`https://lis-skins.ru/api/market/items/?search=${encodeURIComponent(cleanName)}`);
+            const data = await resp.json();
+            if (data.items?.length > 0) return res.json({ success: true, price: Math.round(data.items[0].price) });
+        }
+        const response = await fetch(`https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(cleanName)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         const data = await response.json();
-        if (data && data.success && data.lowest_price) {
-            let priceNum = parseFloat(data.lowest_price.replace(/[^\d,]/g, '').replace(',', '.'));
-            return res.json({ success: true, price: priceNum || 50 });
+        if (data.success && data.lowest_price) {
+            return res.json({ success: true, price: parseFloat(data.lowest_price.replace(/[^\d,]/g, '').replace(',', '.')) });
         }
     } catch (e) {}
-
-    const isCheap = name.toLowerCase().includes('sticker') || name.toLowerCase().includes('graffiti');
-    res.json({ success: true, price: isCheap ? 30 : 250 });
+    res.json({ success: true, price: 200 });
 });
 
-// Обновленный Steam API (Инвентарь с обходом защиты)
+// Инвентарь
 app.post('/api/steam/inventory', async (req, res) => {
+    const { steamId } = req.body;
+    if (!steamId) return res.json({ success: false, error: 'ID не указан' });
     try {
-        const { steamId } = req.body;
-        if (!steamId) return res.json({ success: false, error: 'Steam ID не указан', items: [], descriptions: [] });
-        
         const url = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`;
-        
-        const response = await fetch(url, { 
-            headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'X-Requested-With': 'XMLHttpRequest'
-            } 
-        });
-
-        if (!response.ok) {
-            console.log(`Steam API status: ${response.status}`);
-            throw new Error("Steam API error");
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.success) {
-            res.json({ success: true, items: data.assets || [], descriptions: data.descriptions || [] });
-        } else {
-            res.json({ success: false, error: 'Инвентарь пуст или скрыт', items: [], descriptions: [] });
-        }
+        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const data = await resp.json();
+        res.json({ success: true, items: data.assets || [], descriptions: data.descriptions || [] });
     } catch (e) {
-        console.error("Inventory fetch error:", e.message);
-        res.json({ success: false, error: 'Ошибка загрузки. Убедитесь, что профиль и инвентарь полностью открыты в настройках Steam.', items: [], descriptions: [] });
+        res.json({ success: false, error: 'Ошибка загрузки' });
     }
 });
 
-// Сделки (покупка)
-app.post('/api/deals/buy', (req, res) => {
-    const { tgId, itemId } = req.body;
-    const index = db.marketItems.findIndex(i => i._id === itemId);
-    if (index === -1) return res.json({ success: false, error: 'Лот не найден' });
-    
-    const item = db.marketItems[index];
-    if (!db.users[tgId] || db.users[tgId].balance < Number(item.price)) {
-        return res.json({ success: false, error: 'Недостаточно средств' });
-    }
-
-    db.users[tgId].balance -= Number(item.price);
-    if (db.users[item.tgId]) {
-        db.users[item.tgId].balance += Number(item.price);
-        bot.sendMessage(item.tgId, `🎉 Ваш скин "${item.name}" успешно продан за ${item.price} ₽!`).catch(()=>{});
-    }
-
-    db.marketItems.splice(index, 1);
-    res.json({ success: true, newBalance: db.users[tgId].balance });
-});
-
-// Оплата и вывод
+// Биллинг (минимум 3 USDT)
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, method, amount } = req.body;
-    if (method === 'stars') {
-        try {
-            const link = await bot.createInvoiceLink('Пополнение', 'Steam Sales', JSON.stringify({tgId, amount}), '', 'XTR', [{label: 'Stars', amount: Number(amount)}]);
-            return res.json({ success: true, invoiceUrl: link });
-        } catch(e) { return res.json({ success: false, error: e.message }); }
-    }
-    
+    const numAmount = Number(amount);
     if (method === 'crypto') {
-        const CRYPTO_TOKEN = process.env.CRYPTO_BOT_TOKEN;
-        if (!CRYPTO_TOKEN) return res.json({ success: false, error: 'Токен CryptoBot не настроен' });
-        try {
-            const resp = await fetch('https://pay.crypt.bot/api/createInvoice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Crypto-Pay-API-Token': CRYPTO_TOKEN },
-                body: JSON.stringify({ asset: 'USDT', amount: String(amount), description: `Пополнение баланса ${tgId}` })
-            });
-            const data = await resp.json();
-            if (data.ok) return res.json({ success: true, invoiceUrl: data.result.pay_url });
-        } catch(e) {}
+        if (numAmount < 3) return res.json({ success: false, error: 'Минимум 3 USDT' });
+        const resp = await fetch('https://pay.crypt.bot/api/createInvoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Crypto-Pay-API-Token': process.env.CRYPTO_BOT_TOKEN },
+            body: JSON.stringify({ asset: 'USDT', amount: String(numAmount), description: `Пополнение ${tgId}` })
+        });
+        const data = await resp.json();
+        if (data.ok) return res.json({ success: true, invoiceUrl: data.result.pay_url });
     }
-    res.json({ success: false, error: 'Ошибка создания счета' });
+    res.json({ success: false, error: 'Ошибка' });
 });
 
 app.post('/api/billing/withdraw', (req, res) => {
     const { tgId, amount, address } = req.body;
-    const withdrawAmount = Number(amount);
-    if (!db.users[tgId] || db.users[tgId].balance < withdrawAmount) return res.json({ success: false, error: 'Недостаточно средств' });
-    
-    db.users[tgId].balance -= withdrawAmount;
-    if (process.env.ADMIN_CHAT_ID) {
-        bot.sendMessage(process.env.ADMIN_CHAT_ID, `💸 Заявка на вывод:\nUser: ${tgId}\nСумма: ${withdrawAmount} ₽\nРеквизиты: ${address}`).catch(()=>{});
-    }
-    res.json({ success: true, newBalance: db.users[tgId].balance });
+    if (db.users[tgId]?.balance >= Number(amount)) {
+        db.users[tgId].balance -= Number(amount);
+        res.json({ success: true, newBalance: db.users[tgId].balance });
+    } else res.json({ success: false, error: 'Нет средств' });
 });
 
-// Телеграм-бот: создание розыгрышей через команду /newgiveaway
-bot.on('message', async (msg) => {
-    const text = msg.text || msg.caption;
-    if (!text || !text.startsWith('/newgiveaway')) return;
-    
-    const lines = text.split('\n');
-    let title = '', sponsor = '', timer = 'Скоро', image = '';
-
-    lines.forEach(line => {
-        if (line.toLowerCase().match(/^(приз|prize):/)) title = line.replace(/^(приз|prize):/i, '').trim();
-        if (line.toLowerCase().match(/^(спонсор|sponsor):/)) sponsor = line.replace(/^(спонсор|sponsor):/i, '').trim();
-        if (line.toLowerCase().match(/^(таймер|timer):/)) timer = line.replace(/^(таймер|timer):/i, '').trim();
-    });
-
-    if (msg.photo && msg.photo.length > 0) {
-        try {
-            image = await bot.getFileLink(msg.photo[msg.photo.length - 1].file_id);
-        } catch (err) {}
-    }
-
-    if (!title || !sponsor) {
-        return bot.sendMessage(msg.chat.id, '❌ Укажите формат:\nПриз: Название\nСпонсор: @канал');
-    }
-
-    db.giveaways.push({
-        _id: Date.now().toString(), title, sponsor, timer,
-        image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
-        participantsCount: 0, participants: []
-    });
-
-    bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" успешно добавлен!`);
+bot.on('message', (msg) => {
+    if (msg.text?.startsWith('/newgiveaway')) bot.sendMessage(msg.chat.id, '✅ Розыгрыш принят!');
 });
 
-// Запуск сервера
-app.listen(PORT, () => {
-    console.log(`🚀 Bot and Server running together on port ${PORT}`);
-});
-        
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
