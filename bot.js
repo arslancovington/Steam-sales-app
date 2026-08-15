@@ -206,6 +206,10 @@ app.post('/api/billing/invoice', async (req, res) => {
             return res.json({ success: true, invoiceUrl: invoiceLink });
         } 
         else if (method === 'crypto') {
+            if (!CRYPTO_BOT_TOKEN || CRYPTO_BOT_TOKEN === 'YOUR_CRYPTO_BOT_TOKEN') {
+                return res.json({ success: false, error: 'Не задан CRYPTO_BOT_TOKEN на сервере' });
+            }
+
             const resp = await fetch('https://pay.crypt.bot/api/createInvoice', {
                 method: 'POST',
                 headers: {
@@ -221,10 +225,13 @@ app.post('/api/billing/invoice', async (req, res) => {
             });
 
             const data = await resp.json();
+            console.log('Crypto Bot API Response:', data);
+
             if (data.ok && data.result) {
                 return res.json({ success: true, invoiceUrl: data.result.pay_url });
             } else {
-                return res.json({ success: false, error: 'Ошибка генерации счета в Crypto Bot' });
+                const errName = data.error ? (data.error.name || JSON.stringify(data.error)) : 'Неизвестная ошибка';
+                return res.json({ success: false, error: `Crypto Bot: ${errName}` });
             }
         }
 
