@@ -3,6 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
+const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || 'YOUR_CRYPTO_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -19,14 +20,16 @@ let users = {};
 let marketItems = [];
 let giveaways = [];
 
+// Профиль пользователя
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!users[tgId]) {
-        users[tgId] = { tgId, username: tgUser, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '' };
+        users[tgId] = { tgId, username: tgUser, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '', steamId: '' };
     }
     res.json({ success: true, ...users[tgId] });
 });
 
+// Сохранение настроек пользователя (ссылка обмена, SteamID)
 app.post('/api/user/save', (req, res) => {
     const { tgId, tradeUrl, steamId } = req.body;
     if (!users[tgId]) {
@@ -37,28 +40,32 @@ app.post('/api/user/save', (req, res) => {
     res.json({ success: true });
 });
 
+// Список товаров на маркетплейсе
 app.get('/api/market/items', (req, res) => {
     res.json({ success: true, items: marketItems });
 });
 
+// Добавление лота на маркетплейс
 app.post('/api/market/add', (req, res) => {
     const item = req.body;
     item._id = Date.now().toString();
     marketItems.push(item);
-    res.json({ success: true });
+    res.json({ success: true, item });
 });
 
+// Отмена лота на маркетплейсе
 app.post('/api/market/cancel', (req, res) => {
     const { itemId, tgId } = req.body;
     marketItems = marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
     res.json({ success: true });
 });
 
+// Список розыгрышей
 app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways });
 });
 
-// Проверка подписки перед участием в розыгрыше
+// Участие в розыгрыше с проверкой подписки
 app.post('/api/giveaways/join', async (req, res) => {
     const { tgId, giveawayId } = req.body;
     const giveaway = giveaways.find(g => g._id === giveawayId);
@@ -71,7 +78,6 @@ app.post('/api/giveaways/join', async (req, res) => {
         return res.json({ success: false, error: 'Вы уже участвуете в этом розыгрыше!' });
     }
 
-    // Проверяем подписку на спонсорский канал, если указан username (например, @channel)
     if (giveaway.sponsorUsername) {
         try {
             const chatMember = await bot.getChatMember(giveaway.sponsorUsername, tgId);
@@ -94,7 +100,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Исправленный эндпоинт получения инвентаря Steam
+// Получение инвентаря Steam
 app.post('/api/steam/inventory', async (req, res) => {
     try {
         const { tgId, steamId } = req.body;
@@ -139,35 +145,162 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
+// Получение средней цены предмета
 app.get('/api/steam/price', (req, res) => {
-    res.json({ success: true, price: 1500 });
+    const { name } = req.query;
+    res.json({ success: true, price: 1500, name: name || 'Unknown Item' });
 });
 
+// Покупка предмета на маркетплейсе
 app.post('/api/deals/buy', (req, res) => {
-    res.json({ success: true });
+    const { tgId, itemId } = req.body;
+    
+    const itemIndex = marketItems.findIndex(i => i._id === itemId);
+    if (itemIndex === -1) {
+        return res.json({ success: false, error: 'Лот не найден или уже был продан' });
+    }
+
+    const item = marketItems[itemIndex];
+    if (!users[tgId]) {
+        return res.json({ success: false, error: 'Покупатель не найден' });
+    }
+
+    const price = Number(item.price || 0);
+    if (users[tgId].balance < price) {
+        return res.json({ success: false, error: 'Недостаточно средств на балансе' });
+    }
+
+    users[tgId].balance -= price;
+    users[tgId].completedDeals = (users[tgId].completedDeals || 0) + 1;
+
+    const sellerId = item.tgId;
+    if (sellerId && users[sellerId]) {
+        users[sellerId].balance += price;
+        users[sellerId].completedDeals = (users[sellerId].completedDeals || 0) + 1;
+        
+        bot.sendMessage(sellerId, `🎉 Ваш предмет "${item.name || 'Скин'}" успешно продан за ${price} ₽! Средства зачислены на баланс.`).catch(() => {});
+    }
+
+    marketItems.splice(itemIndex, 1);
+
+    res.json({ success: true, newBalance: users[tgId].balance });
 });
 
-app.post('/api/billing/invoice', (req, res) => {
-    res.json({ success: true });
+// Создание счета на оплату (Crypto Bot & Telegram Stars)
+app.post('/api/billing/invoice', async (req, res) => {
+    try {
+        const { tgId, method, amount } = req.body;
+
+        if (!tgId || !method || !amount) {
+            return res.json({ success: false, error: 'Не переданы обязательные параметры оплаты' });
+        }
+
+        if (method === 'stars') {
+            const title = 'Пополнение баланса Steam Sales';
+            const description = `Пополнение баланса на ${amount} Telegram Stars`;
+            const payload = JSON.stringify({ tgId, amount });
+            const currency = 'XTR';
+            const prices = [{ label: 'Звёзды', amount: Number(amount) }];
+
+            const invoiceLink = await bot.createInvoiceLink(title, description, payload, '', currency, prices);
+            return res.json({ success: true, invoiceUrl: invoiceLink });
+        } 
+        else if (method === 'crypto') {
+            const resp = await fetch('https://pay.crypt.bot/api/createInvoice', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN
+                },
+                body: JSON.stringify({
+                    asset: 'USDT',
+                    amount: String(amount),
+                    description: `Пополнение баланса Steam Sales для пользователя ${tgId}`,
+                    payload: JSON.stringify({ tgId, amount })
+                })
+            });
+
+            const data = await resp.json();
+            if (data.ok && data.result) {
+                return res.json({ success: true, invoiceUrl: data.result.pay_url });
+            } else {
+                return res.json({ success: false, error: 'Ошибка генерации счета в Crypto Bot' });
+            }
+        }
+
+        res.json({ success: false, error: 'Неизвестный метод оплаты' });
+    } catch (error) {
+        console.error('Billing invoice creation error:', error.message);
+        res.json({ success: false, error: 'Ошибка сервера при создании счета' });
+    }
 });
 
-app.post('/api/billing/withdraw', (req, res) => {
-    res.json({ success: true });
+// Запрос на вывод средств
+app.post('/api/billing/withdraw', async (req, res) => {
+    const { tgId, amount, address } = req.body;
+    
+    if (!users[tgId]) {
+        return res.json({ success: false, error: 'Пользователь не найден' });
+    }
+
+    const withdrawAmount = Number(amount);
+    if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
+        return res.json({ success: false, error: 'Некорректная сумма вывода' });
+    }
+
+    if (users[tgId].balance < withdrawAmount) {
+        return res.json({ success: false, error: 'Недостаточно средств для вывода' });
+    }
+
+    users[tgId].balance -= withdrawAmount;
+
+    if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+        await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств!**\n\n👤 Пользователь: \`${tgId}\`\n💰 Сумма: ${withdrawAmount} ₽\n📬 Реквизиты: ${address || 'Не указаны'}`, { parse_mode: 'Markdown' }).catch(() => {});
+    }
+
+    res.json({ success: true, newBalance: users[tgId].balance });
 });
 
+// Мгновенная продажа предмета
 app.post('/api/inventory/instant-sell', (req, res) => {
     const { tgId, payout } = req.body;
     if (users[tgId]) {
         users[tgId].balance += (payout || 0);
+        return res.json({ success: true, newBalance: users[tgId].balance });
     }
-    res.json({ success: true });
+    res.json({ success: false, error: 'Пользователь не найден' });
 });
 
-// Обработка создания розыгрыша через админ-чат
+// Обработка подтверждения платежа Telegram Stars
+bot.on('pre_checkout_query', async (query) => {
+    try {
+        await bot.answerPreCheckoutQuery(query.id, true);
+    } catch (e) {
+        console.error('Pre-checkout error:', e);
+    }
+});
+
+// Обработка успешного платежа Telegram Stars
+bot.on('successful_payment', (msg) => {
+    const chatId = msg.chat.id;
+    const tgId = String(msg.from.id);
+    const payment = msg.successful_payment;
+
+    if (payment.currency === 'XTR') {
+        const starsAmount = payment.total_amount;
+        if (users[tgId]) {
+            users[tgId].balance += starsAmount; 
+        }
+        bot.sendMessage(chatId, `✅ Оплата на ${starsAmount} Telegram Stars успешно проведена! Баланс обновлен.`);
+    }
+});
+
+// Обработка создания розыгрыша через админ-чат (с поддержкой фото)
 bot.on('message', async (msg) => {
-    if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
+    const text = msg.text || msg.caption;
+    if (!text || !text.startsWith('/newgiveaway')) return;
     
-    const lines = msg.text.split('\n');
+    const lines = text.split('\n');
     let title = '', sponsor = '', timer = '', image = '';
 
     lines.forEach(line => {
@@ -176,6 +309,18 @@ bot.on('message', async (msg) => {
         if (line.startsWith('Таймер:')) timer = line.replace('Таймер:', '').trim();
         if (line.startsWith('Картинка:')) image = line.replace('Картинка:', '').trim();
     });
+
+    if (msg.photo && msg.photo.length > 0) {
+        try {
+            const photo = msg.photo[msg.photo.length - 1];
+            const fileLink = await bot.getFileLink(photo.file_id);
+            if (fileLink) {
+                image = fileLink;
+            }
+        } catch (err) {
+            console.error('Error fetching photo from telegram:', err.message);
+        }
+    }
 
     if (!title || !sponsor) {
         await bot.sendMessage(msg.chat.id, '❌ Ошибка! Укажите поля "Приз:" и "Спонсор:".');
