@@ -652,7 +652,7 @@
                 const res = await fetch('/api/deals/buy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ itemId: item._id, buyerTgId: myTgId, buyerTradeUrl: tradeUrl, buyerName: myUsername })
+                    body: JSON.stringify({ itemId: item._id, tgId: myTgId })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -743,27 +743,37 @@
             const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
             if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
 
-            let rublesToAdd = selectedTopupType === 'crypto' ? amount * 90 : amount * 1.8;
-            let currency = selectedTopupType === 'crypto' ? 'USDT' : 'Звёзды ⭐';
+            const method = selectedTopupType;
 
             try {
                 const res = await fetch('/api/billing/invoice', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        tgId: myTgId, 
+                        method: method, 
+                        amount: amount 
+                    })
                 });
                 const data = await res.json();
-                if (data.success) {
+                if (data.success && data.invoiceUrl) {
                     closeModal('modal-topup');
-                    if (selectedTopupType === 'crypto') {
-                        alert('Счет отправлен в личные сообщения с ботом!');
-                        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
+                    if (selectedTopupType === 'stars' && window.Telegram?.WebApp?.openInvoice) {
+                        window.Telegram.WebApp.openInvoice(data.invoiceUrl, (status) => {
+                            if (status === 'paid') {
+                                alert('Оплата успешно проведена!');
+                                syncUserProfile();
+                            }
+                        });
                     } else {
-                        if (data.payUrl) window.open(data.payUrl, '_blank');
+                        window.open(data.invoiceUrl, '_blank');
                     }
                 } else {
                     alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
                 }
-            } catch (err) { alert('Ошибка соединения с сервером'); }
+            } catch (err) { 
+                alert('Ошибка соединения с сервером'); 
+            }
         }
 
         async function processWithdraw() {
@@ -776,15 +786,17 @@
             try {
                 const response = await fetch('/api/billing/withdraw', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: cryptoAccount, username: myUsername })
+                    body: JSON.stringify({ tgId: myTgId, amount, address: cryptoAccount })
                 });
                 const data = await response.json();
                 if (data.success) {
-                    userBalance -= amount;
+                    userBalance = data.newBalance;
                     document.getElementById('user-balance').innerText = userBalance + ' ₽';
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                     closeModal('modal-withdraw');
                     alert('Заявка на вывод успешно отправлена администраторам!');
+                } else {
+                    alert('Ошибка: ' + (data.error || 'Не удалось отправить заявку'));
                 }
             } catch (err) { alert('Ошибка соединения'); }
         }
