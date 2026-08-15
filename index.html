@@ -82,8 +82,8 @@
         .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
         .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
 
-        .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
+        .topup-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 15px 0; }
+        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
         .cs16-modal {
@@ -151,8 +151,8 @@
 
     <header class="top-bar">
         <div class="bot-profile">
-            <div style="width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(124,252,0,0.25) 0%, rgba(0,255,255,0.05) 100%); border: 1px solid var(--neon-green); box-shadow: 0 0 12px rgba(124,252,0,0.4); flex-shrink: 0;">
-                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: var(--neon-green); filter: drop-shadow(0 0 5px var(--neon-green));">
+            <div style="width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(124,252,0,0.25) 0%, rgba(0,255,255,0.05) 100%); border: 1px solid var(--neon-green); box-shadow: 0 0 12px rgba(124,252,0,0.4); flex-shrink: 0;" id="user-avatar-box">
+                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: var(--neon-green);">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
             </div>
@@ -201,7 +201,7 @@
             <h2 class="neon-text">Твой профиль</h2>
             <div class="card" style="border:1px solid var(--neon-green); padding:15px; margin-bottom:15px;">
                 <div class="seller-head">
-                    <div class="seller-avatar" id="user-avatar-box">🧑‍🚀</div>
+                    <div class="seller-avatar" id="profile-avatar-box">🧑‍🚀</div>
                     <div class="seller-meta">
                         <span class="seller-nick" id="my-nick">Игрок</span>
                         <span class="seller-sub">Рейтинг ⭐ <span id="my-rating">0.0</span></span>
@@ -270,25 +270,27 @@
         </div>
     </div>
 
-    <!-- Обновленное модальное окно пополнения (мин. 5 USDT / 100 звезд, курс скрыт) -->
+    <!-- Модальное окно пополнения (Crypto, Stars, P2P UZ) -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
             <div class="topup-methods">
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
-                    <div style="font-size: 18px;">💎</div>
-                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Crypto Bot</div>
-                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 5 USDT</div>
+                    <div style="font-size: 16px;">💎</div>
+                    <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">Crypto</div>
                 </div>
                 <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">
-                    <div style="font-size: 18px;">⭐</div>
-                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Telegram Stars</div>
-                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 100 звёзд</div>
+                    <div style="font-size: 16px;">⭐</div>
+                    <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">Stars</div>
+                </div>
+                <div class="topup-method-card" id="method-p2puz" onclick="selectTopupMethod('p2puz')">
+                    <div style="font-size: 16px;">🇺🇿</div>
+                    <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">P2P UZ</div>
                 </div>
             </div>
             <div class="price-input-container">
                 <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
-                <input type="number" id="topup-amount-input" class="topup-input" placeholder="5" style="padding-left: 55px;">
+                <input type="number" id="topup-amount-input" class="topup-input" placeholder="5" style="padding-left: 55px;" oninput="updateTopupCalculation()">
             </div>
             <p class="hint-text" id="topup-hint">Сумма зачислится автоматически после подтверждения оплаты.</p>
             <div style="display:flex; gap:10px; margin-top:15px;">
@@ -298,12 +300,17 @@
         </div>
     </div>
 
+    <!-- Модальное окно вывода средств -->
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
-            <p class="hint-text">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
-            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
-            <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" readonly></div>
+            <div class="platform-select-group" style="margin-bottom: 12px;">
+                <button type="button" class="platform-option-btn active" id="w-method-crypto" onclick="selectWithdrawMethod('crypto')">Crypto Bot</button>
+                <button type="button" class="platform-option-btn" id="w-method-p2puz" onclick="selectWithdrawMethod('p2puz')">Карта UZ 🇺🇿</button>
+            </div>
+            <p class="hint-text" id="withdraw-desc">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
+            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях" oninput="updateWithdrawCalculation()"></div>
+            <div class="price-input-container"><span class="currency-symbol" id="withdraw-acc-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" placeholder="Номер карты или аккаунт"></div>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
@@ -314,6 +321,7 @@
     <script>
         let userBalance = 0;
         let selectedTopupType = 'crypto';
+        let selectedWithdrawType = 'crypto';
         let selectedSellPlatform = 'Our P2P';
         let currentSelectedItem = null;
         let myInventory = [], marketItems = [], myListings = [];
@@ -321,6 +329,7 @@
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const myTgId = tgUser?.id || 123456789;
         const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
+        const myPhotoUrl = tgUser?.photo_url || null;
 
         window.addEventListener('DOMContentLoaded', async () => {
             const safetyTimeout = setTimeout(() => {
@@ -329,10 +338,14 @@
 
             try {
                 document.getElementById('my-nick').innerText = myUsername;
+                if (myPhotoUrl) {
+                    document.getElementById('user-avatar-box').innerHTML = `<img src="${myPhotoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                    document.getElementById('profile-avatar-box').innerHTML = `<img src="${myPhotoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+                }
                 
                 const withdrawInput = document.getElementById('withdraw-crypto-account-input');
                 if (withdrawInput) {
-                    withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
+                    withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : '';
                 }
 
                 const urlParams = new URLSearchParams(window.location.search);
@@ -401,32 +414,25 @@
             const url = document.getElementById('trade-url-input').value.trim();
             localStorage.setItem('user_trade_url', url);
 
-            let steamId = null;
-            const profileMatch = url.match(/\/profiles\/(\d{17})/);
-            if (profileMatch && profileMatch[1]) {
-                steamId = profileMatch[1];
-            } else {
-                const partnerMatch = url.match(/partner=(\d+)/);
-                if (partnerMatch && partnerMatch[1]) {
-                    const partnerId = partnerMatch[1];
-                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
-                }
-            }
-
-            if (steamId) {
-                localStorage.setItem('user_steam_id', steamId);
-                const authSection = document.getElementById('auth-section');
-                if (authSection) authSection.style.display = 'none';
-                loadSteamData(steamId);
-            } else {
-                alert('Не удалось распознать SteamID из ссылки.');
-            }
-
             fetch('/api/user/save', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId })
-            }).catch(() => {});
+                body: JSON.stringify({ tgId: myTgId, tradeUrl: url })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.steamId) {
+                    localStorage.setItem('user_steam_id', data.steamId);
+                    const authSection = document.getElementById('auth-section');
+                    if (authSection) authSection.style.display = 'none';
+                    loadSteamData(data.steamId);
+                } else {
+                    alert('Не удалось распознать SteamID из ссылки.');
+                }
+            })
+            .catch(() => {
+                alert('Ошибка сохранения Trade URL');
+            });
         }
 
         async function loadSteamData(steamId) {
@@ -434,7 +440,7 @@
             try {
                 const response = await fetch('/api/steam/inventory', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ steamId })
+                    body: JSON.stringify({ steamId, tgId: myTgId })
                 });
                 if (!response.ok) throw new Error();
                 const data = await response.json();
@@ -564,11 +570,11 @@
                 try {
                     const res = await fetch(`/api/steam/price?name=${encodeURIComponent(currentSelectedItem.name)}`);
                     const data = await res.json();
-                    let base = (data.success && data.price) ? data.price : 1500;
+                    let base = (data.success && data.price) ? data.price : 150;
                     let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
                     document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
                 } catch (e) {
-                    document.getElementById('external-plat-price').innerText = '1395 ₽';
+                    document.getElementById('external-plat-price').innerText = '135 ₽';
                 }
                 actionBtn.innerText = `Перейти на ${platform}`;
             }
@@ -588,9 +594,9 @@
             try {
                 const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
                 const data = await res.json();
-                document.getElementById('sale-price-input').value = (data.success && data.price) ? data.price : 1500;
+                document.getElementById('sale-price-input').value = (data.success && data.price) ? data.price : 150;
             } catch(e) {
-                document.getElementById('sale-price-input').value = 1500;
+                document.getElementById('sale-price-input').value = 150;
             }
 
             selectSellPlatform('Our P2P');
@@ -615,7 +621,7 @@
             const listing = {
                 assetid: currentSelectedItem.assetid,
                 name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url,
-                seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', 
+                seller: myUsername, tgId: myTgId, type: 'rifle', 
                 rating: document.getElementById('my-rating').innerText, isVip, platform: selectedSellPlatform
             };
 
@@ -728,24 +734,75 @@
         function selectTopupMethod(type) {
             selectedTopupType = type;
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
-            document.getElementById('method-' + type).classList.add('active');
+            if (type === 'crypto') document.getElementById('method-crypto').classList.add('active');
+            if (type === 'stars') document.getElementById('method-stars').classList.add('active');
+            if (type === 'p2puz') document.getElementById('method-p2puz').classList.add('active');
+
             const symbol = document.getElementById('topup-symbol');
             const input = document.getElementById('topup-amount-input');
             if (type === 'crypto') {
                 symbol.innerText = 'USDT';
                 input.placeholder = '5';
-            } else {
+            } else if (type === 'stars') {
                 symbol.innerText = '⭐';
                 input.placeholder = '100';
+            } else {
+                symbol.innerText = '₽';
+                input.placeholder = '500';
             }
+            updateTopupCalculation();
+        }
+
+        function updateTopupCalculation() {
+            const amount = parseFloat(document.getElementById('topup-amount-input').value) || 0;
+            const hint = document.getElementById('topup-hint');
+            if (selectedTopupType === 'p2puz') {
+                const sum = Math.round(amount * 175);
+                hint.innerText = amount > 0 ? `К оплате: ${sum.toLocaleString()} сум (по курсу 175 сум/₽)` : 'Введите сумму в рублях (курс: 1 ₽ = 175 сум)';
+            } else if (selectedTopupType === 'crypto') {
+                hint.innerText = 'Сумма зачислится автоматически после подтверждения оплаты.';
+            } else {
+                hint.innerText = 'Сумма зачислится после оплаты.';
+            }
+        }
+
+        function selectWithdrawMethod(method) {
+            selectedWithdrawType = method;
+            document.getElementById('w-method-crypto').classList.remove('active');
+            document.getElementById('w-method-p2puz').classList.remove('active');
+
+            const desc = document.getElementById('withdraw-desc');
+            const accSymbol = document.getElementById('withdraw-acc-symbol');
+            const accInput = document.getElementById('withdraw-crypto-account-input');
+
+            if (method === 'crypto') {
+                document.getElementById('w-method-crypto').classList.add('active');
+                desc.innerText = 'Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.';
+                accSymbol.innerText = '💎';
+                accInput.placeholder = 'Crypto Bot аккаунт';
+                accInput.value = tgUser?.username ? `@${tgUser.username}` : '';
+            } else {
+                document.getElementById('w-method-p2puz').classList.add('active');
+                desc.innerText = 'Вывод на карту Узбекистана (Uzcard/Humo). Курс: 1 ₽ = 145 сум (-5% комиссия). Мин. 500 ₽.';
+                accSymbol.innerText = '💳';
+                accInput.placeholder = 'Номер карты (например, 8600...)';
+                accInput.value = '';
+            }
+        }
+
+        function updateWithdrawCalculation() {
+            // Можно добавить подсказку при вводе суммы вывода если нужно
         }
 
         async function processTopUp() {
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
-            const minLimit = selectedTopupType === 'crypto' ? 5 : 100;
-            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit} ${selectedTopupType === 'crypto' ? 'USDT' : 'звёзд'}`); return; }
+            const minLimit = selectedTopupType === 'crypto' ? 5 : (selectedTopupType === 'stars' ? 100 : 100);
+            if (isNaN(amount) || amount < minLimit) { 
+                alert(`Минимальная сумма: ${minLimit} ${selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'звёзд' : '₽')}`); 
+                return; 
+            }
 
-            let currency = selectedTopupType === 'crypto' ? 'USDT' : 'Звёзды ⭐';
+            let currency = selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'Stars' : 'P2P UZ');
 
             try {
                 const res = await fetch('/api/billing/invoice', {
@@ -755,7 +812,11 @@
                 const data = await res.json();
                 if (data.success) {
                     closeModal('modal-topup');
-                    alert('Счет отправлен в личные сообщения с ботом!');
+                    if (currency === 'P2P UZ') {
+                        alert('Запрос создан! Бот отправил вам инструкции и ожидает реквизиты от администратора.');
+                    } else {
+                        alert('Счет отправлен в личные сообщения с ботом!');
+                    }
                     if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
                 } else {
                     alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
@@ -765,15 +826,18 @@
 
         async function processWithdraw() {
             const amount = parseFloat(document.getElementById('withdraw-amount-input').value);
-            const cryptoAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
+            const recipientAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
 
             if (isNaN(amount) || amount < 500) { alert('Мин. сумма вывода — 500 ₽.'); return; }
             if (userBalance < amount) { alert('Недостаточно средств на балансе.'); return; }
+            if (!recipientAccount) { alert('Введите реквизиты для получения средств.'); return; }
+
+            const method = selectedWithdrawType === 'p2puz' ? 'P2P UZ' : 'Crypto';
 
             try {
                 const response = await fetch('/api/billing/withdraw', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: cryptoAccount, username: myUsername })
+                    body: JSON.stringify({ tgId: myTgId, amount, recipientAccount, username: myUsername, method })
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -784,7 +848,7 @@
                     alert('Заявка на вывод успешно отправлена администраторам!');
                 } else {
                     alert(data.error || 'Ошибка вывода');
-          0      }
+                }
             } catch (err) { alert('Ошибка соединения'); }
         }
 
