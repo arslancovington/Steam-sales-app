@@ -1,18 +1,14 @@
 {
-  "name": "steam-sales-backend",
+  "name": "steam-sales-pro",
   "version": "1.0.0",
-  "description": "Backend and Bot for P2P Steam Sales",
-  "main": "bot.js",
   "type": "module",
-  "scripts": {
-    "start": "node bot.js"
-  },
+  "main": "bot.js",
+  "scripts": { "start": "node bot.js" },
   "dependencies": {
-    "axios": "^1.7.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongoose": "^8.4.0",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "axios": "^1.7.2"
   }
 }
