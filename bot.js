@@ -67,18 +67,26 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-// Список розыгрышей
+// Список розыгрышей (с актуальным количеством участников)
 app.get('/api/giveaways/list', (req, res) => {
-    res.json({ success: true, giveaways });
+    const formattedGiveaways = giveaways.map(g => ({
+        ...g,
+        participantsCount: g.participants ? g.participants.length : 0
+    }));
+    res.json({ success: true, giveaways: formattedGiveaways });
 });
 
-// Участие в розыгрыше с проверкой подписки
+// Участие в розыгрыше с мягкой проверкой подписки
 app.post('/api/giveaways/join', async (req, res) => {
     const { tgId, giveawayId } = req.body;
     const giveaway = giveaways.find(g => g._id === giveawayId);
     
     if (!giveaway) {
         return res.json({ success: false, error: 'Розыгрыш не найден' });
+    }
+
+    if (!giveaway.participants) {
+        giveaway.participants = [];
     }
 
     if (giveaway.participants.includes(String(tgId))) {
@@ -98,7 +106,8 @@ app.post('/api/giveaways/join', async (req, res) => {
                 });
             }
         } catch (err) {
-            console.error("Subscription check error:", err.message);
+            console.error("Subscription check error (bypassed for safety):", err.message);
+            // Если бот не админ в канале спонсора, пропускаем проверку, чтобы у пользователей не ломался функционал
         }
     }
 
