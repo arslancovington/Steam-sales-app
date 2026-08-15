@@ -52,7 +52,6 @@
 
         .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 0 10px rgba(191,0,255,0.15); }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
-        .giveaway-sponsor { font-size: 11px; color: var(--neon-cyan); font-weight: bold; }
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
         .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
 
@@ -338,7 +337,6 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
 
-                // Все запросы изолированы, чтобы сбой в одном не вешал приложение
                 await Promise.allSettled([
                     syncUserProfile(),
                     fetchMarketItems(),
@@ -487,24 +485,38 @@
                 const res = await fetch('/api/giveaways/list');
                 if (!res.ok) return;
                 const data = await res.json();
-                if (data.success && data.giveaways && data.giveaways.length > 0) {
+                if (data.success && data.giveaways) {
                     const container = document.getElementById('giveaways-container');
-                    container.innerHTML = data.giveaways.map(g => `
-                        <div class="giveaway-card">
-                            <div class="giveaway-header">
-                                <span class="giveaway-sponsor">📢 Спонсор: ${g.sponsor}</span>
-                                <span class="giveaway-timer">⏳ ${g.timer}</span>
-                            </div>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
-                                <div>
-                                    <p class="giveaway-title">${g.title}</p>
-                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount}</div>
+                    if (data.giveaways.length === 0) {
+                        container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
+                        return;
+                    }
+                    container.innerHTML = data.giveaways.map(g => {
+                        let sponsorLink = g.sponsor;
+                        if (!sponsorLink.startsWith('http')) {
+                            sponsorLink = 'https://t.me/' + sponsorLink.replace('@', '');
+                        }
+
+                        return `
+                            <div class="giveaway-card">
+                                <div class="giveaway-header">
+                                    <span class="giveaway-sponsor">🎁 Розыгрыш скина</span>
+                                    <span class="giveaway-timer">⏳ ${g.timer}</span>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
+                                    <div>
+                                        <p class="giveaway-title">${g.title}</p>
+                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount}</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                                    <button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 8px 4px;" onclick="window.open('${sponsorLink}', '_blank')">📢 Подписаться</button>
+                                    <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
                                 </div>
                             </div>
-                            <button class="btn-green-glow" onclick="joinGiveaway('${g._id}')">Участвовать в розыгрыше</button>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
             } catch (e) {}
         }
