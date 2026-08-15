@@ -32,6 +32,11 @@
         .tab { display: none; padding: 15px; padding-bottom: 95px; }
         .tab.active { display: block; }
         .neon-text { color: var(--text-main); text-shadow: 0 0 5px var(--neon-green); margin-top: 0; }
+        
+        /* Стили для VIP секции */
+        .vip-section-header { color: var(--neon-purple); text-shadow: 0 0 8px var(--neon-purple); display: flex; align-items: center; gap: 6px; font-size: 16px; margin-bottom: 10px; }
+        .vip-frame-container { background: rgba(191, 0, 255, 0.03); border: 1px dashed rgba(191, 0, 255, 0.4); border-radius: 12px; padding: 10px; margin-bottom: 20px; }
+
         .section-title { margin-top: 22px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 15px; }
         .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; }
 
@@ -41,7 +46,10 @@
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 6px; cursor: pointer; }
 
         .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between; }
+        .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+        .card.vip-card { border: 1px solid var(--neon-purple); box-shadow: 0 0 10px rgba(191,0,255,0.25); background: linear-gradient(135deg, rgba(30, 20, 40, 0.8), rgba(20, 30, 25, 0.7)); }
+        .vip-badge { position: absolute; top: 6px; right: 6px; background: var(--neon-purple); color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 5px var(--neon-purple); }
+
         .card h4 { margin: 6px 0 4px 0; font-size: 12px; min-height: 30px; overflow: hidden; }
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
         .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
@@ -169,6 +177,12 @@
 
     <main class="content-area">
         <section id="tab-market" class="tab active">
+            <!-- Отдельная рамка для VIP объявлений в самом верху -->
+            <div id="vip-section-wrapper" style="display: none;">
+                <div class="vip-section-header">👑 VIP Маркетплейс</div>
+                <div id="vip-market-listings" class="grid-layout vip-frame-container"></div>
+            </div>
+
             <h2 class="neon-text">Маркетплейс скинов</h2>
             <div id="market-listings" class="grid-layout"></div>
         </section>
@@ -270,7 +284,6 @@
         </div>
     </div>
 
-    <!-- Модальное окно пополнения (Crypto, Stars, P2P UZ) -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -300,7 +313,6 @@
         </div>
     </div>
 
-    <!-- Модальное окно вывода средств -->
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
@@ -309,7 +321,7 @@
                 <button type="button" class="platform-option-btn" id="w-method-p2puz" onclick="selectWithdrawMethod('p2puz')">Карта UZ 🇺🇿</button>
             </div>
             <p class="hint-text" id="withdraw-desc">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
-            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях" oninput="updateWithdrawCalculation()"></div>
+            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
             <div class="price-input-container"><span class="currency-symbol" id="withdraw-acc-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" placeholder="Номер карты или аккаунт"></div>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
@@ -616,7 +628,6 @@
 
             if (!price || price <= 0) { alert('Введите корректную цену!'); return; }
             if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (требуется 245 ₽).'); return; }
-            if (isVip) userBalance -= 245;
 
             const listing = {
                 assetid: currentSelectedItem.assetid,
@@ -632,6 +643,11 @@
             if (data.success) {
                 document.getElementById('modal-sell').classList.remove('active');
                 alert('Выставлено на продажу!');
+                if(data.newBalance !== undefined) {
+                    userBalance = data.newBalance;
+                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                }
                 fetchMarketItems();
                 syncUserProfile();
             } else {
@@ -699,6 +715,7 @@
                 const data = await res.json();
                 if (data.success) {
                     marketItems = data.items;
+                    
                     myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
                     document.getElementById('profile-listings').innerText = myListings.length;
                     renderMarket();
@@ -708,8 +725,32 @@
         }
 
         function renderMarket() {
-            const container = document.getElementById('market-listings');
-            container.innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
+            const vipContainer = document.getElementById('vip-market-listings');
+            const vipWrapper = document.getElementById('vip-section-wrapper');
+            const regularContainer = document.getElementById('market-listings');
+
+            const vipItems = marketItems.filter(i => i.isVip);
+            const regularItems = marketItems.filter(i => !i.isVip);
+
+            // Рендер VIP блока в отдельной рамке сверху
+            if (vipItems.length > 0) {
+                vipWrapper.style.display = 'block';
+                vipContainer.innerHTML = vipItems.map(i => `
+                    <div class="card vip-card">
+                        <div class="vip-badge">👑 VIP</div>
+                        <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                        <h4>${i.name}</h4>
+                        <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
+                        ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
+                    </div>
+                `).join('');
+            } else {
+                vipWrapper.style.display = 'none';
+                vipContainer.innerHTML = '';
+            }
+
+            // Рендер обычного маркетплейса
+            regularContainer.innerHTML = regularItems.length === 0 ? '<div class="empty-state">Нет обычных лотов</div>' : regularItems.map(i => `
                 <div class="card">
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
@@ -722,7 +763,8 @@
         function renderMyListings() {
             const container = document.getElementById('my-listings');
             container.innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
-                <div class="card">
+                <div class="card ${i.isVip ? 'vip-card' : ''}">
+                    ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                     <h4>${i.name}</h4>
                     <div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div>
@@ -788,10 +830,6 @@
                 accInput.placeholder = 'Номер карты (например, 8600...)';
                 accInput.value = '';
             }
-        }
-
-        function updateWithdrawCalculation() {
-            // Можно добавить подсказку при вводе суммы вывода если нужно
         }
 
         async function processTopUp() {
