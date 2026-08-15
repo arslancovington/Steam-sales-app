@@ -6,7 +6,14 @@ const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || 'YOUR_CRYPTO_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+// Безопасная инициализация с очисткой вебхука для предотвращения 409 ошибки
+const bot = new TelegramBot(TOKEN, { polling: false });
+bot.deleteWebhook().then(() => {
+    bot.startPolling();
+}).catch(() => {
+    bot.startPolling();
+});
+
 const app = express();
 
 app.use(express.json());
@@ -225,8 +232,6 @@ app.post('/api/billing/invoice', async (req, res) => {
             });
 
             const data = await resp.json();
-            console.log('Crypto Bot API Response:', data);
-
             if (data.ok && data.result) {
                 return res.json({ success: true, invoiceUrl: data.result.pay_url });
             } else {
