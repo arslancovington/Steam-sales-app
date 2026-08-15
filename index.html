@@ -50,14 +50,12 @@
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        /* Карточки розыгрышей */
         .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 0 10px rgba(191,0,255,0.15); }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
         .giveaway-sponsor { font-size: 11px; color: var(--neon-cyan); font-weight: bold; }
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
         .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
 
-        /* Нижняя навигация */
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
         .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
         .nav-item svg { width: 24px; height: 24px; fill: var(--text-muted); transition: 0.2s; }
@@ -89,7 +87,6 @@
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
-        /* Ретро стили загрузки в стиле CS 1.6 */
         .cs16-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
             display: none; align-items: center; justify-content: center;
@@ -137,7 +134,6 @@
 </head>
 <body>
 
-    <!-- Ретро модальное окно загрузки в стиле CS 1.6 -->
     <div class="cs16-modal active" id="cs16-loading-modal">
         <div class="cs16-dialog">
             <div class="cs16-title">Загрузка приложения...</div>
@@ -194,26 +190,11 @@
 
         <section id="tab-deals" class="tab"><h2 class="neon-text">Сделки</h2><div class="empty-state">Нет активных сделок</div></section>
 
-        <!-- Новая вкладка Розыгрыши -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
             <p class="hint-text" style="margin-bottom: 15px;">Участвуйте в розыгрышах скинов от наших спонсоров и партнеров!</p>
             <div id="giveaways-container">
-                <!-- Динамический список розыгрышей -->
-                <div class="giveaway-card">
-                    <div class="giveaway-header">
-                        <span class="giveaway-sponsor">📢 Спонсор: @PartnerChannel</span>
-                        <span class="giveaway-timer">⏳ До 20 авг</span>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;">🛡️</div>
-                        <div>
-                            <p class="giveaway-title">AK-47 | Neon Rider (Field-Tested)</p>
-                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: 142</div>
-                        </div>
-                    </div>
-                    <button class="btn-green-glow" onclick="joinGiveaway('giveaway_1')">Участвовать в розыгрыше</button>
-                </div>
+                <div class="empty-state">Нет активных розыгрышей</div>
             </div>
         </section>
 
@@ -242,31 +223,24 @@
         </section>
     </main>
 
-    <!-- Нижняя панель с вкладкой Розыгрыши вместо уведомлений -->
     <nav class="bottom-nav">
-        <!-- Маркет -->
         <button class="nav-item active-nav" onclick="switchTab('market', this)">
             <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
         </button>
-        <!-- Инвентарь -->
         <button class="nav-item" onclick="switchTab('inventory', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
         </button>
-        <!-- Сделки -->
         <button class="nav-item" onclick="switchTab('deals', this)">
             <svg viewBox="0 0 24 24"><path d="M18.84 5.37c-.77-.49-1.74-.27-2.24.5l-1.09 1.63c-.34.5-.96.72-1.54.52l-2.07-.69c-.91-.3-1.91.13-2.31 1.01l-2.1 4.67-1.7-1.13c-.62-.41-1.47-.23-1.87.39-.41.62-.23 1.47.39 1.87l3 2c.4.27.91.31 1.35.1l3.51-1.76c.4-.2.66-.6.67-1.05l.07-1.57 1.41.47c.54.18 1.13-.05 1.43-.54l1.37-2.27c.49-.77.27-1.74-.5-2.24zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
         </button>
-        <!-- Розыгрыши (Подарок) -->
         <button class="nav-item" onclick="switchTab('giveaways', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
         </button>
-        <!-- Профиль -->
         <button class="nav-item" onclick="switchTab('profile', this)">
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg>
         </button>
     </nav>
 
-    <!-- Модалка продажи -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Выставить скин</h3>
@@ -291,4 +265,528 @@
             </div>
 
             <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn-cyan" onclick="closeModal('modal-sell')"
+                <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
+                <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="width:auto; flex:1; margin-top:0;">Продать</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-topup">
+        <div class="modal-content">
+            <h3 class="neon-text">Пополнить баланс</h3>
+            <div class="topup-methods">
+                <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
+                    <div style="font-size: 18px;">💎</div>
+                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Crypto Bot</div>
+                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 10 USDT</div>
+                </div>
+                <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">
+                    <div style="font-size: 18px;">⭐</div>
+                    <div style="font-size: 11px; font-weight: bold; margin-top: 4px;">Telegram Stars</div>
+                    <div style="font-size: 9px; color: var(--text-muted);">Мин. 100 звёзд</div>
+                </div>
+            </div>
+            <div class="price-input-container">
+                <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
+                <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
+            </div>
+            <p class="hint-text" id="topup-hint">Сумма зачислится после оплаты (~90 ₽ за 1 USDT).</p>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
+                <button class="btn-green-glow" onclick="processTopUp()" style="width:auto; flex:1; margin-top:0;">Оплатить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-withdraw">
+        <div class="modal-content">
+            <h3 class="neon-text">Вывод средств</h3>
+            <p class="hint-text">Вывод в USDT через Crypto Bot (комиссия 5%). Мин. 500 ₽.</p>
+            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
+            <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" readonly></div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
+                <button class="btn-green-glow" onclick="processWithdraw()" style="width:auto; flex:1; margin-top:0;">Вывести</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userBalance = 0;
+        let selectedTopupType = 'crypto';
+        let selectedSellPlatform = 'Our P2P';
+        let currentSelectedItem = null;
+        let myInventory = [], marketItems = [], myListings = [];
+
+        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        const myTgId = tgUser?.id || 123456789;
+        const myUsername = tgUser?.username || tgUser?.first_name || `User_${myTgId}`;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const safetyTimeout = setTimeout(() => {
+                hideCs16Loading();
+            }, 3000);
+
+            try {
+                document.getElementById('my-nick').innerText = myUsername;
+                
+                const withdrawInput = document.getElementById('withdraw-crypto-account-input');
+                if (withdrawInput) {
+                    withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
+
+                // Все запросы изолированы, чтобы сбой в одном не вешал приложение
+                await Promise.allSettled([
+                    syncUserProfile(),
+                    fetchMarketItems(),
+                    fetchGiveaways()
+                ]);
+
+                if (steamId) {
+                    localStorage.setItem('user_steam_id', steamId);
+                    const authSection = document.getElementById('auth-section');
+                    if (authSection) authSection.style.display = 'none';
+                    loadSteamData(steamId).catch(e => console.error("Background steam load error:", e));
+                }
+            } catch (err) {
+                console.error("Init error:", err);
+            } finally {
+                clearTimeout(safetyTimeout);
+                hideCs16Loading();
+            }
+        });
+
+        function hideCs16Loading() {
+            const modal = document.getElementById('cs16-loading-modal');
+            if (modal) {
+                document.getElementById('cs16-bar-1').style.width = '100%';
+                document.getElementById('cs16-bar-2').style.width = '100%';
+                setTimeout(() => {
+                    modal.classList.remove('active');
+                }, 100);
+            }
+        }
+
+        async function syncUserProfile() {
+            try {
+                const response = await fetch(`/api/user/profile?tgId=${myTgId}&tgUser=${encodeURIComponent(myUsername)}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.success) {
+                    userBalance = data.balance;
+                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('my-rating').innerText = data.rating;
+                    document.getElementById('completed-deals-count').innerText = data.completedDeals;
+                    
+                    if (data.tradeUrl) {
+                        document.getElementById('trade-url-input').value = data.tradeUrl;
+                        localStorage.setItem('user_trade_url', data.tradeUrl);
+                    }
+                }
+            } catch (err) {}
+        }
+
+        function loginWithSteam() { window.location.href = `/auth/steam`; }
+
+        function saveTradeUrl() {
+            const url = document.getElementById('trade-url-input').value.trim();
+            localStorage.setItem('user_trade_url', url);
+
+            let steamId = null;
+            const profileMatch = url.match(/\/profiles\/(\d{17})/);
+            if (profileMatch && profileMatch[1]) {
+                steamId = profileMatch[1];
+            } else {
+                const partnerMatch = url.match(/partner=(\d+)/);
+                if (partnerMatch && partnerMatch[1]) {
+                    const partnerId = partnerMatch[1];
+                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
+                }
+            }
+
+            if (steamId) {
+                localStorage.setItem('user_steam_id', steamId);
+                const authSection = document.getElementById('auth-section');
+                if (authSection) authSection.style.display = 'none';
+                loadSteamData(steamId);
+            } else {
+                alert('Не удалось распознать SteamID из ссылки.');
+            }
+
+            fetch('/api/user/save', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId })
+            }).catch(() => {});
+        }
+
+        async function loadSteamData(steamId) {
+            const container = document.getElementById('steam-inventory-grid');
+            try {
+                const response = await fetch('/api/steam/inventory', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ steamId })
+                });
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+
+                if (data.avatarUrl) {
+                    document.getElementById('user-avatar-box').innerHTML = `<img src="${data.avatarUrl}" style="width:100%; height:100%; object-fit:cover;">`;
+                }
+                if (data.steamName) {
+                    document.getElementById('my-nick').innerText = data.steamName;
+                }
+
+                if (data.success && data.items && data.items.length > 0) {
+                    renderInventory(data.items, data.descriptions);
+                } else {
+                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль закрыт</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div class="empty-state">Ошибка загрузки инвентаря Steam</div>';
+            }
+        }
+
+        function renderInventory(items, descriptions) {
+            const container = document.getElementById('steam-inventory-grid');
+            myInventory = [];
+            const descMap = {};
+            if (descriptions) descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
+
+            items.forEach(item => {
+                const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
+                if (!desc) return; 
+
+                myInventory.push({
+                    assetid: item.assetid,
+                    name: desc.market_hash_name || desc.name,
+                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`
+                });
+            });
+
+            if (myInventory.length === 0) {
+                container.innerHTML = '<div class="empty-state">Нет предметов в инвентаре</div>';
+                return;
+            }
+
+            container.innerHTML = myInventory.map(item => `
+                <div class="card">
+                    <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
+                    <h4>${item.name}</h4>
+                    <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
+                </div>
+            `).join('');
+        }
+
+        async function fetchGiveaways() {
+            try {
+                const res = await fetch('/api/giveaways/list');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.success && data.giveaways && data.giveaways.length > 0) {
+                    const container = document.getElementById('giveaways-container');
+                    container.innerHTML = data.giveaways.map(g => `
+                        <div class="giveaway-card">
+                            <div class="giveaway-header">
+                                <span class="giveaway-sponsor">📢 Спонсор: ${g.sponsor}</span>
+                                <span class="giveaway-timer">⏳ ${g.timer}</span>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
+                                <div>
+                                    <p class="giveaway-title">${g.title}</p>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount}</div>
+                                </div>
+                            </div>
+                            <button class="btn-green-glow" onclick="joinGiveaway('${g._id}')">Участвовать в розыгрыше</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {}
+        }
+
+        async function joinGiveaway(giveawayId) {
+            try {
+                const res = await fetch('/api/giveaways/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tgId: myTgId, giveawayId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Вы успешно зарегистрированы в розыгрыше!');
+                    fetchGiveaways();
+                } else {
+                    alert(data.error || 'Не удалось принять участие');
+                }
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function selectSellPlatform(platform) {
+            selectedSellPlatform = platform;
+            document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
+            if (platform === 'Our P2P') document.getElementById('plat-our').classList.add('active');
+            if (platform === 'Lis-Skins') document.getElementById('plat-lis').classList.add('active');
+            if (platform === 'CS.MONEY') document.getElementById('plat-csmoney').classList.add('active');
+
+            const ourFields = document.getElementById('our-platform-fields');
+            const externalPriceBox = document.getElementById('external-platform-price-box');
+            const actionBtn = document.getElementById('sell-action-btn');
+
+            if (platform === 'Our P2P') {
+                ourFields.style.display = 'block'; 
+                externalPriceBox.style.display = 'none'; 
+                actionBtn.innerText = 'Продать';
+            } else {
+                ourFields.style.display = 'none'; 
+                externalPriceBox.style.display = 'block';
+                document.getElementById('external-plat-title').innerText = platform;
+                document.getElementById('external-plat-price').innerText = 'Загрузка цены...';
+
+                try {
+                    const res = await fetch(`/api/steam/price?name=${encodeURIComponent(currentSelectedItem.name)}`);
+                    const data = await res.json();
+                    let base = (data.success && data.price) ? data.price : 1500;
+                    let multiplier = platform === 'Lis-Skins' ? 0.96 : 0.93;
+                    document.getElementById('external-plat-price').innerText = Math.round(base * multiplier) + ' ₽';
+                } catch (e) {
+                    document.getElementById('external-plat-price').innerText = '1395 ₽';
+                }
+                actionBtn.innerText = `Перейти на ${platform}`;
+            }
+        }
+
+        async function openSellModal(item) {
+            if (myListings.some(l => l.assetid === item.assetid)) {
+                alert('Этот предмет уже выставлен на продажу!');
+                return;
+            }
+
+            currentSelectedItem = item;
+            document.getElementById('sell-modal-skin-name').innerText = item.name;
+            document.getElementById('vip-checkbox').checked = false;
+            document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
+            
+            try {
+                const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
+                const data = await res.json();
+                document.getElementById('sale-price-input').value = (data.success && data.price) ? data.price : 1500;
+            } catch(e) {
+                document.getElementById('sale-price-input').value = 1500;
+            }
+
+            selectSellPlatform('Our P2P');
+            document.getElementById('modal-sell').classList.add('active');
+        }
+
+        async function confirmSellItem() {
+            if (selectedSellPlatform !== 'Our P2P') {
+                let targetUrl = selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com';
+                closeModal('modal-sell'); 
+                window.open(targetUrl, '_blank'); 
+                return;
+            }
+
+            const price = parseFloat(document.getElementById('sale-price-input').value);
+            const isVip = document.getElementById('vip-checkbox').checked;
+
+            if (!price || price <= 0) { alert('Введите корректную цену!'); return; }
+            if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (требуется 245 ₽).'); return; }
+            if (isVip) userBalance -= 245;
+
+            const listing = {
+                assetid: currentSelectedItem.assetid,
+                name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url,
+                seller: document.getElementById('my-nick').innerText, tgId: myTgId, type: 'rifle', 
+                rating: document.getElementById('my-rating').innerText, isVip, platform: selectedSellPlatform
+            };
+
+            const res = await fetch('/api/market/add', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(listing)
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('modal-sell').classList.remove('active');
+                alert('Выставлено на продажу!');
+                fetchMarketItems();
+                syncUserProfile();
+            } else {
+                alert(data.error || 'Ошибка при выставлении');
+            }
+        }
+
+        async function buyItem(item) {
+            const tradeUrl = localStorage.getItem('user_trade_url');
+            if (!tradeUrl) {
+                alert('Сначала укажите свою Trade URL в инвентаре!');
+                switchTab('inventory', document.querySelectorAll('.nav-item')[1]);
+                return;
+            }
+            if (userBalance < item.price) {
+                alert('Недостаточно средств на балансе!');
+                openTopUpModal();
+                return;
+            }
+
+            if (!confirm(`Купить "${item.name}" за ${item.price} ₽?`)) return;
+
+            try {
+                const res = await fetch('/api/deals/buy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId: item._id, buyerTgId: myTgId, buyerTradeUrl: tradeUrl, buyerName: myUsername })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Заказ успешно оформлен!');
+                    syncUserProfile();
+                    fetchMarketItems();
+                } else {
+                    alert(data.error || 'Ошибка при покупке');
+                }
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function cancelListing(itemId) {
+            try {
+                const res = await fetch('/api/market/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId, tgId: myTgId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Лот снят с продажи!');
+                    fetchMarketItems();
+                } else {
+                    alert(data.error || 'Не удалось снять лот');
+                }
+            } catch (err) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function fetchMarketItems() {
+            try {
+                const res = await fetch('/api/market/items');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.success) {
+                    marketItems = data.items;
+                    myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
+                    document.getElementById('profile-listings').innerText = myListings.length;
+                    renderMarket();
+                    renderMyListings();
+                }
+            } catch (e) {}
+        }
+
+        function renderMarket() {
+            const container = document.getElementById('market-listings');
+            container.innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
+                <div class="card">
+                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                    <h4>${i.name}</h4>
+                    <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
+                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
+                </div>
+            `).join('');
+        }
+
+        function renderMyListings() {
+            const container = document.getElementById('my-listings');
+            container.innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
+                <div class="card">
+                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                    <h4>${i.name}</h4>
+                    <div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div>
+                    <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять с продажи</button>
+                </div>
+            `).join('');
+        }
+
+        function selectTopupMethod(type) {
+            selectedTopupType = type;
+            document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('method-' + type).classList.add('active');
+            const symbol = document.getElementById('topup-symbol');
+            const hint = document.getElementById('topup-hint');
+            if (type === 'crypto') {
+                symbol.innerText = 'USDT'; hint.innerText = 'Сумма зачислится после оплаты (~90 ₽ за 1 USDT). Мин. 10 USDT.';
+            } else {
+                symbol.innerText = '⭐'; hint.innerText = 'Сумма зачислится после оплаты (~1.8 ₽ за 1 звезду). Мин. 100 звёзд.';
+            }
+        }
+
+        async function processTopUp() {
+            const amount = parseFloat(document.getElementById('topup-amount-input').value);
+            const minLimit = selectedTopupType === 'crypto' ? 10 : 100;
+            if (isNaN(amount) || amount < minLimit) { alert(`Минимальная сумма: ${minLimit}`); return; }
+
+            let rublesToAdd = selectedTopupType === 'crypto' ? amount * 90 : amount * 1.8;
+            let currency = selectedTopupType === 'crypto' ? 'USDT' : 'Звёзды ⭐';
+
+            try {
+                const res = await fetch('/api/billing/invoice', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tgId: myTgId, amount, currency, received: Math.round(rublesToAdd) })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModal('modal-topup');
+                    if (selectedTopupType === 'crypto') {
+                        alert('Счет отправлен в личные сообщения с ботом!');
+                        if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
+                    } else {
+                        if (data.payUrl) window.open(data.payUrl, '_blank');
+                    }
+                } else {
+                    alert('Ошибка: ' + (data.error || 'Не удалось создать счет'));
+                }
+            } catch (err) { alert('Ошибка соединения с сервером'); }
+        }
+
+        async function processWithdraw() {
+            const amount = parseFloat(document.getElementById('withdraw-amount-input').value);
+            const cryptoAccount = document.getElementById('withdraw-crypto-account-input').value.trim();
+
+            if (isNaN(amount) || amount < 500) { alert('Мин. сумма вывода — 500 ₽.'); return; }
+            if (userBalance < amount) { alert('Недостаточно средств на балансе.'); return; }
+
+            try {
+                const response = await fetch('/api/billing/withdraw', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: cryptoAccount, username: myUsername })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    userBalance -= amount;
+                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    closeModal('modal-withdraw');
+                    alert('Заявка на вывод успешно отправлена администраторам!');
+                }
+            } catch (err) { alert('Ошибка соединения'); }
+        }
+
+        function switchTab(id, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + id).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+            btn.classList.add('active-nav');
+        }
+
+        function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
+        function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    </script>
+</body>
+</html>
