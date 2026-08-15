@@ -1,459 +1,334 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head> 
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Skin Sales — Marketplace</title>
+    <title>Steam Sales P2P</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
     <style>
-        :root { --bg-color: #0b1110; --neon-green: #7cfc00; --neon-cyan: #00ffff; --neon-purple: #bf00ff; --card-bg: rgba(20, 30, 25, 0.7); --text-main: #ffffff; --text-muted: #889988; --danger-red: #ff4d4d; }
-        * { box-sizing: border-box; }
-        body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+        :root { --bg: #0b0f19; --card: #151c2c; --accent: #22c55e; --text: #f8fafc; --muted: #94a3b8; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 70px; }
 
-        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(11, 17, 16, 0.9); position: sticky; top: 0; z-index: 100; }
-        .bot-profile { display: flex; align-items: center; gap: 10px; }
-        .bot-name { font-weight: bold; font-size: 14px; }
-        .bot-status { color: var(--neon-green); font-size: 11px; font-weight: bold; }
+        /* Экран загрузки CS 1.6 */
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease; }
+        .cs-logo { font-size: 28px; font-weight: bold; color: #ffcc00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255,204,0,0.5); }
+        .progress-bar-container { width: 250px; height: 16px; border: 2px solid #ffcc00; padding: 2px; background: #111; }
+        .progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
+        .loading-text { margin-top: 10px; font-size: 14px; color: var(--muted); }
 
-        .balance-widget { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--neon-green); font-size: 14px; }
-        .add-funds-btn { background: transparent; color: var(--neon-green); border: none; font-size: 20px; cursor: pointer; }
+        /* Навигация */
+        .navbar { display: flex; justify-content: space-around; background: var(--card); position: fixed; bottom: 0; left: 0; width: 100%; padding: 12px 0; border-top: 1px solid #1e293b; z-index: 100; }
+        .nav-item { color: var(--muted); text-align: center; font-size: 12px; cursor: pointer; flex: 1; }
+        .nav-item.active { color: var(--accent); }
+        .nav-item i { display: block; font-size: 18px; margin-bottom: 4px; }
 
-        .tab { display: none; padding: 15px; padding-bottom: 95px; }
-        .tab.active { display: block; }
-        .neon-text { color: var(--text-main); text-shadow: 0 0 5px var(--neon-green); margin-top: 0; }
-        .section-title { margin-top: 22px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 15px; }
-        .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; }
+        /* Шапка */
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--card); border-bottom: 1px solid #1e293b; }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: #333; }
+        .balance-box { background: #1e293b; padding: 6px 12px; border-radius: 8px; font-weight: bold; color: var(--accent); display: flex; align-items: center; gap: 5px; }
 
-        .trade-url-box { display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
-        .trade-url-box input { flex: 1; padding: 10px; background: #111; border: 1px solid #333; color: white; border-radius: 6px; }
-        .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 6px; cursor: pointer; }
-
-        .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between; }
-        .card h4 { margin: 6px 0 4px 0; font-size: 12px; min-height: 30px; overflow: hidden; }
-        .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
-        .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+        /* Контент */
+        .container { padding: 15px; display: none; }
+        .container.active { display: block; }
         
-        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 4px; }
-        .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
-        .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 8px; }
+        button { width: 100%; padding: 12px; background: var(--accent); color: #000; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 5px; }
+        button:active { opacity: 0.8; }
 
-        .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
-        .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
-        .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
-        .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
-
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
-        .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
-        .nav-item svg { width: 24px; height: 24px; fill: var(--text-muted); transition: 0.2s; }
-        .active-nav { opacity: 1; transform: scale(1.08); }
-        .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
-
-        .seller-head { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 14px; }
-        .seller-avatar { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0,255,255,0.08); border: 1px solid var(--neon-cyan); overflow: hidden; flex-shrink: 0; }
-        .seller-meta { display: flex; flex-direction: column; gap: 3px; }
-        .seller-nick { font-weight: bold; font-size: 15px; }
-        .seller-sub { font-size: 11px; color: var(--text-muted); }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .stat-box { background: rgba(0,0,0,0.45); border: 1px solid #2a352f; border-radius: 8px; padding: 8px; }
-        .stat-label { font-size: 10px; color: var(--text-muted); }
-        .stat-value { font-size: 14px; font-weight: bold; }
-
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; }
-        .price-input-container { position: relative; margin: 10px 0; }
-        .currency-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
-        #sale-price-input, .topup-input { width: 100%; padding: 12px 12px 12px 34px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 8px; }
-
-        .platform-select-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
-        .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
-        .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
-
-        .topup-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; text-align: center; }
-        .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        .card { background: var(--card); border-radius: 10px; padding: 10px; text-align: center; border: 1px solid #1e293b; }
+        .card img { width: 100px; height: 100px; object-fit: contain; }
+        .card-title { font-size: 13px; margin: 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-price { color: var(--accent); font-weight: bold; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
-    <header class="top-bar">
-        <div class="bot-profile">
-            <div style="width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(124,252,0,0.25) 0%, rgba(0,255,255,0.05) 100%); border: 1px solid var(--neon-green); box-shadow: 0 0 12px rgba(124,252,0,0.4); flex-shrink: 0;">
-                <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: var(--neon-green); filter: drop-shadow(0 0 5px var(--neon-green));">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-            </div>
-            <div class="bot-info">
-                <span class="bot-name">p2p skin sales ✔️</span>
-                <span class="bot-status">Активен</span>
+    <!-- Экран загрузки -->
+    <div id="loader">
+        <div class="cs-logo">LOADING STEAM SALES...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Инициализация ресурсов...</div>
+    </div>
+
+    <!-- Шапка профиля -->
+    <div class="header">
+        <div class="user-info">
+            <img id="userAvatar" class="user-avatar" src="" alt="">
+            <div>
+                <div id="userName" style="font-weight: bold; font-size: 14px;">Игрок</div>
+                <div style="font-size: 11px; color: var(--muted);">⭐ Рейтинг: <span id="userRating">5.0</span></div>
             </div>
         </div>
-        <div class="balance-widget">
-            <span id="user-balance">0 ₽</span>
-            <button class="add-funds-btn" onclick="openTopUpModal()">+</button>
-        </div>
-    </header>
-
-    <main class="content-area">
-        <section id="tab-market" class="tab active">
-            <h2 class="neon-text">Маркетплейс скинов</h2>
-            <div id="market-listings" class="grid-layout"></div>
-        </section>
-
-        <section id="tab-inventory" class="tab">
-            <h2 class="neon-text">Твой Steam инвентарь</h2>
-            <div class="trade-url-box">
-                <input type="text" id="trade-url-input" placeholder="Trade URL с partner=...">
-                <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
-            </div>
-            <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Введите Trade URL для загрузки инвентаря</div>
-            </div>
-        </section>
-
-        <section id="tab-giveaways" class="tab">
-            <h2 class="neon-text">🎁 Активные розыгрыши</h2>
-            <p class="hint-text" style="margin-bottom: 15px;">Участвуйте в розыгрышах скинов от наших спонсоров!</p>
-            <div id="giveaways-container">
-                <div class="empty-state">Нет активных розыгрышей</div>
-            </div>
-        </section>
-
-        <section id="tab-profile" class="tab">
-            <h2 class="neon-text">Твой профиль</h2>
-            <div class="card" style="border:1px solid var(--neon-green); padding:15px; margin-bottom:15px;">
-                <div class="seller-head">
-                    <div class="seller-avatar" id="user-avatar-box">🧑‍🚀</div>
-                    <div class="seller-meta">
-                        <span class="seller-nick" id="my-nick">Игрок</span>
-                        <span class="seller-sub">Рейтинг ⭐ <span id="my-rating">0.0</span></span>
-                        <span class="seller-sub">Успешных сделок: <span id="completed-deals-count">0</span></span>
-                    </div>
-                </div>
-                <div class="stat-grid">
-                    <div class="stat-box"><div class="stat-label">Баланс</div><div class="stat-value" id="profile-balance">0 ₽</div></div>
-                    <div class="stat-box"><div class="stat-label">Лотов</div><div class="stat-value" id="profile-listings">0</div></div>
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="btn-green-glow" onclick="openTopUpModal()" style="margin:0;">Пополнить</button>
-                <button class="btn-cyan" onclick="openWithdrawModal()" style="flex:1;">Вывести</button>
-            </div>
-            <h3 class="section-title">🏷️ Мои лоты</h3>
-            <div id="my-listings" class="grid-layout"></div>
-        </section>
-    </main>
-
-    <nav class="bottom-nav">
-        <button class="nav-item active-nav" onclick="switchTab('market', this)">
-            <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
-        </button>
-        <button class="nav-item" onclick="switchTab('inventory', this)">
-            <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
-        </button>
-        <button class="nav-item" onclick="switchTab('giveaways', this)">
-            <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
-        </button>
-        <button class="nav-item" onclick="switchTab('profile', this)">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg>
-        </button>
-    </nav>
-
-    <!-- Модальные окна -->
-    <div class="modal-overlay" id="modal-sell">
-        <div class="modal-content">
-            <h3 class="neon-text">Выставить скин</h3>
-            <div class="skin-image" id="sell-modal-img-box">🛡️</div>
-            <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px; margin-bottom: 5px;"></p>
-            <div class="platform-select-group">
-                <button type="button" class="platform-option-btn active" id="plat-our" onclick="selectSellPlatform('Our P2P')">Наша площадка</button>
-                <button type="button" class="platform-option-btn" id="plat-lis" onclick="selectSellPlatform('Lis-Skins')">Lis-Skins</button>
-                <button type="button" class="platform-option-btn" id="plat-csmoney" onclick="selectSellPlatform('CS.MONEY')">CS.MONEY</button>
-            </div>
-            <div id="our-platform-fields">
-                <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="sale-price-input" placeholder="Цена"></div>
-                <label style="display: flex; gap: 8px; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP (245 ₽)</label>
-            </div>
-            <div id="external-platform-price-box" style="display: none; padding: 12px; background: rgba(0,255,255,0.05); border: 1px solid var(--neon-cyan); border-radius: 8px;">
-                <div style="font-size: 11px; color: var(--text-muted);">Цена на <span id="external-plat-title" style="color: var(--neon-cyan); font-weight: bold;">платформе</span>:</div>
-                <div id="external-plat-price" style="font-size: 18px; font-weight: bold; color: var(--neon-cyan);">Загрузка...</div>
-            </div>
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" id="sell-action-btn" onclick="confirmSellItem()" style="flex:1;">Продать</button>
-            </div>
+        <div class="balance-box">
+            <span id="userBalance">0</span> ₽
+            <button onclick="switchTab('wallet')" style="width: auto; padding: 4px 8px; font-size: 12px; margin: 0;">+</button>
         </div>
     </div>
 
-    <div class="modal-overlay" id="modal-topup">
-        <div class="modal-content">
-            <h3 class="neon-text">Пополнить баланс</h3>
-            <div class="topup-methods">
-                <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">
-                    <div style="font-size: 18px;">💎</div><div style="font-size: 11px; font-weight: bold;">Crypto Bot</div>
-                </div>
-                <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">
-                    <div style="font-size: 18px;">⭐</div><div style="font-size: 11px; font-weight: bold;">Telegram Stars</div>
-                </div>
-            </div>
-            <div class="price-input-container">
-                <span class="currency-symbol" id="topup-symbol" style="left: 12px;">USDT</span>
-                <input type="number" id="topup-amount-input" class="topup-input" placeholder="10" style="padding-left: 55px;">
-            </div>
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processTopUp()" style="flex:1;">Оплатить</button>
-            </div>
+    <!-- Вкладка 1: Маркетплейс -->
+    <div id="tab-market" class="container active">
+        <input type="text" id="searchInput" placeholder="🔍 Поиск предмета..." oninput="filterMarket()">
+        <div class="grid" id="marketGrid">
+            <!-- Сюда динамически падают товары -->
         </div>
     </div>
 
-    <div class="modal-overlay" id="modal-withdraw">
-        <div class="modal-content">
-            <h3 class="neon-text">Вывод средств</h3>
-            <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма (мин 500)"></div>
-            <div class="price-input-container"><span class="currency-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;"></div>
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processWithdraw()" style="flex:1;">Вывести</button>
-            </div>
-        </div>
+    <!-- Вкладка 2: Инвентарь -->
+    <div id="tab-inventory" class="container">
+        <h3 style="margin-bottom: 10px;">Твой STEAM инвентарь</h3>
+        <input type="text" id="tradeUrlInput" placeholder="Вставьте вашу Trade URL...">
+        <button onclick="saveAndLoadInventory()">Загрузить инвентарь</button>
+        <div class="grid" id="inventoryGrid" style="margin-top: 15px;"></div>
+    </div>
+
+    <!-- Вкладка 3: Розыгрыши -->
+    <div id="tab-giveaways" class="container">
+        <h3>Активные розыгрыши</h3>
+        <div id="giveawaysList" style="margin-top: 10px;"></div>
+    </div>
+
+    <!-- Вкладка 4: Кошелек / Пополнение -->
+    <div id="tab-wallet" class="container">
+        <h3>Пополнение баланса</h3>
+        
+        <label>Сумма пополнения:</label>
+        <input type="number" id="topupAmount" placeholder="Введите сумму">
+
+        <button onclick="payCrypto()" style="background: #2481cc; color: #fff; margin-top: 10px;">💳 Пополнить через CryptoBot (от 3 USDT)</button>
+        <button onclick="payStars()" style="background: #e1ab3f; color: #000; margin-top: 10px;">⭐ Пополнить через Telegram Stars</button>
+        
+        <hr style="border-color: #1e293b; margin: 20px 0;">
+        
+        <h3>P2P Пополнение (Карты Узбекистана)</h3>
+        <button onclick="payP2P()" style="background: #3b82f6; color: #fff;"> Uzbek Card (Humo / UzCard)</button>
+        
+        <hr style="border-color: #1e293b; margin: 20px 0;">
+        
+        <h3>Вывод средств</h3>
+        <input type="number" id="withdrawAmount" placeholder="Сумма вывода">
+        <input type="text" id="withdrawDetails" placeholder="Номер карты или реквизиты">
+        <button onclick="requestWithdraw()" style="background: #ef4444; color: #fff;">Запросить вывод</button>
+    </div>
+
+    <!-- Нижнее меню -->
+    <div class="navbar">
+        <div class="nav-item active" onclick="switchTab('market')"><i>🛒</i>Маркет</div>
+        <div class="nav-item" onclick="switchTab('inventory')"><i>🎒</i>Инвентарь</div>
+        <div class="nav-item" onclick="switchTab('giveaways')"><i>🎁</i>Розыгрыши</div>
+        <div class="nav-item" onclick="switchTab('wallet')"><i>💳</i>Кошелек</div>
     </div>
 
     <script>
-        let userBalance = 0;
-        let selectedTopupType = 'crypto';
-        let selectedSellPlatform = 'Our P2P';
-        let currentSelectedItem = null;
-        let myInventory = [], marketItems = [], myListings = [];
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        const user = tg.initDataUnsafe.user || { id: 12345, first_name: 'Гость', username: 'guest' };
 
-        let tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
-        const myTgId = tgUser.id || 123456789;
-        const myUsername = tgUser.username || `User_${myTgId}`;
+        // Инициализация профиля ТГ
+        document.getElementById('userName').innerText = user.first_name;
+        if (user.photo_url) document.getElementById('userAvatar').src = user.photo_url;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('my-nick').innerText = myUsername;
-            document.getElementById('withdraw-crypto-account-input').value = `@${myUsername}`;
+        // Имитация классической загрузки CS 1.6
+        let progress = 0;
+        const progressBar = document.getElementById('progressBar');
+        const loadingText = document.getElementById('loadingText');
+        const loader = document.getElementById('loader');
 
-            const savedTradeUrl = localStorage.getItem('user_trade_url');
-            if (savedTradeUrl) document.getElementById('trade-url-input').value = savedTradeUrl;
+        const loadingStages = [
+            "Загрузка моделей игрока...",
+            "Кэширование звуков окружения...",
+            "Подключение к серверу P2P...",
+            "Загрузка каталога скинов...",
+            "Готово!"
+        ];
 
-            let steamId = localStorage.getItem('user_steam_id');
-            if (steamId) loadSteamData(steamId);
-
-            syncUserProfile();
-            fetchMarketItems();
-            fetchGiveaways();
-        });
-
-        async function syncUserProfile() {
-            try {
-                const res = await fetch(`/api/user/profile?tgId=${myTgId}&tgUser=${myUsername}`);
-                const data = await res.json();
-                if (data.success) {
-                    userBalance = data.balance;
-                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
-                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
-                    document.getElementById('my-rating').innerText = data.rating;
-                    document.getElementById('completed-deals-count').innerText = data.completedDeals;
-                }
-            } catch (err) {}
-        }
-
-        function saveTradeUrl() {
-            const urlInput = document.getElementById('trade-url-input');
-            const url = urlInput.value.trim();
-            localStorage.setItem('user_trade_url', url);
-
-            let steamId = null;
-            const partnerMatch = url.match(/partner=(\d+)/);
-            if (partnerMatch && partnerMatch[1]) {
-                try { steamId = (BigInt(partnerMatch[1]) + 76561197960265728n).toString(); } catch (e) {}
-            } else {
-                const profileMatch = url.match(/\/profiles\/(\d{17})/);
-                if (profileMatch && profileMatch[1]) steamId = profileMatch[1];
+        let loadInterval = setInterval(() => {
+            progress += Math.floor(Math.random() * 15) + 5;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(loadInterval);
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
             }
+            progressBar.style.width = progress + '%';
+            let stageIndex = Math.floor((progress / 100) * (loadingStages.length - 1));
+            loadingText.innerText = loadingStages[stageIndex];
+        }, 150);
 
-            if (steamId) {
-                localStorage.setItem('user_steam_id', steamId);
-                loadSteamData(steamId);
-                fetch('/api/user/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, tradeUrl: url, steamId: steamId }) });
-            } else {
-                alert('Не удалось найти SteamID в ссылке. Используйте ссылку с partner=');
-            }
+        // Переключение вкладок
+        function switchTab(tabId) {
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
         }
 
-        async function loadSteamData(steamId) {
-            const container = document.getElementById('steam-inventory-grid');
-            container.innerHTML = '<div class="empty-state">Загрузка...</div>';
-            try {
-                const response = await fetch('/api/steam/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ steamId }) });
-                const data = await response.json();
-
-                if (data.success && data.items.length > 0) {
-                    myInventory = [];
-                    const descMap = {};
-                    data.descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
-
-                    data.items.forEach(item => {
-                        const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
-                        if (desc) myInventory.push({ assetid: item.assetid, name: desc.market_hash_name, icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}` });
-                    });
-
-                    container.innerHTML = myInventory.map(item => `
-                        <div class="card">
-                            <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
-                            <h4>${item.name}</h4>
-                            <button class="btn-green-glow" onclick="openSellModal('${item.assetid}')">Продать</button>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или скрыт настройками приватности Steam</div>';
-                }
-            } catch (e) { container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
-        }
-
-        async function fetchMarketItems() {
-            try {
-                const res = await fetch('/api/market/items');
-                const data = await res.json();
-                if (data.success) {
-                    marketItems = data.items;
-                    myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
-                    document.getElementById('profile-listings').innerText = myListings.length;
-                    
-                    document.getElementById('market-listings').innerHTML = marketItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : marketItems.map(i => `
-                        <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4><div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick="buyItem('${i._id}')">Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}</div>
-                    `).join('');
-                    
-                    document.getElementById('my-listings').innerHTML = myListings.length === 0 ? '<div class="empty-state">У вас нет лотов</div>' : myListings.map(i => `
-                        <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4><div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div><button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button></div>
-                    `).join('');
-                }
-            } catch (e) {}
-        }
-
-        async function fetchGiveaways() {
-            try {
-                const res = await fetch('/api/giveaways/list');
-                const data = await res.json();
-                if (data.success) {
-                    const c = document.getElementById('giveaways-container');
-                    c.innerHTML = data.giveaways.length === 0 ? '<div class="empty-state">Нет активных розыгрышей</div>' : data.giveaways.map(g => `
-                        <div class="giveaway-card">
-                            <div class="giveaway-header"><span style="font-size: 11px; color: var(--neon-purple);">🎁 Спонсор: ${g.sponsor}</span><span class="giveaway-timer">⏳ ${g.timer}</span></div>
-                            <div style="display: flex; gap: 10px; align-items: center;"><div class="skin-image" style="width: 70px; height: 70px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div><div><p class="giveaway-title">${g.title}</p><div style="font-size: 11px; color: var(--text-muted);">Участников: ${g.participantsCount}</div></div></div>
-                            <div style="display: flex; gap: 8px; margin-top: 6px;"><button class="btn-cyan" style="flex: 1; padding: 8px 4px;" onclick="window.open('${g.sponsor.startsWith('http') ? g.sponsor : 'https://t.me/'+g.sponsor.replace('@','')}', '_blank')">📢 Подписаться</button><button class="btn-green-glow" style="flex: 1;" onclick="joinGiveaway('${g._id}')">Участвовать</button></div>
-                        </div>
-                    `).join('');
-                }
-            } catch (e) {}
-        }
-
-        async function openSellModal(assetid) {
-            const item = myInventory.find(i => i.assetid === assetid);
-            if (!item) return;
-            currentSelectedItem = item;
-            document.getElementById('sell-modal-skin-name').innerText = item.name;
-            document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
+        // Загрузка инвентаря по трейд-ссылке
+        async function saveAndLoadInventory() {
+            const tradeUrl = document.getElementById('tradeUrlInput').value;
+            if (!tradeUrl) return alert('Введите trade URL!');
             
-            try {
-                const res = await fetch(`/api/steam/price?name=${encodeURIComponent(item.name)}`);
-                const data = await res.json();
-                document.getElementById('sale-price-input').value = data.price || 1500;
-            } catch(e) { document.getElementById('sale-price-input').value = 1500; }
-            
-            selectSellPlatform('Our P2P');
-            document.getElementById('modal-sell').classList.add('active');
-        }
-
-        async function confirmSellItem() {
-            if (selectedSellPlatform !== 'Our P2P') {
-                window.open(selectedSellPlatform === 'CS.MONEY' ? 'https://cs.money' : 'https://lis-skins.com', '_blank');
-                return closeModal('modal-sell');
-            }
-            const price = parseFloat(document.getElementById('sale-price-input').value);
-            const isVip = document.getElementById('vip-checkbox').checked;
-            if (!price) return alert('Введите цену!');
-            if (isVip && userBalance < 245) return alert('Недостаточно средств для VIP');
-            
-            await fetch('/api/market/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assetid: currentSelectedItem.assetid, name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url, seller: myUsername, tgId: myTgId, isVip }) });
-            closeModal('modal-sell');
-            alert('Выставлено на продажу!');
-            fetchMarketItems();
-            syncUserProfile();
-        }
-
-        async function buyItem(itemId) {
-            const item = marketItems.find(i => i._id === itemId);
-            if (userBalance < item.price) return alert('Недостаточно средств!');
-            if (!confirm(`Купить "${item.name}" за ${item.price} ₽?`)) return;
-            const res = await fetch('/api/deals/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: item._id, tgId: myTgId }) });
+            const res = await fetch('/api/steam/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tradeUrl })
+            });
             const data = await res.json();
-            if (data.success) { alert('Успешно куплено!'); syncUserProfile(); fetchMarketItems(); }
+            
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = '';
+            
+            if (data.success && data.items.length > 0) {
+                data.items.forEach(item => {
+                    const desc = data.descriptions.find(d => d.classid === item.classid && d.instanceid === item.instanceid);
+                    if (!desc) return;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <img src="https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}" alt="">
+                        <div class="card-title">${desc.market_hash_name}</div>
+                        <button onclick="sellItem('${desc.market_hash_name}', '${desc.icon_url}', '${tradeUrl}')">Продать</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } else {
+                grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--muted);">Инвентарь пуст или профиль скрыт</p>';
+            }
         }
 
-        async function cancelListing(itemId) {
-            await fetch('/api/market/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, tgId: myTgId }) });
-            alert('Лот снят!'); fetchMarketItems();
-        }
-
-        async function joinGiveaway(giveawayId) {
-            const res = await fetch('/api/giveaways/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, giveawayId }) });
-            const data = await res.json();
-            alert(data.success ? 'Успешно!' : data.error);
-            if (data.success) fetchGiveaways();
-        }
-
-        function switchTab(id, btn) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + id).classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-            btn.classList.add('active-nav');
-        }
-
-        function selectSellPlatform(plat) {
-            selectedSellPlatform = plat;
-            document.querySelectorAll('.platform-option-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(plat === 'Our P2P' ? 'plat-our' : plat === 'Lis-Skins' ? 'plat-lis' : 'plat-csmoney').classList.add('active');
-            document.getElementById('our-platform-fields').style.display = plat === 'Our P2P' ? 'block' : 'none';
-            document.getElementById('external-platform-price-box').style.display = plat === 'Our P2P' ? 'none' : 'block';
-            document.getElementById('external-plat-title').innerText = plat;
-            document.getElementById('sell-action-btn').innerText = plat === 'Our P2P' ? 'Продать' : `Перейти на ${plat}`;
-            if(plat !== 'Our P2P') document.getElementById('external-plat-price').innerText = Math.round(document.getElementById('sale-price-input').value * 0.95) + ' ₽';
-        }
-
-        function selectTopupMethod(type) {
-            selectedTopupType = type;
-            document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
-            document.getElementById('method-' + type).classList.add('active');
-            document.getElementById('topup-symbol').innerText = type === 'crypto' ? 'USDT' : '⭐';
-        }
-
-        async function processTopUp() {
-            const amount = parseFloat(document.getElementById('topup-amount-input').value);
-            const res = await fetch('/api/billing/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, method: selectedTopupType, amount }) });
+        // Выставить товар на продажу
+        async function sellItem(name, iconUrl, tradeUrl) {
+            // Запрос цены из API (можно применить промокод)
+            const priceRes = await fetch(`/api/steam/price?name=${encodeURIComponent(name)}`);
+            const priceData = await priceRes.json();
+            
+            let price = priceData.price || 150;
+            
+            const res = await fetch('/api/market/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, iconUrl, price, tgId: user.id, tradeUrl })
+            });
             const data = await res.json();
             if (data.success) {
-                closeModal('modal-topup');
-                if (selectedTopupType === 'stars' && window.Telegram?.WebApp?.openInvoice) window.Telegram.WebApp.openInvoice(data.invoiceUrl, () => syncUserProfile());
-                else window.open(data.invoiceUrl, '_blank');
-            } else alert(data.error);
+                alert('Предмет успешно выставлен на маркетплейс!');
+                loadMarketItems();
+            }
         }
 
-        async function processWithdraw() {
-            const amount = document.getElementById('withdraw-amount-input').value;
-            const address = document.getElementById('withdraw-crypto-account-input').value;
-            const res = await fetch('/api/billing/withdraw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount, address }) });
+        // Загрузка товаров маркета
+        async function loadMarketItems() {
+            const res = await fetch('/api/market/items');
             const data = await res.json();
-            alert(data.success ? 'Заявка на вывод создана' : data.error);
-            if (data.success) { closeModal('modal-withdraw'); syncUserProfile(); }
+            const grid = document.getElementById('marketGrid');
+            grid.innerHTML = '';
+            
+            if (data.success && data.items.length > 0) {
+                data.items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <img src="https://community.cloudflare.steamstatic.com/economy/image/${item.iconUrl}" alt="">
+                        <div class="card-title">${item.name}</div>
+                        <div class="card-price">${item.price} ₽</div>
+                        <button onclick="buyItem('${item._id}')">Купить</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } else {
+                grid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--muted);">Нет товаров на продаже</p>';
+            }
         }
 
-        function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
-        function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        // Покупка товара
+        async function buyItem(itemId) {
+            const buyerTradeUrl = prompt('Введите вашу Trade URL для получения предмета:');
+            if (!buyerTradeUrl) return;
+
+            const res = await fetch('/api/deals/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ buyerTgId: user.id, buyerTradeUrl, itemId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('Запрос на покупку создан! Продавец уведомлен.');
+                loadMarketItems();
+            } else {
+                alert(data.error || 'Ошибка покупки');
+            }
+        }
+
+        // Пополнение CryptoBot
+        async function payCrypto() {
+            const amount = document.getElementById('topupAmount').value;
+            const res = await fetch('/api/billing/invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: user.id, method: 'crypto', amount })
+            });
+            const data = await res.json();
+            if (data.success) window.location.href = data.url;
+            else alert(data.error);
+        }
+
+        // Пополнение Telegram Stars
+        async function payStars() {
+            const amount = document.getElementById('topupAmount').value;
+            const res = await fetch('/api/billing/invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: user.id, method: 'stars', amount })
+            });
+            const data = await res.json();
+            if (data.success) tg.openInvoice(data.url);
+            else alert(data.error);
+        }
+
+        // Пополнение P2P (Узбекистан)
+        async function payP2P() {
+            const amount = document.getElementById('topupAmount').value;
+            if (!amount) return alert('Введите сумму');
+            const res = await fetch('/api/billing/p2p', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: user.id, username: user.username, amount })
+            });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        // Запрос на вывод
+        async function requestWithdraw() {
+            const amount = document.getElementById('withdrawAmount').value;
+            const details = document.getElementById('withdrawDetails').value;
+            if (!amount || !details) return alert('Заполните все поля');
+            
+            const res = await fetch('/api/billing/withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tgId: user.id, amount, details })
+            });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        // Фильтрация маркета
+        function filterMarket() {
+            let query = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('#marketGrid .card').forEach(card => {
+                let title = card.querySelector('.card-title').innerText.toLowerCase();
+                card.style.display = title.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        // Загрузка маркета при старте
+        loadMarketItems();
     </script>
 </body>
 </html>
