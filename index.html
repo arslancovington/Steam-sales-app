@@ -354,8 +354,18 @@
                     withdrawInput.value = tgUser?.username ? `@${tgUser.username}` : `${myUsername}`;
                 }
 
-                const urlParams = new URLSearchParams(window.location.search);
-                let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
+                const savedTradeUrl = localStorage.getItem('user_trade_url');
+                if (savedTradeUrl) {
+                    const tradeInput = document.getElementById('trade-url-input');
+                    if (tradeInput) tradeInput.value = savedTradeUrl;
+                }
+
+                let steamId = localStorage.getItem('user_steam_id');
+                if (steamId) {
+                    const authSection = document.getElementById('auth-section');
+                    if (authSection) authSection.style.display = 'none';
+                    loadSteamData(steamId).catch(e => console.error("Background steam load error:", e));
+                }
 
                 Promise.allSettled([
                     syncUserProfile(),
@@ -365,13 +375,6 @@
                     clearTimeout(safetyTimeout);
                     hideCs16Loading();
                 });
-
-                if (steamId) {
-                    localStorage.setItem('user_steam_id', steamId);
-                    const authSection = document.getElementById('auth-section');
-                    if (authSection) authSection.style.display = 'none';
-                    loadSteamData(steamId).catch(e => console.error("Background steam load error:", e));
-                }
             } catch (err) {
                 console.error("Init error:", err);
                 clearTimeout(safetyTimeout);
@@ -391,7 +394,7 @@
                     document.getElementById('my-rating').innerText = data.rating;
                     document.getElementById('completed-deals-count').innerText = data.completedDeals;
                     
-                    if (data.tradeUrl) {
+                    if (data.tradeUrl && !localStorage.getItem('user_trade_url')) {
                         document.getElementById('trade-url-input').value = data.tradeUrl;
                         localStorage.setItem('user_trade_url', data.tradeUrl);
                     }
@@ -408,16 +411,16 @@
             localStorage.setItem('user_trade_url', url);
 
             let steamId = null;
-            const profileMatch = url.match(/\/profiles\/(\d{17})/);
-            if (profileMatch && profileMatch[1]) {
-                steamId = profileMatch[1];
+            const partnerMatch = url.match(/partner=(\d+)/);
+            if (partnerMatch && partnerMatch[1]) {
+                const partnerId = partnerMatch[1];
+                try {
+                    steamId = (BigInt(partnerId) + 76561197960265728n).toString();
+                } catch (e) {}
             } else {
-                const partnerMatch = url.match(/partner=(\d+)/);
-                if (partnerMatch && partnerMatch[1]) {
-                    const partnerId = partnerMatch[1];
-                    try {
-                        steamId = (BigInt(partnerId) + 76561197960265728n).toString();
-                    } catch (e) {}
+                const profileMatch = url.match(/\/profiles\/(\d{17})/);
+                if (profileMatch && profileMatch[1]) {
+                    steamId = profileMatch[1];
                 }
             }
 
@@ -426,8 +429,9 @@
                 const authSection = document.getElementById('auth-section');
                 if (authSection) authSection.style.display = 'none';
                 loadSteamData(steamId);
+                alert('Trade URL успешно сохранен!');
             } else {
-                alert('Не удалось распознать SteamID из ссылки.');
+                alert('Не удалось распознать SteamID. Убедитесь, что ссылка содержит параметр partner= или /profiles/');
             }
 
             fetch('/api/user/save', {
@@ -439,6 +443,7 @@
 
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
+            container.innerHTML = '<div class="empty-state">Загрузка инвентаря...</div>';
             try {
                 const response = await fetch('/api/steam/inventory', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -446,13 +451,6 @@
                 });
                 if (!response.ok) throw new Error();
                 const data = await response.json();
-
-                if (data.avatarUrl) {
-                    document.getElementById('user-avatar-box').innerHTML = `<img src="${data.avatarUrl}" style="width:100%; height:100%; object-fit:cover;">`;
-                }
-                if (data.steamName) {
-                    document.getElementById('my-nick').innerText = data.steamName;
-                }
 
                 if (data.success && data.items && data.items.length > 0) {
                     renderInventory(data.items, data.descriptions);
@@ -535,9 +533,7 @@
                         `;
                     }).join('');
                 }
-            } catch (e) {
-                console.error("Fetch giveaways error:", e);
-            }
+            } catch (e) {}
         }
 
         async function joinGiveaway(giveawayId) {
