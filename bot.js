@@ -19,8 +19,9 @@ app.get('/', (req, res) => {
 let users = {};
 let marketItems = [];
 let giveaways = [];
+// Временное хранилище состояний для админов (ожидание ввода номера карты)
+let adminStates = {};
 
-// Безопасное получение или создание пользователя
 function getOrCreateUser(tgId, username = 'Игрок') {
     if (!users[tgId]) {
         users[tgId] = { 
@@ -32,11 +33,12 @@ function getOrCreateUser(tgId, username = 'Игрок') {
             tradeUrl: '', 
             steamId: '' 
         };
+    } else if (username && username !== 'Игрок') {
+        users[tgId].username = username;
     }
     return users[tgId];
 }
 
-// Функция для извлечения и конвертации SteamID64 из Trade URL
 function extractSteamIdFromTradeUrl(url) {
     if (!url) return null;
     const profileMatch = url.match(/\/profiles\/(\d{17})/);
@@ -56,34 +58,11 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Парсинг никнейма и аватара из публичного профиля Steam (XML)
-async function getSteamProfileInfo(steamId) {
-    try {
-        const res = await axios.get(`https://steamcommunity.com/profiles/${steamId}/?xml=1`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            timeout: 5000
-        });
-        const xml = res.data;
-        const nameMatch = xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/) || xml.match(/<steamID>(.*?)<\/steamID>/);
-        const avatarMatch = xml.match(/<avatarMedium><!\[CDATA\[(.*?)\]\]><\/avatarMedium>/) || xml.match(/<avatarMedium>(.*?)<\/avatarMedium>/);
-        
-        return {
-            steamName: nameMatch ? nameMatch[1] : null,
-            avatarUrl: avatarMatch ? avatarMatch[1] : null
-        };
-    } catch (e) {
-        return { steamName: null, avatarUrl: null };
-    }
-}
-
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!tgId) return res.json({ success: false, error: 'No tgId provided' });
     
     const user = getOrCreateUser(tgId, tgUser);
-    if (tgUser && user.username === 'Игрок') {
-        user.username = tgUser;
-    }
     res.json({ success: true, ...user });
 });
 
@@ -157,7 +136,6 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Запрос инвентаря Steam + подгрузка аватара и никнейма
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     
@@ -170,36 +148,25 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 
     try {
-        const [invRes, profileInfo] = await Promise.all([
-            axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/json, text/javascript, */*; q=0.01',
-                    'Accept-Language': 'ru-RU,ru;q=0.9',
-                    'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
-                },
-                timeout: 10000
-            }).catch(() => ({ data: null })),
-            getSteamProfileInfo(steamId)
-        ]);
+        const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Accept-Language': 'ru-RU,ru;q=0.9',
+                'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
+            },
+            timeout: 10000
+        });
 
         const invData = invRes?.data;
         if (invData && invData.success) {
             res.json({
                 success: true,
                 items: invData.assets || [],
-                descriptions: invData.descriptions || [],
-                steamName: profileInfo.steamName,
-                avatarUrl: profileInfo.avatarUrl
+                descriptions: invData.descriptions || []
             });
         } else {
-            res.json({ 
-                success: false, 
-                items: [], 
-                descriptions: [], 
-                steamName: profileInfo.steamName, 
-                avatarUrl: profileInfo.avatarUrl 
-            });
+            res.json({ success: false, items: [], descriptions: [] });
         }
     } catch (e) {
         console.error("Steam API Error:", e.message);
@@ -207,7 +174,6 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-// Получение реальной цены скина со Steam Community Market (в рублях)
 app.get('/api/steam/price', async (req, res) => {
     const skinName = req.query.name;
     if (!skinName) return res.json({ success: false, price: 100 });
@@ -239,22 +205,44 @@ app.post('/api/deals/buy', (req, res) => {
     res.json({ success: true });
 });
 
-// Пополнение баланса
+// Пополнение (Crypto Bot, Stars, P2P UZ)
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
-    let rubles = currency === 'USDT' ? amount * 80 : amount * 1.5;
+    let rubles = currency === 'USDT' ? amount * 80 : (currency === 'Stars' ? amount * 1.5 : amount);
 
     try {
-        await bot.sendMessage(tgId, `🧾 **Счет на пополнение баланса**\n\nСумма: ${amount} ${currency}\nК зачислению: ${Math.round(rubles)} ₽\n\nПожалуйста, завершите оплату через @CryptoBot или Telegram Stars.`);
+        if (currency === 'P2P UZ') {
+            const sumAmount = Math.round(amount * 175);
+            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `💳 **Запрос на пополнение P2P UZ!**\n\n` +
+                    `👤 Пользователь ID: \`${tgId}\`\n` +
+                    `💰 Сумма к зачислению: ${amount} ₽\n` +
+                    `💵 К оплате клиентом: ${sumAmount} сум (курс 175)\n\n` +
+                    `Нажмите кнопку ниже, чтобы отправить номер карты пользователю:`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '💳 Отправить реквизиты карты', callback_data: `p2p_sendcard_${tgId}_${amount}_${sumAmount}` }]
+                            ]
+                        }
+                    }
+                );
+            }
+            await bot.sendMessage(tgId, `💳 **Запрос на пополнение P2P UZ создан**\n\nСумма: ${amount} ₽ (${sumAmount} сум).\nОжидайте реквизиты карты от администратора.`);
+        } else {
+            await bot.sendMessage(tgId, `🧾 **Счет на пополнение баланса**\n\nСумма: ${amount} ${currency}\nК зачислению: ${Math.round(rubles)} ₽\n\nПожалуйста, завершите оплату.`);
+        }
         res.json({ success: true });
     } catch (e) {
         res.json({ success: false, error: 'Не удалось отправить счет. Напишите боту /start в личные сообщения.' });
     }
 });
 
-// Вывод средств (с защитой от списания при ошибке отправки)
+// Вывод средств (в т.ч. P2P UZ на карту)
 app.post('/api/billing/withdraw', async (req, res) => {
-    const { tgId, amount, recipientAccount, username } = req.body;
+    const { tgId, amount, recipientAccount, username, method } = req.body;
     const user = getOrCreateUser(tgId, username);
     
     if (user.balance < amount) {
@@ -265,61 +253,178 @@ app.post('/api/billing/withdraw', async (req, res) => {
 
     try {
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств!**\n\n👤 Игрок: @${username || user.username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
+            if (method === 'P2P UZ') {
+                const puyoutSum = Math.round(amount * 0.95 * 145);
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `💸 **Новая заявка на вывод P2P UZ!**\n\n` +
+                    `👤 Игрок: @${username || user.username || tgId} (ID: \`${tgId}\`)\n` +
+                    `💰 Списано с баланса: ${amount} ₽\n` +
+                    `💵 К выплате на карту: ${puyoutSum} сум (курс 145, с учетом комиссии 5%)\n` +
+                    `💳 Карты получателя: \`${recipientAccount}\``, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '✅ Подтвердить перевод', callback_data: `p2p_withdraw_done_${tgId}_${amount}` }]
+                            ]
+                        }
+                    }
+                );
+            } else {
+                await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств (Crypto)!**\n\n👤 Игрок: @${username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
+            }
         }
         res.json({ success: true, newBalance: user.balance });
     } catch (e) {
-        user.balance += amount; // Возвращаем баланс в случае ошибки сети/телеграма
+        user.balance += amount;
         res.json({ success: false, error: 'Ошибка отправки чека администраторам' });
     }
 });
 
-app.post('/api/inventory/instant-sell', (req, res) => {
-    const { tgId, payout } = req.body;
-    const user = getOrCreateUser(tgId);
-    user.balance += (payout || 0);
-    res.json({ success: true });
+// Обработка кликов админа по кнопкам в Телеграме
+bot.on('callback_query', async (query) => {
+    const data = query.data;
+    const adminId = query.from.id;
+
+    if (data.startsWith('p2p_sendcard_')) {
+        const parts = data.split('_');
+        const targetTgId = parts[2];
+        const amount = parts[3];
+        const sumAmount = parts[4];
+
+        adminStates[adminId] = { action: 'awaiting_card', targetTgId, amount, sumAmount, messageId: query.message.message_id };
+        await bot.sendMessage(adminId, `✍️ Отправьте номер карты (текстом в чат), на который пользователь должен перевести ${sumAmount} сум для пополнения на ${amount} ₽:`);
+        await bot.answerCallbackQuery(query.id);
+    } 
+    else if (data.startsWith('p2p_confirm_pay_')) {
+        const parts = data.split('_');
+        const targetTgId = parts[3];
+        const amount = parseFloat(parts[4]);
+
+        const user = getOrCreateUser(targetTgId);
+        user.balance += amount;
+
+        await bot.sendMessage(targetTgId, `✅ Ваша оплата на сумму ${amount} ₽ подтверждена! Баланс успешно пополнен.`);
+        await bot.editMessageText(`✅ Пополнение на ${amount} ₽ для игрока \`${targetTgId}\` успешно подтверждено!`, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown'
+        });
+        await bot.answerCallbackQuery(query.id, { text: 'Пополнение подтверждено!' });
+    }
+    else if (data.startsWith('p2p_withdraw_done_')) {
+        const parts = data.split('_');
+        const targetTgId = parts[3];
+        const amount = parts[4];
+
+        await bot.sendMessage(targetTgId, `✅ Ваша заявка на вывод ${amount} ₽ успешно обработана! Деньги отправлены на вашу банковскую карту.`);
+        await bot.editMessageText(`✅ Вывод средств на сумму ${amount} ₽ для игрока \`${targetTgId}\` выполнен.`, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown'
+        });
+        await bot.answerCallbackQuery(query.id, { text: 'Вывод подтвержден!' });
+    }
 });
 
+// Обработка текстового ввода админа (когда он вводит номер карты)
 bot.on('message', async (msg) => {
-    if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
-    
-    const lines = msg.text.split('\n');
-    let title = '', sponsor = '', timer = '', image = '';
+    const adminId = msg.from.id;
+    const text = msg.text;
 
-    lines.forEach(line => {
-        if (line.startsWith('Приз:')) title = line.replace('Приз:', '').trim();
-        if (line.startsWith('Спонсор:')) sponsor = line.replace('Спонсор:', '').trim();
-        if (line.startsWith('Таймер:')) timer = line.replace('Таймер:', '').trim();
-        if (line.startsWith('Картинка:')) image = line.replace('Картинка:', '').trim();
-    });
+    if (adminStates[adminId] && adminStates[adminId].action === 'awaiting_card') {
+        const state = adminStates[adminId];
+        delete adminStates[adminId];
 
-    if (!title || !sponsor) {
-        await bot.sendMessage(msg.chat.id, '❌ Ошибка! Укажите поля "Приз:" и "Спонсор:".');
+        const cardNumber = text.trim();
+        const targetTgId = state.targetTgId;
+        const amount = state.amount;
+        const sumAmount = state.sumAmount;
+
+        try {
+            // Отправляем пользователю реквизиты карты и кнопку подтверждения
+            await bot.sendMessage(targetTgId, 
+                `💳 **Реквизиты для оплаты P2P UZ**\n\n` +
+                `Сумма к оплате: **${sumAmount} сум** (${amount} ₽)\n` +
+                `Номер карты для перевода:\n\`${cardNumber}\`\n\n` +
+                `После перевода нажмите кнопку ниже, чтобы администратор проверил поступление.`, 
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${adminId}_${targetTgId}_${amount}` }]
+                        ]
+                    }
+                }
+            );
+
+            // Уведомляем админа
+            await bot.sendMessage(adminId, `✅ Номер карты отправлен пользователю. Ожидайте подтверждения оплаты от него.`);
+            
+            // Также продублируем в админ чат кнопку подтверждения зачисления для удобства админа
+            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `⏳ Ожидание оплаты P2P UZ от пользователя \`${targetTgId}\` на ${amount} ₽ (${sumAmount} сум).\nКарта: \`${cardNumber}\``,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: `✅ Подтвердить зачисление (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` }]
+                            ]
+                        }
+                    }
+                );
+            }
+        } catch (e) {
+            await bot.sendMessage(adminId, `❌ Не удалось отправить реквизиты пользователю (возможно, он не запустил бота в ЛС).`);
+        }
         return;
     }
 
-    let sponsorUsername = sponsor.trim();
-    if (sponsorUsername.includes('t.me/')) {
-        const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
-        sponsorUsername = '@' + clean;
-    } else if (!sponsorUsername.startsWith('@') && !sponsorUsername.startsWith('http')) {
-        sponsorUsername = '@' + sponsorUsername;
+    // Обработка кнопки "Я оплатил" от юзера
+    if (msg.text && msg.text.startsWith('/newgiveaway')) {
+        // Логика розыгрышей
+        const lines = msg.text.split('\n');
+        let title = '', sponsor = '', timer = '', image = '';
+        lines.forEach(line => {
+            if (line.startsWith('Приз:')) title = line.replace('Приз:', '').trim();
+            if (line.startsWith('Спонсор:')) sponsor = line.replace('Спонсор:', '').trim();
+            if (line.startsWith('Таймер:')) timer = line.replace('Таймер:', '').trim();
+            if (line.startsWith('Картинка:')) image = line.replace('Картинка:', '').trim();
+        });
+        if (!title || !sponsor) return;
+        let sponsorUsername = sponsor.trim();
+        if (sponsorUsername.includes('t.me/')) {
+            const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
+            sponsorUsername = '@' + clean;
+        } else if (!sponsorUsername.startsWith('@') && !sponsorUsername.startsWith('http')) {
+            sponsorUsername = '@' + sponsorUsername;
+        }
+        giveaways.push({
+            _id: Date.now().toString(),
+            title, sponsor, sponsorUsername,
+            timer: timer || 'Скоро',
+            image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
+            participantsCount: 0, participants: []
+        });
+        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" добавлен!`);
     }
+});
 
-    const newGiveaway = {
-        _id: Date.now().toString(),
-        title,
-        sponsor,
-        sponsorUsername,
-        timer: timer || 'Скоро',
-        image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
-        participantsCount: 0,
-        participants: []
-    };
+// Клик юзера "Я оплатил"
+bot.on('callback_query', async (query) => {
+    if (query.data && query.data.startsWith('user_paid_')) {
+        const parts = query.data.split('_');
+        const targetTgId = parts[3];
+        const amount = parts[4];
 
-    giveaways.push(newGiveaway);
-    await bot.sendMessage(msg.chat.id, `✅ Обязательный розыгрыш приза "${title}" успешно добавлен! Проверка подписки на ${sponsorUsername} активна.`);
+        await bot.sendMessage(ADMIN_CHAT_ID, `🔔 Пользователь \`${targetTgId}\` нажал кнопку **"Я оплатил"** для пополнения на ${amount} ₽! Проверьте поступление денег и нажмите подтверждение.`);
+        await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено администратору!' });
+        await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения администратора.`, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id
+        });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
