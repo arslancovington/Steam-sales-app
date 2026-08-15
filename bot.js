@@ -55,7 +55,11 @@ app.post('/api/market/cancel', (req, res) => {
 });
 
 app.get('/api/giveaways/list', (req, res) => {
-    res.json({ success: true, giveaways: giveaways });
+    const formattedGiveaways = giveaways.map(g => ({
+        ...g,
+        participantsCount: g.participants ? g.participants.length : 0
+    }));
+    res.json({ success: true, giveaways: formattedGiveaways });
 });
 
 app.post('/api/giveaways/join', async (req, res) => {
@@ -93,8 +97,15 @@ app.get('/api/steam/price', async (req, res) => {
 app.post('/api/steam/inventory', async (req, res) => {
     try {
         const { steamId } = req.body;
+        if (!steamId) {
+            return res.json({ success: false, error: 'Steam ID не указан', items: [], descriptions: [] });
+        }
         const url = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`;
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
         if (!response.ok) throw new Error();
         const data = await response.json();
         res.json({ success: true, items: data.assets || [], descriptions: data.descriptions || [] });
@@ -130,18 +141,48 @@ app.post('/api/billing/invoice', async (req, res) => {
 });
 
 bot.on('message', async (msg) => {
-    if (!msg.text || !msg.text.startsWith('/newgiveaway')) return;
-    const lines = msg.text.split('\n');
-    let title = lines.find(l => l.startsWith('Prize:') || l.startsWith('Приз:'))?.replace(/(Prize:|Приз:)/, '').trim();
-    let sponsor = lines.find(l => l.startsWith('Sponsor:') || l.startsWith('Спонсор:'))?.replace(/(Sponsor:|Спонсор:)/, '').trim();
+    const text = msg.text || msg.caption;
+    if (!text || !text.startsWith('/newgiveaway')) return;
     
-    if (!title || !sponsor) return bot.sendMessage(msg.chat.id, 'Используй формат:\nПриз: Скин\nСпонсор: @канал');
+    const lines = text.split('\n');
+    let title = '', sponsor = '', timer = 'Скоро', image = '';
+
+    lines.forEach(line => {
+        if (line.toLowerCase().startsWith('приз:') || line.toLowerCase().startsWith('prize:')) 
+            title = line.replace(/^(приз:|prize:)/i, '').trim();
+        if (line.toLowerCase().startsWith('спонсор:') || line.toLowerCase().startsWith('sponsor:')) 
+            sponsor = line.replace(/^(спонсор:|sponsor:)/i, '').trim();
+        if (line.toLowerCase().startsWith('таймер:') || line.toLowerCase().startsWith('timer:')) 
+            timer = line.replace(/^(таймер:|timer:)/i, '').trim();
+        if (line.toLowerCase().startsWith('картинка:') || line.toLowerCase().startsWith('image:')) 
+            image = line.replace(/^(картинка:|image:)/i, '').trim();
+    });
+
+    if (msg.photo && msg.photo.length > 0) {
+        try {
+            const photo = msg.photo[msg.photo.length - 1];
+            const fileLink = await bot.getFileLink(photo.file_id);
+            if (fileLink) image = fileLink;
+        } catch (err) {
+            console.error('Error fetching photo:', err.message);
+        }
+    }
+
+    if (!title || !sponsor) {
+        return bot.sendMessage(msg.chat.id, '❌ Ошибка! Укажите формат:\nПриз: Название\nСпонсор: @канал');
+    }
 
     giveaways.push({
-        _id: Date.now().toString(), title, sponsor, participants: [], participantsCount: 0, timer: '24ч',
-        image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f'
+        _id: Date.now().toString(),
+        title,
+        sponsor,
+        timer,
+        image: image || 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
+        participantsCount: 0,
+        participants: []
     });
-    bot.sendMessage(msg.chat.id, '✅ Розыгрыш создан!');
+
+    bot.sendMessage(msg.chat.id, `✅ Розыгрыш приза "${title}" успешно добавлен в приложение!`);
 });
 
 const PORT = process.env.PORT || 3000;
