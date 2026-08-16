@@ -11,6 +11,15 @@ const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 
+// Обработчики фатальных ошибок, чтобы сервер не падал (status 1) при неверном токене
+bot.on('polling_error', (error) => {
+    console.error('⚠️ Ошибка Telegram (возможно неверный BOT_TOKEN):', error.code, error.message);
+});
+
+bot.on('error', (error) => {
+    console.error('⚠️ Общая ошибка бота:', error.code, error.message);
+});
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
@@ -27,13 +36,17 @@ let cards = [];
 if (fs.existsSync(dbFile)) {
     try {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-    } catch (e) {}
+    } catch (e) {
+        console.error("Ошибка чтения базы данных:", e.message);
+    }
 }
 
 if (fs.existsSync(cardsFile)) {
     try {
         cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8'));
-    } catch (e) {}
+    } catch (e) {
+        console.error("Ошибка чтения файла карт:", e.message);
+    }
 }
 
 let users = db.users || {};
@@ -44,13 +57,17 @@ let cardIndex = 0;
 function saveData() {
     try {
         fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2));
-    } catch (e) {}
+    } catch (e) {
+        console.error("Ошибка сохранения БД:", e.message);
+    }
 }
 
 function saveCards() {
     try {
         fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2));
-    } catch (e) {}
+    } catch (e) {
+        console.error("Ошибка сохранения карт:", e.message);
+    }
 }
 
 function getOrCreateUser(tgId, username = 'Игрок') {
@@ -293,7 +310,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
 
     try {
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            const currentUsername = username || user.username || tgId;
+            const currentUsername = username || user.username || String(tgId);
             let adminMessage = '';
             
             if (method === 'P2P UZ') {
@@ -326,7 +343,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
         console.error("Withdraw Error:", e.message);
         user.balance += amount;
         saveData();
-        res.json({ success: false, error: 'Ошибка отправки чека администраторам: ' + e.message });
+        res.json({ success: false, error: 'Ошибка отправки чека администраторам: возможно бот не добавлен в админ-чат.' });
     }
 });
 
@@ -500,4 +517,18 @@ bot.on('message', async (msg) => {
         giveaways.push({
             _id: Date.now().toString(),
             title, sponsor, sponsorUsername,
-            timer: timer || 'Скоро'
+            timer: timer || 'Скоро',
+            image: imageUrl,
+            participantsCount: 0, participants: []
+        });
+        saveData();
+
+        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" с картинкой успешно добавлен!`);
+        return;
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Bot and Server are running on port ${PORT}`);
+});
