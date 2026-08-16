@@ -11,7 +11,6 @@ const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 
-// Обработчики фатальных ошибок, чтобы сервер не падал (status 1) при неверном токене
 bot.on('polling_error', (error) => {
     console.error('⚠️ Ошибка Telegram (возможно неверный BOT_TOKEN):', error.code, error.message);
 });
@@ -27,8 +26,18 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-const dbFile = path.join(__dirname, 'database.json');
-const cardsFile = path.join(__dirname, 'cards.json');
+// Настройка путей для постоянного диска /data на Render
+const dataDir = '/data';
+if (!fs.existsSync(dataDir)) {
+    try {
+        fs.mkdirSync(dataDir, { recursive: true });
+    } catch (e) {
+        console.error("Не удалось создать папку /data, используется локальная директория:", e.message);
+    }
+}
+
+const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
+const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
 
 let db = { users: {}, marketItems: [], giveaways: [] };
 let cards = [];
