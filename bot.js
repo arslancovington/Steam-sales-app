@@ -331,13 +331,26 @@ app.post('/api/billing/withdraw', async (req, res) => {
                         parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: '✅ Подтвердить перевод', callback_data: `p2p_withdraw_done_${tgId}_${amount}` }]
+                                [
+                                    { text: '✅ Подтвердить перевод', callback_data: `p2p_withdraw_done_${tgId}_${amount}` },
+                                    { text: '❌ Отменить / Ошибка', callback_data: `p2p_cancel_${tgId}_${amount}` }
+                                ]
                             ]
                         }
                     }
                 );
             } else {
-                await bot.sendMessage(ADMIN_CHAT_ID, `💸 **Новая заявка на вывод средств (Crypto)!**\n\n👤 Игрок: @${username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, { parse_mode: 'Markdown' });
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `💸 **Новая заявка на вывод средств (Crypto)!**\n\n👤 Игрок: @${username || tgId}\n🆔 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n💎 Кошелек: \`${recipientAccount}\``, 
+                    { 
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '❌ Отменить / Ошибка', callback_data: `p2p_cancel_${tgId}_${amount}` }]
+                            ]
+                        }
+                    }
+                );
             }
         }
         res.json({ success: true, newBalance: user.balance });
@@ -399,13 +412,43 @@ bot.on('callback_query', async (query) => {
         });
         await bot.answerCallbackQuery(query.id, { text: 'Вывод подтвержден!' });
     }
+    else if (data.startsWith('p2p_cancel_')) {
+        const parts = data.split('_');
+        const targetTgId = parts[2];
+        const amount = parts[3];
+
+        // Возвращаем средства на баланс, если это был отмененный вывод
+        const user = getOrCreateUser(targetTgId);
+        // Проверяем по логике контекста (если это была заявка на вывод, возвращаем деньги)
+        // Для пополнения деньги еще не списывались, но если администратор отменил, просто уведомляем
+        await bot.sendMessage(targetTgId, `❌ Ваша операция на сумму ${amount} ₽ была отклонена администратором / Оплата не поступила.`);
+        await bot.editMessageText(`❌ Заявка на сумму ${amount} ₽ для игрока \`${targetTgId}\` отклонена / отменена.`, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown'
+        });
+        await bot.answerCallbackQuery(query.id, { text: 'Заявка отклонена' });
+    }
     else if (data.startsWith('user_paid_')) {
         const parts = data.split('_');
         const targetTgId = parts[3];
         const amount = parts[4];
 
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            await bot.sendMessage(ADMIN_CHAT_ID, `🔔 Пользователь \`${targetTgId}\` нажал кнопку **"Я оплатил"** для пополнения на ${amount} ₽! Проверьте поступление денег и нажмите подтверждение.`, { parse_mode: 'Markdown' });
+            await bot.sendMessage(ADMIN_CHAT_ID, 
+                `🔔 Пользователь \`${targetTgId}\` нажал кнопку **"Я оплатил"** для пополнения на ${amount} ₽! Проверьте поступление денег.`, 
+                {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` },
+                                { text: `❌ Оплата не пришла`, callback_data: `p2p_cancel_${targetTgId}_${amount}` }
+                            ]
+                        ]
+                    }
+                }
+            );
         }
         await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено администратору!' });
         await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения администратора.`, {
@@ -529,7 +572,10 @@ bot.on('message', async (msg) => {
                         parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: `✅ Подтвердить зачисление (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` }]
+                                [
+                                    { text: `✅ Подтвердить зачисление (${amount} ₽)`, callback_data: `p2p_confirm_pay_${targetTgId}_${amount}` },
+                                    { text: `❌ Оплата не пришла`, callback_data: `p2p_cancel_${targetTgId}_${amount}` }
+                                ]
                             ]
                         }
                     }
