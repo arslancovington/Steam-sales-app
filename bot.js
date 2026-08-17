@@ -53,6 +53,8 @@ if (fs.existsSync(dbFile)) {
 if (fs.existsSync(cardsFile)) {
     try {
         cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8'));
+        // Добавляем тип UZ по умолчанию для старых карт без указанного типа
+        cards = cards.map(c => ({ ...c, type: c.type || 'UZ' }));
     } catch (e) {
         console.error("Ошибка чтения файла карт:", e.message);
     }
@@ -61,7 +63,8 @@ if (fs.existsSync(cardsFile)) {
 let users = db.users || {};
 let marketItems = db.marketItems || [];
 let giveaways = db.giveaways || [];
-let cardIndex = 0;
+let cardIndexRu = 0;
+let cardIndexUz = 0;
 
 function saveData() {
     try {
@@ -234,47 +237,97 @@ app.post('/api/billing/invoice', async (req, res) => {
     let rubles = currency === 'USDT' ? amount * 80 : (currency === 'Stars' ? amount * 1.5 : amount);
 
     try {
-        if (currency === 'P2P UZ') {
-            const sumAmount = Math.round(amount * 175);
+        if (currency === 'P2P RU' || currency === 'P2P UZ') {
+            const isRu = (currency === 'P2P RU');
+            const targetType = isRu ? 'RU' : 'UZ';
+            const filteredCards = cards.filter(c => c.type === targetType);
             
-            if (cards.length === 0) {
-                return res.json({ success: false, error: 'У администратора не добавлены карты для приема P2P UZ.' });
+            if (filteredCards.length === 0) {
+                return res.json({ success: false, error: `У администратора не добавлены карты для приема ${currency}.` });
             }
 
-            const activeCard = cards[cardIndex % cards.length];
-            cardIndex = (cardIndex + 1) % cards.length;
+            let activeCard;
+            if (isRu) {
+                activeCard = filteredCards[cardIndexRu % filteredCards.length];
+                cardIndexRu = (cardIndexRu + 1) % filteredCards.length;
+            } else {
+                activeCard = filteredCards[cardIndexUz % filteredCards.length];
+                cardIndexUz = (cardIndexUz + 1) % filteredCards.length;
+            }
 
-            await bot.sendMessage(tgId, 
-                `💳 Реквизиты для оплаты P2P UZ\n\n` +
-                `Сумма к оплате: ${sumAmount.toLocaleString()} сум (${amount} ₽)\n` +
-                `Карта для перевода (${activeCard.holder}):\n${activeCard.number}\n\n` +
-                `После перевода нажмите кнопку ниже, чтобы отправить отчет администратору.`, 
-                {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}_${sumAmount}` }]
-                        ]
-                    }
-                }
-            );
-
-            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                await bot.sendMessage(ADMIN_CHAT_ID, 
-                    `💳 Новый авто-запрос P2P UZ!\n\n` +
-                    `👤 Пользователь ID: ${tgId}\n` +
-                    `💰 Сумма зачисления: ${amount} ₽ (${sumAmount.toLocaleString()} сум)\n` +
-                    `🏦 Выданная карта: ${activeCard.number} (${activeCard.holder})`, 
+            if (isRu) {
+                // P2P RU: Сумма в рублях напрямую
+                await bot.sendMessage(tgId, 
+                    `💳 Реквизиты для оплаты P2P RU\n\n` +
+                    `Сумма к оплате: **${amount} ₽**\n` +
+                    `Карта для перевода (${activeCard.holder}):\n\`${activeCard.number}\`\n\n` +
+                    `После перевода нажмите кнопку ниже, чтобы отправить отчет администратору.`, 
                     {
+                        parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: [
-                                [
-                                    { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
-                                    { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
-                                ]
+                                [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}_${amount}` }]
                             ]
                         }
                     }
                 );
+
+                if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                    await bot.sendMessage(ADMIN_CHAT_ID, 
+                        `💳 Новый авто-запрос P2P RU!\n\n` +
+                        `👤 Пользователь ID: \`${tgId}\`\n` +
+                        `💰 Сумма зачисления: ${amount} ₽\n` +
+                        `🏦 Выданная карта: \`${activeCard.number}\` (${activeCard.holder})`, 
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [
+                                        { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
+                                        { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
+                                    ]
+                                ]
+                            }
+                        }
+                    );
+                }
+            } else {
+                // P2P UZ: С пересчетом в сумы
+                const sumAmount = Math.round(amount * 175);
+                await bot.sendMessage(tgId, 
+                    `💳 Реквизиты для оплаты P2P UZ\n\n` +
+                    `Сумма к оплате: **${sumAmount.toLocaleString()} сум** (${amount} ₽)\n` +
+                    `Карта для перевода (${activeCard.holder}):\n\`${activeCard.number}\`\n\n` +
+                    `После перевода нажмите кнопку ниже, чтобы отправить отчет администратору.`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}_${sumAmount}` }]
+                            ]
+                        }
+                    }
+                );
+
+                if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                    await bot.sendMessage(ADMIN_CHAT_ID, 
+                        `💳 Новый авто-запрос P2P UZ!\n\n` +
+                        `👤 Пользователь ID: \`${tgId}\`\n` +
+                        `💰 Сумма зачисления: ${amount} ₽ (${sumAmount.toLocaleString()} сум)\n` +
+                        `🏦 Выданная карта: \`${activeCard.number}\` (${activeCard.holder})`, 
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [
+                                        { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
+                                        { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
+                                    ]
+                                ]
+                            }
+                        }
+                    );
+                }
             }
         } else if (currency === 'USDT') {
             let payUrl = 'https://t.me/CryptoBot';
@@ -450,28 +503,42 @@ bot.on('message', async (msg) => {
     if (text.startsWith('/addcard')) {
         const parts = text.split(' ');
         if (parts.length < 3) {
-            await bot.sendMessage(msg.chat.id, '❌ Формат: /addcard [номер_карты] [владелец]');
+            await bot.sendMessage(msg.chat.id, '❌ Формат:\n`/addcard ru [номер] [владелец]`\nили\n`/addcard uz [номер] [владелец]`', { parse_mode: 'Markdown' });
             return;
         }
-        const number = parts[1];
-        const holder = parts.slice(2).join(' ');
-        cards.push({ number, holder });
+
+        let type = 'UZ';
+        let startIndex = 1;
+        if (parts[1].toLowerCase() === 'ru' || parts[1].toLowerCase() === 'uz') {
+            type = parts[1].toUpperCase();
+            startIndex = 2;
+        }
+
+        const number = parts[startIndex];
+        const holder = parts.slice(startIndex + 1).join(' ');
+
+        if (!number || !holder) {
+            await bot.sendMessage(msg.chat.id, '❌ Неверный формат. Укажите номер и владельца карты.');
+            return;
+        }
+
+        cards.push({ number, holder, type });
         saveCards();
-        await bot.sendMessage(msg.chat.id, `✅ Карта ${number} (${holder}) успешно добавлена в пул! Всего карт: ${cards.length}`);
+        await bot.sendMessage(msg.chat.id, `✅ [${type}] Карта ${number} (${holder}) успешно добавлена в пул! Всего карт: ${cards.length}`);
         return;
     }
 
     if (text.startsWith('/cards')) {
         if (cards.length === 0) {
-            await bot.sendMessage(msg.chat.id, '📭 Список карт пуст. Добавьте карту через /addcard.');
+            await bot.sendMessage(msg.chat.id, '📭 Список карт пуст. Добавьте карту через `/addcard ru` или `/addcard uz`.', { parse_mode: 'Markdown' });
             return;
         }
-        let list = '💳 Список доступных карт:\n\n';
+        let list = '💳 **Список доступных карт:**\n\n';
         cards.forEach((c, idx) => {
-            list += `${idx + 1}. ${c.number} — ${c.holder}\n`;
+            list += `${idx + 1}. [**${c.type || 'UZ'}**] \`${c.number}\` — ${c.holder}\n`;
         });
-        list += '\nДля удаления используйте: /delcard [номер_в_списке]';
-        await bot.sendMessage(msg.chat.id, list);
+        list += '\nДля удаления используйте: `/delcard [номер_в_списке]`';
+        await bot.sendMessage(msg.chat.id, list, { parse_mode: 'Markdown' });
         return;
     }
 
@@ -479,12 +546,12 @@ bot.on('message', async (msg) => {
         const parts = text.split(' ');
         const index = parseInt(parts[1]) - 1;
         if (isNaN(index) || !cards[index]) {
-            await bot.sendMessage(msg.chat.id, '❌ Неверный номер карты. Посмотрите список через /cards.');
+            await bot.sendMessage(msg.chat.id, '❌ Неверный номер карты. Посмотрите список через `/cards`.');
             return;
         }
         const removed = cards.splice(index, 1);
         saveCards();
-        await bot.sendMessage(msg.chat.id, `🗑 Карта ${removed[0].number} удалена из пула.`);
+        await bot.sendMessage(msg.chat.id, `🗑 Карта [${removed[0].type}] \`${removed[0].number}\` удалена из пула.`);
         return;
     }
 
