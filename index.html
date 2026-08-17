@@ -90,7 +90,8 @@
         .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
         .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
 
-        .topup-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 15px 0; }
+        /* Изменено под 4 метода пополнения (grid-template-columns: repeat(2, 1fr) или по 2 в ряд) */
+        .topup-methods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 15px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
@@ -284,6 +285,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно пополнения (теперь с 4 методами: Crypto, Stars, P2P UZ, P2P RU) -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -299,6 +301,10 @@
                 <div class="topup-method-card" id="method-p2puz" onclick="selectTopupMethod('p2puz')">
                     <div style="font-size: 16px;">🇺🇿</div>
                     <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">P2P UZ</div>
+                </div>
+                <div class="topup-method-card" id="method-p2pru" onclick="selectTopupMethod('p2pru')">
+                    <div style="font-size: 16px;">🇷🇺</div>
+                    <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">P2P RU</div>
                 </div>
             </div>
             <div class="price-input-container">
@@ -779,6 +785,7 @@
             if (type === 'crypto') document.getElementById('method-crypto').classList.add('active');
             if (type === 'stars') document.getElementById('method-stars').classList.add('active');
             if (type === 'p2puz') document.getElementById('method-p2puz').classList.add('active');
+            if (type === 'p2pru') document.getElementById('method-p2pru').classList.add('active');
 
             const symbol = document.getElementById('topup-symbol');
             const input = document.getElementById('topup-amount-input');
@@ -801,6 +808,8 @@
             if (selectedTopupType === 'p2puz') {
                 const sum = Math.round(amount * 175);
                 hint.innerText = amount > 0 ? `К оплате: ${sum.toLocaleString()} сум (по курсу 175 сум/₽)` : 'Введите сумму в рублях (курс: 1 ₽ = 175 сум)';
+            } else if (selectedTopupType === 'p2pru') {
+                hint.innerText = amount > 0 ? `К оплате: ${amount} ₽ на карту РФ` : 'Введите сумму в рублях';
             } else if (selectedTopupType === 'crypto') {
                 hint.innerText = 'Сумма зачислится автоматически после подтверждения оплаты.';
             } else {
@@ -840,7 +849,7 @@
                 return; 
             }
 
-            let currency = selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'Stars' : 'P2P UZ');
+            let currency = selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'Stars' : (selectedTopupType === 'p2pru' ? 'P2P RU' : 'P2P UZ'));
 
             try {
                 const res = await fetch('/api/billing/invoice', {
@@ -850,8 +859,8 @@
                 const data = await res.json();
                 if (data.success) {
                     closeModal('modal-topup');
-                    if (currency === 'P2P UZ') {
-                        alert('Запрос создан! Бот отправил вам инструкции и ожидает реквизиты от администратора.');
+                    if (currency === 'P2P UZ' || currency === 'P2P RU') {
+                        alert('Запрос создан! Бот отправил вам инструкции и реквизиты в личные сообщения.');
                     } else {
                         alert('Счет отправлен в личные сообщения с ботом!');
                     }
