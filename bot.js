@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Настройка путей для постоянного диска /data на Render
+// Настройка путей для постоянного диска /data на Render с fallback на локальную директорию
 const dataDir = '/data';
 if (!fs.existsSync(dataDir)) {
     try {
@@ -53,7 +53,6 @@ if (fs.existsSync(dbFile)) {
 if (fs.existsSync(cardsFile)) {
     try {
         cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8'));
-        // Добавляем тип UZ по умолчанию для старых карт без указанного типа
         cards = cards.map(c => ({ ...c, type: c.type || 'UZ' }));
     } catch (e) {
         console.error("Ошибка чтения файла карт:", e.message);
@@ -240,7 +239,7 @@ app.post('/api/billing/invoice', async (req, res) => {
         if (currency === 'P2P RU' || currency === 'P2P UZ') {
             const isRu = (currency === 'P2P RU');
             const targetType = isRu ? 'RU' : 'UZ';
-            const filteredCards = cards.filter(c => c.type === targetType);
+            const filteredCards = cards.filter(c => (c.type || 'UZ') === targetType);
             
             if (filteredCards.length === 0) {
                 return res.json({ success: false, error: `У администратора не добавлены карты для приема ${currency}.` });
@@ -256,7 +255,6 @@ app.post('/api/billing/invoice', async (req, res) => {
             }
 
             if (isRu) {
-                // P2P RU: Сумма в рублях напрямую
                 await bot.sendMessage(tgId, 
                     `💳 Реквизиты для оплаты P2P RU\n\n` +
                     `Сумма к оплате: **${amount} ₽**\n` +
@@ -292,7 +290,6 @@ app.post('/api/billing/invoice', async (req, res) => {
                     );
                 }
             } else {
-                // P2P UZ: С пересчетом в сумы
                 const sumAmount = Math.round(amount * 175);
                 await bot.sendMessage(tgId, 
                     `💳 Реквизиты для оплаты P2P UZ\n\n` +
