@@ -206,43 +206,60 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-// СТАБИЛИЗАЦИЯ ЦЕН: Кэширование на 12 часов для защиты от лимитов Steam
+// УЛУЧШЕННОЕ СТАБИЛИЗИРОВАННОЕ ПОЛУЧЕНИЕ ЦЕН С ОЧИСТКОЙ И КЭШЕМ НА 12 ЧАСОВ
 app.get('/api/steam/price', async (req, res) => {
-    const skinName = req.query.name;
+    let skinName = req.query.name;
     if (!skinName) return res.json({ success: false, price: 100 });
 
     const now = Date.now();
     const twelveHoursMs = 12 * 60 * 60 * 1000;
 
-    // Проверяем кэш и актуальность (менее 12 часов)
     if (pricesCache[skinName] && (now - pricesCache[skinName].updatedAt < twelveHoursMs)) {
         return res.json({ success: true, price: pricesCache[skinName].price });
     }
 
-    try {
-        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(skinName)}`;
-        const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 });
-        
+    async function fetchPriceFromSteam(name) {
+        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(name)}`;
+        const response = await axios.get(url, { 
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.9'
+            }, 
+            timeout: 6000 
+        });
+
         if (response.data && response.data.success && response.data.lowest_price) {
             let priceStr = response.data.lowest_price.replace(/[^\d,.]/g, '').replace(/\s/g, '').replace(',', '.');
             let price = parseFloat(priceStr);
             if (!isNaN(price) && price > 0) {
-                const roundedPrice = Math.round(price);
-                // Сохраняем в кэш с текущим временем
-                pricesCache[skinName] = { price: roundedPrice, updatedAt: now };
-                savePricesCache();
-                return res.json({ success: true, price: roundedPrice });
+                return Math.round(price);
             }
         }
-        
-        // Если Steam вернул ошибку, но в кэше есть старая цена — отдаем её, чтобы не ломать интерфейс
+        return null;
+    }
+
+    try {
+        let finalPrice = await fetchPriceFromSteam(skinName);
+
+        if (!finalPrice) {
+            let cleanName = skinName.replace(/★\s*/g, '').replace(/StatTrak™\s*/g, '').trim();
+            if (cleanName !== skinName) {
+                finalPrice = await fetchPriceFromSteam(cleanName);
+            }
+        }
+
+        if (finalPrice) {
+            pricesCache[skinName] = { price: finalPrice, updatedAt: now };
+            savePricesCache();
+            return res.json({ success: true, price: finalPrice });
+        }
+
         if (pricesCache[skinName]) {
             return res.json({ success: true, price: pricesCache[skinName].price });
         }
 
         res.json({ success: true, price: 150 });
     } catch (e) {
-        // При ошибке сети/лимитов Steam отдаем кэшированную цену или дефолт
         if (pricesCache[skinName]) {
             return res.json({ success: true, price: pricesCache[skinName].price });
         }
