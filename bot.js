@@ -38,25 +38,25 @@ if (!fs.existsSync(dataDir)) {
 
 const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
+const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
 
 let db = { users: {}, marketItems: [], giveaways: [] };
 let cards = [];
+let pricesCache = {}; // Кэш цен { skinName: { price: 150, updatedAt: timestamp } }
 
 if (fs.existsSync(dbFile)) {
-    try {
-        db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-    } catch (e) {
-        console.error("Ошибка чтения базы данных:", e.message);
-    }
+    try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {}
 }
 
 if (fs.existsSync(cardsFile)) {
-    try {
+    try { 
         cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8'));
         cards = cards.map(c => ({ ...c, type: c.type || 'UZ' }));
-    } catch (e) {
-        console.error("Ошибка чтения файла карт:", e.message);
-    }
+    } catch (e) {}
+}
+
+if (fs.existsSync(pricesFile)) {
+    try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) {}
 }
 
 let users = db.users || {};
@@ -66,19 +66,15 @@ let cardIndexRu = 0;
 let cardIndexUz = 0;
 
 function saveData() {
-    try {
-        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2));
-    } catch (e) {
-        console.error("Ошибка сохранения БД:", e.message);
-    }
+    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2)); } catch (e) {}
 }
 
 function saveCards() {
-    try {
-        fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2));
-    } catch (e) {
-        console.error("Ошибка сохранения карт:", e.message);
-    }
+    try { fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2)); } catch (e) {}
+}
+
+function savePricesCache() {
+    try { fs.writeFileSync(pricesFile, JSON.stringify(pricesCache, null, 2)); } catch (e) {}
 }
 
 function getOrCreateUser(tgId, username = 'Игрок') {
@@ -210,19 +206,46 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
+// СТАБИЛИЗАЦИЯ ЦЕН: Кэширование на 12 часов для защиты от лимитов Steam
 app.get('/api/steam/price', async (req, res) => {
     const skinName = req.query.name;
     if (!skinName) return res.json({ success: false, price: 100 });
 
+    const now = Date.now();
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
+
+    // Проверяем кэш и актуальность (менее 12 часов)
+    if (pricesCache[skinName] && (now - pricesCache[skinName].updatedAt < twelveHoursMs)) {
+        return res.json({ success: true, price: pricesCache[skinName].price });
+    }
+
     try {
         const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(skinName)}`;
         const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 });
-        if (response.data?.success && response.data?.lowest_price) {
-            let price = parseFloat(response.data.lowest_price.replace(/[^\d,.]/g, '').replace(/\s/g, '').replace(',', '.'));
-            if (!isNaN(price) && price > 0) return res.json({ success: true, price: Math.round(price) });
+        
+        if (response.data && response.data.success && response.data.lowest_price) {
+            let priceStr = response.data.lowest_price.replace(/[^\d,.]/g, '').replace(/\s/g, '').replace(',', '.');
+            let price = parseFloat(priceStr);
+            if (!isNaN(price) && price > 0) {
+                const roundedPrice = Math.round(price);
+                // Сохраняем в кэш с текущим временем
+                pricesCache[skinName] = { price: roundedPrice, updatedAt: now };
+                savePricesCache();
+                return res.json({ success: true, price: roundedPrice });
+            }
         }
+        
+        // Если Steam вернул ошибку, но в кэше есть старая цена — отдаем её, чтобы не ломать интерфейс
+        if (pricesCache[skinName]) {
+            return res.json({ success: true, price: pricesCache[skinName].price });
+        }
+
         res.json({ success: true, price: 150 });
     } catch (e) {
+        // При ошибке сети/лимитов Steam отдаем кэшированную цену или дефолт
+        if (pricesCache[skinName]) {
+            return res.json({ success: true, price: pricesCache[skinName].price });
+        }
         res.json({ success: true, price: 150 });
     }
 });
@@ -543,7 +566,7 @@ bot.on('message', async (msg) => {
         const parts = text.split(' ');
         const index = parseInt(parts[1]) - 1;
         if (isNaN(index) || !cards[index]) {
-            await bot.sendMessage(msg.chat.id, '❌ Неверный номер карты. Посмотрите список через `/cards`.');
+            await bot.sendMessage(msg.chat.id, '❌ Неверный номер карты. Посмотрите список через `/cards`.', { parse_mode: 'Markdown' });
             return;
         }
         const removed = cards.splice(index, 1);
