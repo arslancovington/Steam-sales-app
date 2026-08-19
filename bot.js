@@ -78,6 +78,7 @@ function savePricesCache() {
 }
 
 function getOrCreateUser(tgId, username = 'Игрок') {
+    const now = Date.now();
     if (!users[tgId]) {
         users[tgId] = { 
             tgId, 
@@ -86,11 +87,16 @@ function getOrCreateUser(tgId, username = 'Игрок') {
             rating: 5.0, 
             completedDeals: 0, 
             tradeUrl: '', 
-            steamId: '' 
+            steamId: '',
+            lastActive: now
         };
         saveData();
-    } else if (username && username !== 'Игрок' && users[tgId].username !== username) {
-        users[tgId].username = username;
+    } else {
+        // Обновляем время последней активности при каждом обращении
+        users[tgId].lastActive = now;
+        if (username && username !== 'Игрок' && users[tgId].username !== username) {
+            users[tgId].username = username;
+        }
         saveData();
     }
     return users[tgId];
@@ -206,7 +212,7 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-// УЛУЧШЕННОЕ СТАБИЛИЗИРОВАННОЕ ПОЛУЧЕНИЕ ЦЕН С ОЧИСТКОЙ И КЭШЕМ НА 12 ЧАСОВ
+// Кэширование цен на 12 часов с очисткой названий
 app.get('/api/steam/price', async (req, res) => {
     let skinName = req.query.name;
     if (!skinName) return res.json({ success: false, price: 100 });
@@ -536,6 +542,23 @@ bot.on('message', async (msg) => {
 
     const text = msg.text || msg.caption;
     if (!text) return;
+
+    // Команда просмотра онлайна: /online
+    if (text.startsWith('/online')) {
+        const now = Date.now();
+        const fifteenMinutesMs = 15 * 60 * 1000;
+        let total = Object.keys(users).length;
+        let online = 0;
+
+        Object.values(users).forEach(u => {
+            if (u.lastActive && (now - u.lastActive < fifteenMinutesMs)) {
+                online++;
+            }
+        });
+
+        await bot.sendMessage(msg.chat.id, `👥 Онлайн / Всего: <b>${online} / ${total}</b>`, { parse_mode: 'HTML' });
+        return;
+    }
 
     if (text.startsWith('/addcard')) {
         const parts = text.split(' ');
