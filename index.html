@@ -1,9 +1,9 @@
-х<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>​CS2 Cash & Skins — Marketplace</title>
+    <title>CS2 Cash & Skins — Marketplace</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
@@ -33,7 +33,6 @@
         .tab.active { display: block; }
         .neon-text { color: var(--text-main); text-shadow: 0 0 5px var(--neon-green); margin-top: 0; }
         
-        /* Стили для VIP секции */
         .vip-section-header { color: var(--neon-purple); text-shadow: 0 0 8px var(--neon-purple); display: flex; align-items: center; gap: 6px; font-size: 16px; margin-bottom: 10px; }
         .vip-frame-container { background: rgba(191, 0, 255, 0.03); border: 1px dashed rgba(191, 0, 255, 0.4); border-radius: 12px; padding: 10px; margin-bottom: 20px; }
 
@@ -41,16 +40,16 @@
         .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; }
 
         .steam-login-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: #171a21; border: 1px solid #66c0f4; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 15px; }
-        .trade-url-box { display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
+        .trade-url-box { display: flex; gap: 8px; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
         .trade-url-box input { flex: 1; padding: 10px; background: #111; border: 1px solid #333; color: white; border-radius: 6px; }
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 6px; cursor: pointer; }
 
         .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
         .card.vip-card { border: 1px solid var(--neon-purple); box-shadow: 0 0 10px rgba(191,0,255,0.25); background: linear-gradient(135deg, rgba(30, 20, 40, 0.8), rgba(20, 30, 25, 0.7)); }
-        .vip-badge { position: absolute; top: 6px; right: 6px; background: var(--neon-purple); color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 5px var(--neon-purple); }
+        .vip-badge { position: absolute; top: 6px; right: 6px; background: var(--neon-purple); color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 5px var(--neon-purple); z-index: 5; }
 
-        .card h4 { margin: 6px 0 4px 0; font-size: 12px; min-height: 30px; overflow: hidden; }
+        .card h4 { margin: 6px 0 4px 0; font-size: 11px; min-height: 30px; overflow: hidden; }
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
         .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
         
@@ -90,7 +89,6 @@
         .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
         .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
 
-        /* Изменено под 4 метода пополнения (grid-template-columns: repeat(2, 1fr) или по 2 в ряд) */
         .topup-methods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 15px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
@@ -178,7 +176,6 @@
 
     <main class="content-area">
         <section id="tab-market" class="tab active">
-            <!-- Отдельная рамка для VIP объявлений в самом верху -->
             <div id="vip-section-wrapper" style="display: none;">
                 <div class="vip-section-header">👑 VIP Маркетплейс</div>
                 <div id="vip-market-listings" class="grid-layout vip-frame-container"></div>
@@ -196,6 +193,9 @@
             <div class="trade-url-box">
                 <input type="text" id="trade-url-input" placeholder="Trade URL...">
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
+                <button class="btn-cyan" onclick="refreshInventory()" style="padding: 10px; display: flex; align-items: center; justify-content: center;" title="Обновить инвентарь">
+                    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: var(--neon-cyan);"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </button>
             </div>
             <div id="steam-inventory-grid" class="grid-layout">
                 <div class="empty-state">Войдите через Steam или укажите Trade URL для просмотра инвентаря</div>
@@ -285,7 +285,6 @@
         </div>
     </div>
 
-    <!-- Модальное окно пополнения (теперь с 4 методами: Crypto, Stars, P2P UZ, P2P RU) -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -453,6 +452,18 @@
             });
         }
 
+        // Функция обновления, чтобы пользователь мог вручную сбросить кеш Steam
+        function refreshInventory() {
+            const steamId = localStorage.getItem('user_steam_id');
+            if (steamId) {
+                const container = document.getElementById('steam-inventory-grid');
+                container.innerHTML = '<div class="empty-state">⏳ Обновление данных из Steam...</div>';
+                loadSteamData(steamId);
+            } else {
+                alert('Сначала укажите и сохраните Trade URL!');
+            }
+        }
+
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
             try {
@@ -473,20 +484,34 @@
             }
         }
 
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРА
         function renderInventory(items, descriptions) {
             const container = document.getElementById('steam-inventory-grid');
             myInventory = [];
             const descMap = {};
-            if (descriptions) descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
+            
+            // Строгое приведение к строке для ключей, чтобы не терять предметы из-за разных типов данных
+            if (descriptions) {
+                descriptions.forEach(d => { 
+                    descMap[String(d.classid) + '_' + String(d.instanceid || '0')] = d; 
+                });
+            }
 
             items.forEach(item => {
-                const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
+                const desc = descMap[String(item.classid) + '_' + String(item.instanceid || '0')];
                 if (!desc) return; 
+
+                // У Steam API иногда попадаются пустые предметы без имени (например, дефолтные медали/значки), скрываем их
+                if (!desc.market_hash_name && !desc.name) return;
+
+                // Проверяем статус трейд-бана
+                const isTradable = (desc.tradable === 1 || desc.tradable === true);
 
                 myInventory.push({
                     assetid: item.assetid,
                     name: desc.market_hash_name || desc.name,
-                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`
+                    icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}`,
+                    isTradable: isTradable
                 });
             });
 
@@ -495,11 +520,18 @@
                 return;
             }
 
+            // Отрисовка с учетом статуса трейд-бана
             container.innerHTML = myInventory.map(item => `
-                <div class="card">
-                    <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
-                    <h4>${item.name}</h4>
-                    <button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>
+                <div class="card ${!item.isTradable ? 'locked-item' : ''}" style="${!item.isTradable ? 'border-color: rgba(255,77,77,0.4);' : ''}">
+                    <div class="skin-image" style="position: relative;">
+                        ${!item.isTradable ? '<div style="position:absolute; top:4px; right:4px; background:rgba(255,77,77,0.9); color:white; font-size:9px; padding:2px 4px; border-radius:3px; font-weight:bold; box-shadow: 0 0 5px red;">В холде</div>' : ''}
+                        <img src="${item.icon_url}" class="skin-img" style="${!item.isTradable ? 'filter: grayscale(80%); opacity: 0.6;' : ''}">
+                    </div>
+                    <h4 style="font-size: 11px;">${item.name}</h4>
+                    ${item.isTradable 
+                        ? `<button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>`
+                        : `<button class="btn-danger" style="border: 1px dashed var(--danger-red); cursor: not-allowed; opacity: 0.7;" disabled>Заблокировано</button>`
+                    }
                 </div>
             `).join('');
         }
@@ -738,7 +770,6 @@
             const vipItems = marketItems.filter(i => i.isVip);
             const regularItems = marketItems.filter(i => !i.isVip);
 
-            // Рендер VIP блока в отдельной рамке сверху
             if (vipItems.length > 0) {
                 vipWrapper.style.display = 'block';
                 vipContainer.innerHTML = vipItems.map(i => `
@@ -755,7 +786,6 @@
                 vipContainer.innerHTML = '';
             }
 
-            // Рендер обычного маркетплейса
             regularContainer.innerHTML = regularItems.length === 0 ? '<div class="empty-state">Нет обычных лотов</div>' : regularItems.map(i => `
                 <div class="card">
                     <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
