@@ -198,16 +198,21 @@ app.post('/api/steam/inventory', async (req, res) => {
     if (!steamId) return res.json({ success: false, items: [], descriptions: [] });
 
     try {
-        const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, {
+        const cacheBuster = Date.now();
+        const apiUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=2000&t=${cacheBuster}`;
+
+        const invRes = await axios.get(apiUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'ru-RU,ru;q=0.9' },
             timeout: 10000
         });
+        
         if (invRes?.data?.success) {
             res.json({ success: true, items: invRes.data.assets || [], descriptions: invRes.data.descriptions || [] });
         } else {
             res.json({ success: false, items: [], descriptions: [] });
         }
     } catch (e) {
+        console.error("Ошибка парсинга инвентаря:", e.message);
         res.json({ success: false, items: [], descriptions: [] });
     }
 });
