@@ -463,27 +463,45 @@
             }
         }
 
+        // --- ОТЛАДОЧНАЯ ФУНКЦИЯ ЗАГРУЗКИ ИНВЕНТАРЯ ---
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
+            container.innerHTML = '<div class="empty-state">⏳ Отладка: запрашиваем Steam...</div>';
+            
             try {
                 const response = await fetch('/api/steam/inventory', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ steamId, tgId: myTgId })
                 });
-                if (!response.ok) throw new Error();
+                if (!response.ok) throw new Error('HTTP error ' + response.status);
                 const data = await response.json();
 
-                if (data.success && data.items && data.items.length > 0) {
-                    renderInventory(data.items, data.descriptions);
+                if (data.success) {
+                    const assetsCount = data.items ? data.items.length : 0;
+                    const descCount = data.descriptions ? data.descriptions.length : 0;
+                    
+                    let debugNames = '';
+                    if (data.descriptions && data.descriptions.length > 0) {
+                        debugNames = data.descriptions.slice(0, 8).map(d => d.market_hash_name || d.name).join(', ');
+                    }
+
+                    container.innerHTML = `
+                        <div class="empty-state" style="text-align: left; font-size: 11px; word-break: break-all;">
+                            🟢 <b>Связь со Steam успешна!</b><br>
+                            📦 Предметов в инвентаре (assets): ${assetsCount}<br>
+                            📝 Описаний найдено (descriptions): ${descCount}<br>
+                            🔍 Первые вещи: ${debugNames || 'нет названий'}<br><br>
+                            <button class="btn-green-glow" onclick='renderInventory(${JSON.stringify(data.items)}, ${JSON.stringify(data.descriptions)})'>Принудительно отрисовать сетку</button>
+                        </div>
+                    `;
                 } else {
-                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль закрыт</div>';
+                    container.innerHTML = '<div class="empty-state">❌ Steam API вернул ошибку success: false</div>';
                 }
             } catch (e) {
-                container.innerHTML = '<div class="empty-state">Ошибка загрузки инвентаря Steam</div>';
+                container.innerHTML = `<div class="empty-state">❌ Ошибка запроса: ${e.message}</div>`;
             }
         }
 
-        // --- ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРА С ФОЛЛБЕКОМ ---
         function renderInventory(items, descriptions) {
             const container = document.getElementById('steam-inventory-grid');
             myInventory = [];
@@ -496,19 +514,14 @@
             }
 
             items.forEach(item => {
-                // 1. Поиск по точному совпадению classid + instanceid
                 let desc = descMap[String(item.classid) + '_' + String(item.instanceid || '0')];
-                
-                // 2. ФОЛЛБЕК: Если Steam забаговал и ID рассинхронизировались, ищем просто по базовому classid
                 if (!desc && descriptions) {
                     desc = descriptions.find(d => String(d.classid) === String(item.classid));
                 }
 
-                // Если описания всё равно нет или это пустой предмет — пропускаем
                 if (!desc) return; 
                 if (!desc.market_hash_name && !desc.name) return;
 
-                // Проверяем статус трейд-бана
                 const isTradable = (desc.tradable === 1 || desc.tradable === true);
 
                 myInventory.push({
@@ -524,7 +537,6 @@
                 return;
             }
 
-            // Отрисовка с учетом статуса трейд-бана
             container.innerHTML = myInventory.map(item => `
                 <div class="card ${!item.isTradable ? 'locked-item' : ''}" style="${!item.isTradable ? 'border-color: rgba(255,77,77,0.4);' : ''}">
                     <div class="skin-image" style="position: relative;">
@@ -539,7 +551,6 @@
                 </div>
             `).join('');
         }
-        // ------------------------------------------------
 
         async function fetchGiveaways() {
             try {
