@@ -192,7 +192,6 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// ОБНОВЛЕННЫЙ ЭНДПОИНТ ИНВЕНТАРЯ С ИСПОЛЬЗОВАНИЕМ STEAM API KEY И count=500
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -206,13 +205,11 @@ app.post('/api/steam/inventory', async (req, res) => {
 
     try {
         const cacheBuster = Date.now();
-        // Используем count=500 для стабильной отдачи без сброса со стороны Steam
         let apiUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=500&t=${cacheBuster}`;
         
-        // Если задан Steam API ключ, передаем его в заголовках или параметрах, если требуется
         let requestOptions = {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'ru-RU,ru;q=0.9' },
-            timeout: 10000
+            timeout: 30000 // УВЕЛИЧИЛИ ТАЙМАУТ ДО 30 СЕКУНД
         };
 
         const invRes = await axios.get(apiUrl, requestOptions);
