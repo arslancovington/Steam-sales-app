@@ -463,10 +463,9 @@
             }
         }
 
-        // --- ОТЛАДОЧНАЯ ФУНКЦИЯ ЗАГРУЗКИ ИНВЕНТАРЯ ---
         async function loadSteamData(steamId) {
             const container = document.getElementById('steam-inventory-grid');
-            container.innerHTML = '<div class="empty-state">⏳ Отладка: запрашиваем Steam...</div>';
+            container.innerHTML = '<div class="empty-state">⏳ Обновление данных из Steam...</div>';
             
             try {
                 const response = await fetch('/api/steam/inventory', {
@@ -476,26 +475,10 @@
                 if (!response.ok) throw new Error('HTTP error ' + response.status);
                 const data = await response.json();
 
-                if (data.success) {
-                    const assetsCount = data.items ? data.items.length : 0;
-                    const descCount = data.descriptions ? data.descriptions.length : 0;
-                    
-                    let debugNames = '';
-                    if (data.descriptions && data.descriptions.length > 0) {
-                        debugNames = data.descriptions.slice(0, 8).map(d => d.market_hash_name || d.name).join(', ');
-                    }
-
-                    container.innerHTML = `
-                        <div class="empty-state" style="text-align: left; font-size: 11px; word-break: break-all;">
-                            🟢 <b>Связь со Steam успешна!</b><br>
-                            📦 Предметов в инвентаре (assets): ${assetsCount}<br>
-                            📝 Описаний найдено (descriptions): ${descCount}<br>
-                            🔍 Первые вещи: ${debugNames || 'нет названий'}<br><br>
-                            <button class="btn-green-glow" onclick='renderInventory(${JSON.stringify(data.items)}, ${JSON.stringify(data.descriptions)})'>Принудительно отрисовать сетку</button>
-                        </div>
-                    `;
+                if (data.success && data.items && data.items.length > 0) {
+                    renderInventory(data.items, data.descriptions);
                 } else {
-                    container.innerHTML = '<div class="empty-state">❌ Steam API вернул ошибку success: false</div>';
+                    container.innerHTML = '<div class="empty-state">Инвентарь пуст или профиль закрыт</div>';
                 }
             } catch (e) {
                 container.innerHTML = `<div class="empty-state">❌ Ошибка запроса: ${e.message}</div>`;
