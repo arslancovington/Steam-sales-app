@@ -186,8 +186,38 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/deals/buy', (req, res) => {
-    res.json({ success: true });
+// ИСПРАВЛЕНО: Полноценная логика покупки скина (списание у покупателя, начисление продавцу, удаление с маркета)
+app.post('/api/deals/buy', async (req, res) => {
+    const { itemId, buyerTgId, buyerTradeUrl, buyerName } = req.body;
+    const itemIndex = marketItems.findIndex(i => i._id === itemId);
+    if (itemIndex === -1) return res.json({ success: false, error: 'Лот не найден' });
+
+    const item = marketItems[itemIndex];
+    const buyer = getOrCreateUser(buyerTgId, buyerName);
+
+    if (buyer.balance < item.price) {
+        return res.json({ success: false, error: 'Недостаточно средств на балансе' });
+    }
+
+    // Списываем баланс у покупателя и увеличиваем счетчик сделок
+    buyer.balance -= item.price;
+    buyer.completedDeals = (buyer.completedDeals || 0) + 1;
+
+    // Начисляем баланс продавцу
+    const seller = getOrCreateUser(item.tgId);
+    seller.balance += item.price;
+    seller.completedDeals = (seller.completedDeals || 0) + 1;
+
+    // Удаляем проданный лот с маркета
+    marketItems.splice(itemIndex, 1);
+    saveData();
+
+    // Отправляем уведомление продавцу в личку Telegram
+    try {
+        await bot.sendMessage(item.tgId, `🎉 Ваш скин <b>${item.name}</b> успешно куплен за ${item.price} ₽! Средства зачислены на баланс.`, { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    res.json({ success: true, newBalance: buyer.balance });
 });
 
 // ================= GIVEAWAYS API + NOTIFICATIONS =================
@@ -266,12 +296,10 @@ app.post('/api/battles/join', async (req, res) => {
         battleWinnersHistory.push({ tgId: winnerObj.tgId, username: winnerObj.username });
         saveData();
 
-        // 1. Уведомление победителю в ЛС
         try {
             await bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы победили в Королевской Битве и забрали скин <b>${battle.title}</b>!`, { parse_mode: 'HTML' });
         } catch (e) {}
 
-        // 2. Уведомление в админ-чат/канал с ником победителя
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             try {
                 await bot.sendMessage(ADMIN_CHAT_ID, `⚔️ <b>Королевская Битва завершена!</b>\n\nСкин: ${battle.title}\n👑 Победитель: @${winnerObj.username}`, { parse_mode: 'HTML' });
@@ -416,16 +444,16 @@ app.get('/api/steam/price', async (req, res) => {
 // ================= BILLING & PAYMENTS API =================
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
-    let rubles = currency === 'USDT' ? amount * 80 : (currency === 'Stars' ? amount * 1.5 : amount);
+    let rubles = currency === 'crypto' ? amount * 80 : (currency === 'stars' ? amount * 1.5 : amount);
 
     try {
-        if (currency === 'P2P RU' || currency === 'P2P UZ') {
-            const isRu = (currency === 'P2P RU');
+        if (currency === 'p2pru' || currency === 'p2puz') {
+            const isRu = (currency === 'p2pru');
             const targetType = isRu ? 'RU' : 'UZ';
             const filteredCards = cards.filter(c => (c.type || 'UZ') === targetType);
             
             if (filteredCards.length === 0) {
-                return res.json({ success: false, error: `У администратора не добавлены карты для приема ${currency}.` });
+                return res.json({ success: false, error: `У администратора не добавлены карты для приема ${currency.toUpperCase()}.` });
             }
 
             let activeCard;
@@ -509,7 +537,7 @@ app.post('/api/billing/invoice', async (req, res) => {
                     );
                 }
             }
-        } else if (currency === 'USDT') {
+        } else if (currency === 'crypto') {
             let payUrl = 'https://t.me/CryptoBot';
             if (CRYPTO_BOT_TOKEN) {
                 try {
@@ -526,7 +554,7 @@ app.post('/api/billing/invoice', async (req, res) => {
                 `🧾 Счет на пополнение баланса\n\nСумма: ${amount} USDT\nК зачислению: ${Math.round(rubles)} ₽\n\nНажмите кнопку ниже для оплаты:`, 
                 { reply_markup: { inline_keyboard: [[{ text: '💎 Оплатить в CryptoBot', url: payUrl }]] } }
             );
-        } else if (currency === 'Stars') {
+        } else if (currency === 'stars') {
             await bot.sendInvoice(
                 tgId, 'Пополнение баланса', `Пополнение баланса на ${Math.round(rubles)} ₽`,
                 `topup_${tgId}_${amount}_${Math.round(rubles)}`, '', 'XTR',
@@ -555,7 +583,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
             const currentUsername = username || user.username || String(tgId);
             let adminMessage = '';
             
-            if (method === 'P2P UZ') {
+            if (method === 'p2puz') {
                 const puyoutSum = Math.round(amount * 0.95 * 145);
                 adminMessage = `💸 Новая заявка на вывод P2P UZ!\n\n` +
                     `👤 Игрок: @${currentUsername} (ID: ${tgId})\n` +
