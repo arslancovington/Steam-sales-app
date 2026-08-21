@@ -41,7 +41,7 @@ const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : pa
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
 const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
 
-let db = { users: {}, marketItems: [], giveaways: [] };
+let db = { users: {}, marketItems: [], giveaways: [], battles: [] };
 let cards = [];
 let pricesCache = {};
 
@@ -63,11 +63,12 @@ if (fs.existsSync(pricesFile)) {
 let users = db.users || {};
 let marketItems = db.marketItems || [];
 let giveaways = db.giveaways || [];
+let battles = db.battles || [];
 let cardIndexRu = 0;
 let cardIndexUz = 0;
 
 function saveData() {
-    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2)); } catch (e) {}
+    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, battles }, null, 2)); } catch (e) {}
 }
 
 function saveCards() {
@@ -192,6 +193,53 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
+app.get('/api/battles/list', (req, res) => {
+    res.json({ success: true, battles: battles.filter(b => !b.finished) });
+});
+
+app.post('/api/battles/join', async (req, res) => {
+    const { tgId, battleId } = req.body;
+    const battle = battles.find(b => b._id === battleId);
+    const user = users[tgId];
+
+    if (!battle || battle.finished) return res.json({ success: false, error: 'Битва завершена или не найдена' });
+    if (!user) return res.json({ success: false, error: 'Пользователь не найден' });
+    if (battle.participants.includes(String(tgId))) return res.json({ success: false, error: 'Вы уже в игре!' });
+    if (user.balance < battle.price) return res.json({ success: false, error: 'Недостаточно средств на балансе. Пополните счет!' });
+
+    user.balance -= battle.price;
+    battle.participants.push(String(tgId));
+    saveData();
+
+    let isFinished = false;
+    if (battle.participants.length >= battle.slots) {
+        battle.finished = true;
+        isFinished = true;
+        
+        const winnerId = battle.participants[Math.floor(Math.random() * battle.participants.length)];
+        const winner = users[winnerId];
+
+        if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+            const adminMsg = `🏆 <b>КОРОЛЕВСКАЯ БИТВА ЗАВЕРШЕНА!</b> 🏆\n\n` +
+                `🔫 Скин: <b>${battle.title}</b>\n` +
+                `💰 Банк игры: <b>${battle.price * battle.slots} ₽</b>\n\n` +
+                `👑 <b>ПОБЕДИТЕЛЬ:</b> @${winner.username || winnerId} (ID: <code>${winnerId}</code>)\n` +
+                `🔗 Трейд-ссылка: ${winner.tradeUrl ? `\n<code>${winner.tradeUrl}</code>` : '<b>Не указана (напиши ему в ЛС)</b>'}`;
+            
+            bot.sendMessage(ADMIN_CHAT_ID, adminMsg, { parse_mode: 'HTML' }).catch(()=>{});
+        }
+
+        const winnerMsg = `🎉 <b>ДЖЕКПОТ! ТЫ ВЫИГРАЛ В КОРОЛЕВСКОЙ БИТВЕ!</b> 🎉\n\n` +
+            `Твой приз: <b>${battle.title}</b>\n\n` +
+            `Администратор скоро свяжется с тобой или отправит трейд по твоей ссылке. Убедись, что она указана в профиле!`;
+        bot.sendMessage(winnerId, winnerMsg, { parse_mode: 'HTML' }).catch(()=>{});
+
+        saveData();
+    }
+
+    res.json({ success: true, newBalance: user.balance, finished: isFinished });
+});
+
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -209,7 +257,7 @@ app.post('/api/steam/inventory', async (req, res) => {
         
         let requestOptions = {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'ru-RU,ru;q=0.9' },
-            timeout: 30000 // УВЕЛИЧИЛИ ТАЙМАУТ ДО 30 СЕКУНД
+            timeout: 30000 
         };
 
         const invRes = await axios.get(apiUrl, requestOptions);
@@ -575,6 +623,56 @@ bot.on('message', async (msg) => {
         await bot.sendMessage(msg.chat.id, `👥 Онлайн / Всего: <b>${online} / ${total}</b>`, { parse_mode: 'HTML' });
         return;
     }
+
+    // === УПРОЩЕННОЕ СОЗДАНИЕ КОРОЛЕВСКОЙ БИТВЫ ===
+    if (text.startsWith('/battle')) {
+        const parts = text.split(' ');
+        
+        if (parts.length < 4) {
+            return bot.sendMessage(msg.chat.id, '❌ Ошибка формата.\nОтправь фото и подпись:\n`/battle [цена] [места] [название]`\n\nПример: `/battle 70 10 AK-47 Redline`', {parse_mode:'Markdown'});
+        }
+
+        const price = parseInt(parts[1]);
+        const slots = parseInt(parts[2]);
+        // Всё, что написано после мест — объединяем обратно в название скина
+        const title = parts.slice(3).join(' ');
+
+        if (isNaN(price) || isNaN(slots) || price <= 0 || slots < 2) {
+            return bot.sendMessage(msg.chat.id, '❌ Ошибка: Цена и количество мест должны быть числами (минимум 2 места).');
+        }
+
+        let imageUrl = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f';
+        if (msg.photo && msg.photo.length > 0) {
+            try { imageUrl = await bot.getFileLink(msg.photo[msg.photo.length - 1].file_id); } catch (err) {}
+        }
+
+        const battle = {
+            _id: Date.now().toString(),
+            title, price, slots, image: imageUrl,
+            participants: [], finished: false
+        };
+        battles.push(battle);
+        saveData();
+
+        bot.sendMessage(msg.chat.id, `✅ <b>Битва за ${title} успешно создана!</b>\nРассылаю уведомления игрокам...`, {parse_mode:'HTML'});
+
+        const broadcastMsg = `⚔️ <b>НОВАЯ КОРОЛЕВСКАЯ БИТВА!</b> ⚔️\n\n` +
+                             `На кону: <b>${title}</b>\n` +
+                             `Взнос за участие: <b>${price} ₽</b>\n` +
+                             `Всего мест: <b>${slots}</b>\n\n` +
+                             `Успей залететь, пока не разобрали слоты! Победитель забирает всё. Открывай приложение 👇`;
+        
+        Object.values(users).forEach(u => {
+            if (u.tgId) {
+                bot.sendMessage(u.tgId, broadcastMsg, { 
+                    parse_mode: 'HTML',
+                    reply_markup: { inline_keyboard: [[{ text: '🎮 Участвовать', web_app: { url: 'ТВОЯ_ССЫЛКА_НА_APP' } }]] }
+                }).catch(()=>{});
+            }
+        });
+        return;
+    }
+    // ===================================
 
     if (text.startsWith('/addcard')) {
         const parts = text.split(' ');
