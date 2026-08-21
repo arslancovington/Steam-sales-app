@@ -92,7 +92,6 @@ function getOrCreateUser(tgId, username = 'Игрок') {
         };
         saveData();
     } else {
-        // Обновляем время последней активности при каждом обращении
         users[tgId].lastActive = now;
         if (username && username !== 'Игрок' && users[tgId].username !== username) {
             users[tgId].username = username;
@@ -195,7 +194,13 @@ app.post('/api/giveaways/join', async (req, res) => {
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
-    if (!steamId) return res.json({ success: false, items: [], descriptions: [] });
+    
+    console.log(`🔍 Запрос инвентаря для SteamID: ${steamId}`);
+    
+    if (!steamId) {
+        console.log(`⚠️ Ошибка: SteamID не найден ни в запросе, ни у пользователя ${tgId}`);
+        return res.json({ success: false, items: [], descriptions: [] });
+    }
 
     try {
         const cacheBuster = Date.now();
@@ -207,17 +212,21 @@ app.post('/api/steam/inventory', async (req, res) => {
         });
         
         if (invRes?.data?.success) {
+            const assetsCount = invRes.data.assets ? invRes.data.assets.length : 0;
+            const descCount = invRes.data.descriptions ? invRes.data.descriptions.length : 0;
+            console.log(`✅ Steam API ответил успешно! Найдено предметов (assets): ${assetsCount}, описаний (descriptions): ${descCount}`);
+            
             res.json({ success: true, items: invRes.data.assets || [], descriptions: invRes.data.descriptions || [] });
         } else {
+            console.log(`❌ Steam API вернул success: false или пустой ответ для ${steamId}`);
             res.json({ success: false, items: [], descriptions: [] });
         }
     } catch (e) {
-        console.error("Ошибка парсинга инвентаря:", e.message);
+        console.error(`❌ Ошибка запроса к Steam API для ${steamId}:`, e.message);
         res.json({ success: false, items: [], descriptions: [] });
     }
 });
 
-// Кэширование цен на 12 часов с очисткой названий
 app.get('/api/steam/price', async (req, res) => {
     let skinName = req.query.name;
     if (!skinName) return res.json({ success: false, price: 100 });
@@ -548,7 +557,6 @@ bot.on('message', async (msg) => {
     const text = msg.text || msg.caption;
     if (!text) return;
 
-    // Команда просмотра онлайна: /online
     if (text.startsWith('/online')) {
         const now = Date.now();
         const fifteenMinutesMs = 15 * 60 * 1000;
