@@ -452,7 +452,6 @@
             });
         }
 
-        // Функция обновления, чтобы пользователь мог вручную сбросить кеш Steam
         function refreshInventory() {
             const steamId = localStorage.getItem('user_steam_id');
             if (steamId) {
@@ -484,13 +483,12 @@
             }
         }
 
-        // ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРА
+        // --- ИСПРАВЛЕННАЯ ФУНКЦИЯ РЕНДЕРА С ФОЛЛБЕКОМ ---
         function renderInventory(items, descriptions) {
             const container = document.getElementById('steam-inventory-grid');
             myInventory = [];
             const descMap = {};
             
-            // Строгое приведение к строке для ключей, чтобы не терять предметы из-за разных типов данных
             if (descriptions) {
                 descriptions.forEach(d => { 
                     descMap[String(d.classid) + '_' + String(d.instanceid || '0')] = d; 
@@ -498,10 +496,16 @@
             }
 
             items.forEach(item => {
-                const desc = descMap[String(item.classid) + '_' + String(item.instanceid || '0')];
-                if (!desc) return; 
+                // 1. Поиск по точному совпадению classid + instanceid
+                let desc = descMap[String(item.classid) + '_' + String(item.instanceid || '0')];
+                
+                // 2. ФОЛЛБЕК: Если Steam забаговал и ID рассинхронизировались, ищем просто по базовому classid
+                if (!desc && descriptions) {
+                    desc = descriptions.find(d => String(d.classid) === String(item.classid));
+                }
 
-                // У Steam API иногда попадаются пустые предметы без имени (например, дефолтные медали/значки), скрываем их
+                // Если описания всё равно нет или это пустой предмет — пропускаем
+                if (!desc) return; 
                 if (!desc.market_hash_name && !desc.name) return;
 
                 // Проверяем статус трейд-бана
@@ -524,7 +528,7 @@
             container.innerHTML = myInventory.map(item => `
                 <div class="card ${!item.isTradable ? 'locked-item' : ''}" style="${!item.isTradable ? 'border-color: rgba(255,77,77,0.4);' : ''}">
                     <div class="skin-image" style="position: relative;">
-                        ${!item.isTradable ? '<div style="position:absolute; top:4px; right:4px; background:rgba(255,77,77,0.9); color:white; font-size:9px; padding:2px 4px; border-radius:3px; font-weight:bold; box-shadow: 0 0 5px red;">В холде</div>' : ''}
+                        ${!item.isTradable ? '<div style="position:absolute; top:4px; right:4px; background:rgba(255,77,77,0.9); color:white; font-size:9px; padding:2px 4px; border-radius:3px; font-weight:bold; box-shadow: 0 0 5px red; z-index: 10;">В холде</div>' : ''}
                         <img src="${item.icon_url}" class="skin-img" style="${!item.isTradable ? 'filter: grayscale(80%); opacity: 0.6;' : ''}">
                     </div>
                     <h4 style="font-size: 11px;">${item.name}</h4>
@@ -535,6 +539,7 @@
                 </div>
             `).join('');
         }
+        // ------------------------------------------------
 
         async function fetchGiveaways() {
             try {
