@@ -53,7 +53,8 @@
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
         .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
         
-        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 4px; }
+        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 4px; text-transform: uppercase; }
+        .btn-green-glow:disabled { background: #333; color: #888; cursor: not-allowed; box-shadow: none; }
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 22px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
@@ -67,6 +68,10 @@
         .nav-item svg { width: 24px; height: 24px; fill: var(--text-muted); transition: 0.2s; }
         .active-nav { opacity: 1; transform: scale(1.08); }
         .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
+        
+        /* Стили для прогресс-бара битвы */
+        .battle-progress-bg { width: 100%; background: #111; height: 8px; border-radius: 4px; margin-top: 6px; overflow: hidden; border: 1px solid #333; }
+        .battle-progress-fill { background: linear-gradient(90deg, #ff007f, #bf00ff); height: 100%; transition: width 0.4s ease; }
 
         .seller-head { display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 14px; }
         .seller-avatar { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0,255,255,0.08); border: 1px solid var(--neon-cyan); overflow: hidden; flex-shrink: 0; }
@@ -180,7 +185,6 @@
                 <div class="vip-section-header">👑 VIP Маркетплейс</div>
                 <div id="vip-market-listings" class="grid-layout vip-frame-container"></div>
             </div>
-
             <h2 class="neon-text">Маркетплейс скинов</h2>
             <div id="market-listings" class="grid-layout"></div>
         </section>
@@ -202,7 +206,15 @@
             </div>
         </section>
 
-        <section id="tab-deals" class="tab"><h2 class="neon-text">Сделки</h2><div class="empty-state">Нет активных сделок</div></section>
+        <!-- === ВКЛАДКА: КОРОЛЕВСКАЯ БИТВА === -->
+        <section id="tab-deals" class="tab">
+            <h2 class="neon-text" style="color: #ff007f; text-shadow: 0 0 8px #ff007f;">⚔️ Королевская Битва</h2>
+            <p class="hint-text" style="margin-bottom: 15px;">Скидываемся на крутой скин! Как только набирается нужное число участников, рулетка рандомно выбирает победителя.</p>
+            <div id="battles-container">
+                <div class="empty-state">В данный момент нет активных битв</div>
+            </div>
+        </section>
+        <!-- ================================== -->
 
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
@@ -244,8 +256,9 @@
         <button class="nav-item" onclick="switchTab('inventory', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
         </button>
+        <!-- Иконка Мечей для Битвы -->
         <button class="nav-item" onclick="switchTab('deals', this)">
-            <svg viewBox="0 0 24 24"><path d="M18.84 5.37c-.77-.49-1.74-.27-2.24.5l-1.09 1.63c-.34.5-.96.72-1.54.52l-2.07-.69c-.91-.3-1.91.13-2.31 1.01l-2.1 4.67-1.7-1.13c-.62-.41-1.47-.23-1.87.39-.41.62-.23 1.47.39 1.87l3 2c.4.27.91.31 1.35.1l3.51-1.76c.4-.2.66-.6.67-1.05l.07-1.57 1.41.47c.54.18 1.13-.05 1.43-.54l1.37-2.27c.49-.77.27-1.74-.5-2.24zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M19.98 2.52c-.19-.04-.39 0-.54.12l-3.32 2.66-2.09-1.05c-.24-.12-.52-.1-.74.05L9.62 6.9 6.8 4.08C6.6 3.88 6.3 3.82 6.04 3.93 5.79 4.04 5.62 4.3 5.62 4.58v4.24l-3.5 3.5c-.39.39-.39 1.02 0 1.41l4.95 4.95c.39.39 1.02.39 1.41 0l3.5-3.5h4.24c.28 0 .54-.17.65-.42.11-.25.05-.55-.15-.75l-2.82-2.82 2.6-3.68c.15-.22.17-.5.05-.74l-1.05-2.09 2.66-3.32c.12-.15.16-.35.12-.54-.04-.19-.18-.33-.37-.37zM12 17.5l-4-4 2.5-2.5 4 4-2.5 2.5z"/></svg>
         </button>
         <button class="nav-item" onclick="switchTab('giveaways', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
@@ -371,7 +384,8 @@
                 await Promise.allSettled([
                     syncUserProfile(),
                     fetchMarketItems(),
-                    fetchGiveaways()
+                    fetchGiveaways(),
+                    fetchBattles() // Загрузка Королевских битв
                 ]);
 
                 if (steamId) {
@@ -594,6 +608,82 @@
                 alert('Ошибка соединения');
             }
         }
+
+        // === ЛОГИКА КОРОЛЕВСКОЙ БИТВЫ ===
+        async function fetchBattles() {
+            try {
+                const res = await fetch('/api/battles/list');
+                const data = await res.json();
+                if (data.success) {
+                    const container = document.getElementById('battles-container');
+                    if (data.battles.length === 0) {
+                        container.innerHTML = '<div class="empty-state">Пока нет активных битв</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = data.battles.map(b => {
+                        const filledSlots = b.participants.length;
+                        const percent = (filledSlots / b.slots) * 100;
+                        const isJoined = b.participants.includes(String(myTgId));
+                        
+                        return `
+                            <div class="giveaway-card" style="border-color: #ff007f; box-shadow: 0 0 12px rgba(255,0,127,0.2);">
+                                <div class="giveaway-header">
+                                    <span class="giveaway-sponsor" style="color: #ff007f; text-transform: uppercase; font-weight: bold;">⚔️ Royal Battle</span>
+                                    <span class="giveaway-timer" style="background: rgba(255,0,127,0.2); color: #fff; font-weight: bold; border: 1px solid #ff007f;">Вход: ${b.price} ₽</span>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
+                                    <div class="skin-image" style="width: 80px; height: 80px; flex-shrink: 0; background: rgba(255,0,127,0.05); border: 1px solid rgba(255,0,127,0.3);"><img src="${b.image}" class="skin-img"></div>
+                                    <div style="flex: 1;">
+                                        <p class="giveaway-title" style="font-size: 15px;">${b.title}</p>
+                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; display: flex; justify-content: space-between;">
+                                            <span>Участников:</span>
+                                            <span style="color: #ff007f; font-weight: bold;">${filledSlots} / ${b.slots}</span>
+                                        </div>
+                                        <div class="battle-progress-bg">
+                                            <div class="battle-progress-fill" style="width: ${percent}%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-green-glow" style="margin-top: 14px; background: ${isJoined ? '#333' : 'linear-gradient(90deg, #ff007f, #bf00ff)'}; color: #fff;" onclick="joinBattle('${b._id}')" ${isJoined ? 'disabled' : ''}>
+                                    ${isJoined ? '✅ ВЫ В ИГРЕ' : 'ПРИСОЕДИНИТЬСЯ'}
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch(e) {}
+        }
+
+        async function joinBattle(battleId) {
+            if (!confirm('Подтверждаете участие? С вашего баланса спишется стоимость входа.')) return;
+            
+            try {
+                const res = await fetch('/api/battles/join', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ tgId: myTgId, battleId })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    userBalance = data.newBalance;
+                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    
+                    if (data.finished) {
+                        alert('Битва завершена! Рулетка крутится... Победитель получит уведомление в личку от бота!');
+                    } else {
+                        alert('✅ Место успешно куплено! Ожидаем остальных.');
+                    }
+                    fetchBattles(); 
+                } else {
+                    alert('❌ Ошибка: ' + (data.error || 'Не удалось присоединиться'));
+                }
+            } catch(e) {
+                alert('Ошибка соединения с сервером');
+            }
+        }
+        // ===================================
 
         async function selectSellPlatform(platform) {
             selectedSellPlatform = platform;
@@ -933,6 +1023,7 @@
             document.getElementById('tab-' + id).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             btn.classList.add('active-nav');
+            if (id === 'deals') fetchBattles(); 
         }
 
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
