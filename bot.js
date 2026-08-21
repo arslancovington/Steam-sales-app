@@ -197,6 +197,7 @@ app.get('/api/battles/list', (req, res) => {
     res.json({ success: true, battles: battles.filter(b => !b.finished) });
 });
 
+// ИСПРАВЛЕННЫЙ ЭНДПОИНТ БИТВЫ С ПЕРЕДАЧЕЙ ДАННЫХ ДЛЯ РУЛЕТКИ[span_1](start_span)[span_1](end_span)
 app.post('/api/battles/join', async (req, res) => {
     const { tgId, battleId } = req.body;
     const battle = battles.find(b => b._id === battleId);
@@ -212,12 +213,30 @@ app.post('/api/battles/join', async (req, res) => {
     saveData();
 
     let isFinished = false;
+    let winnerObj = null;
+    let participantsData = [];
+
     if (battle.participants.length >= battle.slots) {
         battle.finished = true;
         isFinished = true;
         
         const winnerId = battle.participants[Math.floor(Math.random() * battle.participants.length)];
         const winner = users[winnerId];
+
+        winnerObj = {
+            tgId: winnerId,
+            username: (winner ? winner.username : null) || `User_${winnerId}`,
+            photo: winner && winner.photo ? winner.photo : null
+        };
+
+        participantsData = battle.participants.map(pId => {
+            const u = users[pId];
+            return {
+                tgId: pId,
+                username: (u ? u.username : null) || `User_${pId}`,
+                photo: u && u.photo ? u.photo : null
+            };
+        });
 
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             const adminMsg = `🏆 <b>КОРОЛЕВСКАЯ БИТВА ЗАВЕРШЕНА!</b> 🏆\n\n` +
@@ -237,7 +256,14 @@ app.post('/api/battles/join', async (req, res) => {
         saveData();
     }
 
-    res.json({ success: true, newBalance: user.balance, finished: isFinished });
+    res.json({ 
+        success: true, 
+        newBalance: user.balance, 
+        finished: isFinished, 
+        winner: winnerObj,
+        participantsList: participantsData,
+        battleTitle: battle.title
+    });
 });
 
 app.post('/api/steam/inventory', async (req, res) => {
@@ -510,10 +536,9 @@ app.post('/api/billing/withdraw', async (req, res) => {
         }
         res.json({ success: true, newBalance: user.balance });
     } catch (e) {
-        console.error("Withdraw Error:", e.message);
         user.balance += amount;
         saveData();
-        res.json({ success: false, error: 'Ошибка отправки чека администраторам: возможно бот не добавлен в админ-чат.' });
+        res.json({ success: false, error: 'Ошибка отправки чека администраторам.' });
     }
 });
 
@@ -544,7 +569,7 @@ bot.on('callback_query', async (query) => {
         const targetTgId = parts[3];
         const amount = parts[4];
 
-        await bot.sendMessage(targetTgId, `✅ Ваша заявка на вывод ${amount} ₽ успешно обработана! Деньги отправлены на банковскую карту.`);
+        await bot.sendMessage(targetTgId, `✅ Ваша заявка на вывод ${amount} ₽ успешно обработана!`);
         await bot.editMessageText(`✅ Вывод средств на сумму ${amount} ₽ для игрока ${targetTgId} выполнен.`, {
             chat_id: query.message.chat.id, message_id: query.message.message_id
         });
@@ -555,8 +580,8 @@ bot.on('callback_query', async (query) => {
         const targetTgId = parts[2];
         const amount = parts[3];
 
-        await bot.sendMessage(targetTgId, `❌ Ваша операция на сумму ${amount} ₽ была отклонена / отменена администратором.`);
-        await bot.editMessageText(`❌ Заявка / платеж на сумму ${amount} ₽ для игрока ${targetTgId} отклонена.`, {
+        await bot.sendMessage(targetTgId, `❌ Ваша операция на сумму ${amount} ₽ была отклонена администратором.`);
+        await bot.editMessageText(`❌ Заявка на сумму ${amount} ₽ для игрока ${targetTgId} отклонена.`, {
             chat_id: query.message.chat.id, message_id: query.message.message_id
         });
         await bot.answerCallbackQuery(query.id, { text: 'Отменено' });
@@ -568,7 +593,7 @@ bot.on('callback_query', async (query) => {
 
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             await bot.sendMessage(ADMIN_CHAT_ID, 
-                `🔔 Пользователь ${targetTgId} нажал кнопку "Я оплатил" для пополнения на ${amount} ₽! Проверьте поступление денег.`, 
+                `🔔 Пользователь ${targetTgId} нажал кнопку "Я оплатил" для пополнения на ${amount} ₽!`, 
                 {
                     reply_markup: {
                         inline_keyboard: [
@@ -581,8 +606,8 @@ bot.on('callback_query', async (query) => {
                 }
             );
         }
-        await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено администратору!' });
-        await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения администратора.`, {
+        await bot.answerCallbackQuery(query.id, { text: 'Уведомление отправлено!' });
+        await bot.editMessageText(`✅ Вы сообщили об оплате. Ожидайте подтверждения.`, {
             chat_id: query.message.chat.id, message_id: query.message.message_id
         });
     }
@@ -608,33 +633,15 @@ bot.on('message', async (msg) => {
     const text = msg.text || msg.caption;
     if (!text) return;
 
-    if (text.startsWith('/online')) {
-        const now = Date.now();
-        const fifteenMinutesMs = 15 * 60 * 1000;
-        let total = Object.keys(users).length;
-        let online = 0;
-
-        Object.values(users).forEach(u => {
-            if (u.lastActive && (now - u.lastActive < fifteenMinutesMs)) {
-                online++;
-            }
-        });
-
-        await bot.sendMessage(msg.chat.id, `👥 Онлайн / Всего: <b>${online} / ${total}</b>`, { parse_mode: 'HTML' });
-        return;
-    }
-
-    // === УПРОЩЕННОЕ СОЗДАНИЕ КОРОЛЕВСКОЙ БИТВЫ ===
     if (text.startsWith('/battle')) {
         const parts = text.split(' ');
         
         if (parts.length < 4) {
-            return bot.sendMessage(msg.chat.id, '❌ Ошибка формата.\nОтправь фото и подпись:\n`/battle [цена] [места] [название]`\n\nПример: `/battle 70 10 AK-47 Redline`', {parse_mode:'Markdown'});
+            return bot.sendMessage(msg.chat.id, '❌ Ошибка формата.\nОтправь фото и подпись:\n`/battle [цена] [места] [название]`', {parse_mode:'Markdown'});
         }
 
         const price = parseInt(parts[1]);
         const slots = parseInt(parts[2]);
-        // Всё, что написано после мест — объединяем обратно в название скина
         const title = parts.slice(3).join(' ');
 
         if (isNaN(price) || isNaN(slots) || price <= 0 || slots < 2) {
@@ -654,126 +661,7 @@ bot.on('message', async (msg) => {
         battles.push(battle);
         saveData();
 
-        bot.sendMessage(msg.chat.id, `✅ <b>Битва за ${title} успешно создана!</b>\nРассылаю уведомления игрокам...`, {parse_mode:'HTML'});
-
-        const broadcastMsg = `⚔️ <b>НОВАЯ КОРОЛЕВСКАЯ БИТВА!</b> ⚔️\n\n` +
-                             `На кону: <b>${title}</b>\n` +
-                             `Взнос за участие: <b>${price} ₽</b>\n` +
-                             `Всего мест: <b>${slots}</b>\n\n` +
-                             `Успей залететь, пока не разобрали слоты! Победитель забирает всё. Открывай приложение 👇`;
-        
-        Object.values(users).forEach(u => {
-            if (u.tgId) {
-                bot.sendMessage(u.tgId, broadcastMsg, { 
-                    parse_mode: 'HTML',
-                    reply_markup: { inline_keyboard: [[{ text: '🎮 Участвовать', web_app: { url: 'ТВОЯ_ССЫЛКА_НА_APP' } }]] }
-                }).catch(()=>{});
-            }
-        });
-        return;
-    }
-    // ===================================
-
-    if (text.startsWith('/addcard')) {
-        const parts = text.split(' ');
-        if (parts.length < 3) {
-            await bot.sendMessage(msg.chat.id, '❌ Формат:\n`/addcard ru [номер] [владелец]`\nили\n`/addcard uz [номер] [владелец]`', { parse_mode: 'Markdown' });
-            return;
-        }
-
-        let type = 'UZ';
-        let startIndex = 1;
-        if (parts[1].toLowerCase() === 'ru' || parts[1].toLowerCase() === 'uz') {
-            type = parts[1].toUpperCase();
-            startIndex = 2;
-        }
-
-        const number = parts[startIndex];
-        const holder = parts.slice(startIndex + 1).join(' ');
-
-        if (!number || !holder) {
-            await bot.sendMessage(msg.chat.id, '❌ Неверный формат. Укажите номер и владельца карты.');
-            return;
-        }
-
-        cards.push({ number, holder, type });
-        saveCards();
-        await bot.sendMessage(msg.chat.id, `✅ [${type}] Карта ${number} (${holder}) успешно добавлена в пул! Всего карт: ${cards.length}`);
-        return;
-    }
-
-    if (text.startsWith('/cards')) {
-        if (cards.length === 0) {
-            await bot.sendMessage(msg.chat.id, '📭 Список карт пуст. Добавьте карту через `/addcard ru` или `/addcard uz`.', { parse_mode: 'Markdown' });
-            return;
-        }
-        let list = '💳 **Список доступных карт:**\n\n';
-        cards.forEach((c, idx) => {
-            list += `${idx + 1}. [**${c.type || 'UZ'}**] \`${c.number}\` — ${c.holder}\n`;
-        });
-        list += '\nДля удаления используйте: `/delcard [номер_в_списке]`';
-        await bot.sendMessage(msg.chat.id, list, { parse_mode: 'Markdown' });
-        return;
-    }
-
-    if (text.startsWith('/delcard')) {
-        const parts = text.split(' ');
-        const index = parseInt(parts[1]) - 1;
-        if (isNaN(index) || !cards[index]) {
-            await bot.sendMessage(msg.chat.id, '❌ Неверный номер карты. Посмотрите список через `/cards`.', { parse_mode: 'Markdown' });
-            return;
-        }
-        const removed = cards.splice(index, 1);
-        saveCards();
-        await bot.sendMessage(msg.chat.id, `🗑 Карта [${removed[0].type}] \`${removed[0].number}\` удалена из пула.`);
-        return;
-    }
-
-    if (text.startsWith('/newgiveaway')) {
-        const lines = text.split('\n');
-        let title = '', sponsor = '', timer = '';
-        lines.forEach(line => {
-            if (line.toLowerCase().startsWith('prize:') || line.toLowerCase().startsWith('приз:')) {
-                title = line.replace(/^(prize:|приз:)/i, '').trim();
-            }
-            if (line.toLowerCase().startsWith('sponsor:') || line.toLowerCase().startsWith('спонсор:')) {
-                sponsor = line.replace(/^(sponsor:|спонсор:)/i, '').trim();
-            }
-            if (line.toLowerCase().startsWith('timer:') || line.toLowerCase().startsWith('таймер:')) {
-                timer = line.replace(/^(timer:|таймер:)/i, '').trim();
-            }
-        });
-
-        if (!title || !sponsor) {
-            await bot.sendMessage(msg.chat.id, '❌ Ошибка! Не удалось распознать поля "Приз:" или "Спонсор:".');
-            return;
-        }
-
-        let sponsorUsername = sponsor.trim();
-        if (sponsorUsername.includes('t.me/')) {
-            const clean = sponsorUsername.split('t.me/')[1].replace('/', '');
-            sponsorUsername = '@' + clean;
-        } else if (!sponsorUsername.startsWith('@') && !sponsorUsername.startsWith('http')) {
-            sponsorUsername = '@' + sponsorUsername;
-        }
-
-        let imageUrl = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f';
-        if (msg.photo && msg.photo.length > 0) {
-            try {
-                imageUrl = await bot.getFileLink(msg.photo[msg.photo.length - 1].file_id);
-            } catch (err) {}
-        }
-
-        giveaways.push({
-            _id: Date.now().toString(),
-            title, sponsor, sponsorUsername,
-            timer: timer || 'Скоро',
-            image: imageUrl,
-            participantsCount: 0, participants: []
-        });
-        saveData();
-
-        await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" с картинкой успешно добавлен!`);
+        bot.sendMessage(msg.chat.id, `✅ <b>Битва за ${title} успешно создана!</b>`, {parse_mode:'HTML'});
         return;
     }
 });
