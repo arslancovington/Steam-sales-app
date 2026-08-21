@@ -5,25 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CS2 Cash & Skins — Marketplace</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <style>
-        :root { 
-            --bg-color: #0b1110; 
-            --neon-green: #7cfc00; 
-            --neon-cyan: #00ffff; 
-            --neon-purple: #bf00ff; 
-            --card-bg: rgba(20, 30, 25, 0.7); 
-            --text-main: #ffffff; 
-            --text-muted: #889988; 
-            --danger-red: #ff4d4d; 
+        :root {
+            --bg-color: #0b1110;
+            --neon-green: #7cfc00;
+            --neon-cyan: #00ffff;
+            --neon-purple: #bf00ff;
+            --neon-pink: #ff007f;
+            --card-bg: rgba(20, 30, 25, 0.7);
+            --text-main: #ffffff;
+            --text-muted: #889988;
+            --danger-red: #ff4d4d;
         }
+
         * { box-sizing: border-box; }
         body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
-        
+
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(11, 17, 16, 0.9); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .bot-profile { display: flex; align-items: center; gap: 10px; }
         .bot-name { font-weight: bold; font-size: 14px; }
         .bot-status { color: var(--neon-green); font-size: 11px; font-weight: bold; }
-        
+
         .balance-widget { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--neon-green); font-size: 14px; background: rgba(124, 252, 0, 0.05); }
         .add-funds-btn { background: transparent; color: var(--neon-green); border: none; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
 
@@ -61,6 +64,134 @@
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
         .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
 
+        /* Стили Королевской Битвы */
+        .battle-card {
+            background: #141e19;
+            border: 1px solid rgba(255, 0, 127, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.1);
+        }
+        .battle-slots-badge {
+            display: inline-block;
+            border: 1px solid var(--neon-pink);
+            color: var(--neon-pink);
+            background: rgba(255, 0, 127, 0.1);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .battle-skin-box {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,0,127,0.2);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 12px;
+            position: relative;
+            min-height: 130px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .battle-skin-img {
+            max-width: 130px;
+            max-height: 90px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .battle-skin-name {
+            font-weight: bold;
+            font-style: italic;
+            font-size: 14px;
+            color: #fff;
+        }
+        .battle-btn {
+            width: 100%;
+            background: linear-gradient(90deg, #ff007f, #bf00ff);
+            border: none;
+            color: #fff;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.4);
+            margin-bottom: 15px;
+        }
+        .battle-btn:disabled {
+            background: #2a352f;
+            color: #889988;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .battle-participants-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        .battle-slot-item {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            gap: 10px;
+        }
+        .battle-slot-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #889988;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .battle-slot-name {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .battle-slot-name.filled {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* Рулетка */
+        .roulette-window { position: relative; width: 100%; height: 100px; background: #000; overflow: hidden; border-radius: 8px; border: 1px solid var(--neon-pink); }
+        .roulette-pointer { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; background: var(--neon-green); z-index: 10; box-shadow: 0 0 8px var(--neon-green); }
+        .roulette-strip { display: flex; position: absolute; left: 0; top: 0; height: 100%; will-change: transform; transition: transform 4s cubic-bezier(0.08, 0.82, 0.17, 1); }
+        .roulette-item { min-width: 80px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); padding: 5px; }
+        .roulette-item img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid var(--neon-pink); margin-bottom: 4px; }
+        .roulette-item span { font-size: 10px; color: #fff; width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+
+        /* Полноэкранный режим победителя */
+        .fullscreen-winner-overlay {
+            position: fixed; inset: 0; background: rgba(11, 17, 16, 0.96); z-index: 9999;
+            display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;
+        }
+        .fullscreen-winner-overlay.active { display: flex; }
+
+        /* Таблица рейтинга победителей */
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: var(--card-bg); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+        .leaderboard-table th, .leaderboard-table td { padding: 10px 12px; text-align: left; font-size: 12px; }
+        .leaderboard-table th { background: rgba(255, 0, 127, 0.15); color: var(--neon-pink); font-weight: bold; }
+        .leaderboard-table tr:not(:last-child) td { border-bottom: 1px solid rgba(255,255,255,0.05); }
+
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.95); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(124, 252, 0, 0.3); z-index: 100; }
         .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
         .nav-item svg { width: 24px; height: 24px; fill: var(--text-muted); transition: 0.2s; }
@@ -92,16 +223,39 @@
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; font-size: 12px; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); color: var(--neon-green); font-weight: bold; }
 
-        /* Рулетка */
-        .roulette-window { position: relative; width: 100%; height: 100px; background: #000; overflow: hidden; border-radius: 10px; border: 1px solid #ff007f; }
-        .roulette-pointer { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; background: var(--neon-green); z-index: 10; box-shadow: 0 0 8px var(--neon-green); }
-        .roulette-strip { display: flex; position: absolute; left: 0; top: 0; height: 100%; will-change: transform; transition: transform 4s cubic-bezier(0.08, 0.82, 0.17, 1); }
-        .roulette-item { min-width: 80px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); padding: 5px; }
-        .roulette-item img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid #ff007f; margin-bottom: 4px; }
-        .roulette-item span { font-size: 10px; color: #fff; width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+        .cs16-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; font-family: 'Courier New', Courier, monospace; }
+        .cs16-modal.active { display: flex; }
+        .cs16-dialog { background: #2b332e; border: 2px solid #5a6b60; border-top-color: #7c9484; border-left-color: #7c9484; box-shadow: 6px 6px 15px rgba(0,0,0,0.9); width: 320px; padding: 3px; color: #d0ded4; }
+        .cs16-title { background: #19201c; padding: 4px 8px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #3e4a42; color: #ffffff; }
+        .cs16-body { padding: 12px; font-size: 11px; }
+        .cs16-progress-container { background: #111513; border: 1px solid #455249; border-bottom-color: #7c9484; border-right-color: #7c9484; height: 16px; margin: 6px 0 12px 0; padding: 1px; }
+        .cs16-progress-bar { background: linear-gradient(90deg, #2e7d32, #4caf50); height: 100%; width: 0%; transition: width 0.2s ease; }
     </style>
 </head>
 <body>
+
+    <div class="cs16-modal active" id="cs16-loading-modal">
+        <div class="cs16-dialog">
+            <div class="cs16-title">Загрузка приложения...</div>
+            <div class="cs16-body">
+                <p id="cs16-status-text">Connecting to P2P Server...</p>
+                <div class="cs16-progress-container"><div class="cs16-progress-bar" id="cs16-bar-1" style="width: 75%;"></div></div>
+                <p id="cs16-sub-text">Loading Marketplace & User Profile...</p>
+                <div class="cs16-progress-container"><div class="cs16-progress-bar" id="cs16-bar-2" style="width: 90%;"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Полноэкранный режим победителя (длится 1 минуту) -->
+    <div class="fullscreen-winner-overlay" id="fullscreen-winner-modal">
+        <div style="font-size: 28px; font-weight: bold; color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); margin-bottom: 20px;">🏆 ПОБЕДИТЕЛЬ БИТВЫ! 🏆</div>
+        <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--neon-green); margin: 0 auto 15px auto; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid #fff; box-shadow: 0 0 25px var(--neon-green);" id="fs-winner-avatar">
+            👑
+        </div>
+        <div id="fs-winner-name" style="font-size: 20px; font-weight: bold; color: #fff; margin-bottom: 8px;">@Username</div>
+        <div id="fs-winner-prize" style="font-size: 14px; color: var(--neon-cyan); margin-bottom: 20px;">Забрал скин!</div>
+        <div id="fs-winner-timer" style="font-size: 12px; color: var(--text-muted);">Возврат к списку через: 60 сек</div>
+    </div>
 
     <header class="top-bar">
         <div class="bot-profile">
@@ -120,7 +274,6 @@
     </header>
 
     <main class="content-area">
-        <!-- Вкладка: Маркетплейс -->
         <section id="tab-market" class="tab active">
             <div id="vip-section-wrapper" style="display: none;">
                 <div class="vip-section-header">👑 VIP Маркетплейс</div>
@@ -130,33 +283,46 @@
             <div id="market-listings" class="grid-layout"></div>
         </section>
 
-        <!-- Вкладка: Инвентарь -->
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Твой Steam инвентарь</h2>
             <div id="auth-section"><button class="steam-login-btn" onclick="loginWithSteam()">Войти через Steam</button></div>
             <div class="trade-url-box">
                 <input type="text" id="trade-url-input" placeholder="Trade URL...">
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
-                <button class="btn-cyan" onclick="refreshInventory()" style="padding: 10px; display: flex; align-items: center; justify-content: center;" title="Обновить инвентарь">
+                <button class="btn-cyan" onclick="refreshInventory()" style="padding: 10px; display: flex; align-items: center; justify-content: center;" title="Обновить">
                     <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: var(--neon-cyan);"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
             </div>
             <div id="steam-inventory-grid" class="grid-layout"><div class="empty-state">Войдите через Steam или укажите Trade URL для просмотра инвентаря</div></div>
         </section>
 
-        <!-- Вкладка: Королевские Битвы -->
+        <!-- ВКЛАДКА: КОРОЛЕВСКАЯ БИТВА И РЕЙТИНГ -->
         <section id="tab-deals" class="tab">
-            <h2 class="neon-text" style="color: #ff007f; text-shadow: 0 0 8px #ff007f; margin-bottom: 15px;">⚔️ Королевская Битва</h2>
+            <h2 class="neon-text" style="color: var(--neon-pink); text-shadow: 0 0 8px var(--neon-pink); margin-bottom: 15px;">⚔️ Королевская Битва</h2>
             <div id="battles-container"><div class="empty-state">В данный момент нет активных битв</div></div>
+
+            <h3 class="section-title" style="color: var(--neon-pink); border-color: rgba(255,0,127,0.3); margin-top: 30px;">🏆 Рейтинг победителей</h3>
+            <div id="leaderboard-container" style="margin-top: 10px;">
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Место</th>
+                            <th>Ник</th>
+                            <th>Побед</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-tbody">
+                        <tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">Загрузка рейтинга...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
-        <!-- Вкладка: Розыгрыши -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
             <div id="giveaways-container"><div class="empty-state">Нет активных розыгрышей</div></div>
         </section>
 
-        <!-- Вкладка: Профиль -->
         <section id="tab-profile" class="tab">
             <h2 class="neon-text">Твой профиль</h2>
             <div class="card" style="border:1px solid var(--neon-green); padding:15px; margin-bottom:15px;">
@@ -182,7 +348,6 @@
         </section>
     </main>
 
-    <!-- Нижняя навигация -->
     <nav class="bottom-nav">
         <button class="nav-item active-nav" onclick="switchTab('market', this)"><svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg></button>
         <button class="nav-item" onclick="switchTab('inventory', this)"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg></button>
@@ -191,7 +356,7 @@
         <button class="nav-item" onclick="switchTab('profile', this)"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg></button>
     </nav>
 
-    <!-- Модальные окна -->
+    <!-- Модалки -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Выставить скин</h3>
@@ -252,7 +417,6 @@
         </div>
     </div>
 
-    <!-- Основной клиентский скрипт -->
     <script>
         let userBalance = 0;
         let selectedTopupType = 'crypto';
@@ -269,6 +433,7 @@
         const myPhotoUrl = tgUser?.photo_url || null;
 
         window.addEventListener('DOMContentLoaded', async () => {
+            const safetyTimeout = setTimeout(() => { hideCs16Loading(); }, 3000);
             try {
                 document.getElementById('my-nick').innerText = myUsername;
                 if (myPhotoUrl) {
@@ -281,7 +446,7 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
 
-                await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways(), fetchBattles()]);
+                await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways(), fetchBattles(), fetchLeaderboard()]);
 
                 if (steamId) {
                     localStorage.setItem('user_steam_id', steamId);
@@ -289,8 +454,20 @@
                     if (authSection) authSection.style.display = 'none';
                     loadSteamData(steamId).catch(e => {});
                 }
-            } catch (err) {}
+            } catch (err) {} finally {
+                clearTimeout(safetyTimeout);
+                hideCs16Loading();
+            }
         });
+
+        function hideCs16Loading() {
+            const modal = document.getElementById('cs16-loading-modal');
+            if (modal) {
+                document.getElementById('cs16-bar-1').style.width = '100%';
+                document.getElementById('cs16-bar-2').style.width = '100%';
+                setTimeout(() => { modal.classList.remove('active'); }, 100);
+            }
+        }
 
         async function syncUserProfile() {
             try {
@@ -330,7 +507,7 @@
                     if (authSection) authSection.style.display = 'none';
                     loadSteamData(data.steamId);
                 } else { alert('Не удалось распознать SteamID.'); }
-            }).catch(() => alert('Ошибка соединения'));
+            }).catch(() => alert('Ошибка'));
         }
         function refreshInventory() {
             const steamId = localStorage.getItem('user_steam_id');
@@ -512,7 +689,7 @@
             } catch (e) {}
         }
 
-        // === КОРОЛЕВСКАЯ БИТВА С ТАЙМЕРОМ И РУЛЕТКОЙ ===
+        // === КОРОЛЕВСКАЯ БИТВА ===
         async function fetchBattles() {
             try {
                 const res = await fetch('/api/battles/list');
@@ -533,53 +710,49 @@
                     if (isFull && b.finished && b.winner) {
                         if (activeBattleFinishedHandled !== b._id) {
                             activeBattleFinishedHandled = b._id;
-                            setTimeout(() => { startCountdownAndRoulette(b.title, b.participantsList, b.winner); }, 300);
+                            setTimeout(() => { startCountdownAndRoulette(b.title, b.participants, b.winner); }, 300);
                         }
                     }
 
                     let participantsHtml = '';
                     for (let i = 0; i < b.slots; i++) {
                         let p = b.participants && b.participants[i] ? b.participants[i] : null;
-                        let color = playerColors[i % playerColors.length];
                         if (p) {
                             let username = p.username || `User_${p.tgId || i}`;
                             let photo = p.photo || null;
                             participantsHtml += `
-                                <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border-left: 4px solid ${color}; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; gap: 10px;">
-                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; color: #000; overflow: hidden; flex-shrink: 0;">
-                                        ${photo ? `<img src="${photo}" style="width:100%; height:100%; object-fit:cover;">` : username.charAt(0).toUpperCase()}
+                                <div class="battle-slot-item">
+                                    <div class="battle-slot-avatar">
+                                        ${photo ? `<img src="${photo}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">` : username.charAt(0).toUpperCase()}
                                     </div>
-                                    <div style="font-size: 12px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@${username}</div>
+                                    <div class="battle-slot-name filled">@${username}</div>
                                 </div>
                             `;
                         } else {
                             participantsHtml += `
-                                <div style="display: flex; align-items: center; background: rgba(255,255,255,0.02); border-left: 4px solid #333; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; gap: 10px; opacity: 0.4;">
-                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; font-size: 11px;">?</div>
-                                    <div style="font-size: 12px; color: var(--text-muted);">Свободный слот...</div>
+                                <div class="battle-slot-item" style="opacity: 0.5;">
+                                    <div class="battle-slot-avatar">?</div>
+                                    <div class="battle-slot-name">Свободный слот...</div>
                                 </div>
                             `;
                         }
                     }
 
                     container.innerHTML = `
-                        <div style="background: var(--card-bg); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 15px; margin-bottom: 15px;">
-                            <div style="position: relative; width: 100%; height: 160px; background: rgba(0,0,0,0.4); border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid rgba(255,0,127,0.3); margin-bottom: 12px;">
-                                <div style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); border: 1px solid #ff007f; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; color: #ff007f; z-index: 5;">
-                                    ${filledSlots} / ${b.slots}
-                                </div>
-                                <div id="battle-skin-view" style="text-align: center; width: 100%;">
-                                    <img src="${b.image}" style="max-width: 120px; max-height: 100px; object-fit: contain; margin-bottom: 6px;">
-                                    <div style="font-size: 13px; font-weight: bold; color: #fff;">${b.title}</div>
-                                </div>
+                        <div class="battle-card">
+                            <div class="battle-slots-badge">${filledSlots} / ${b.slots}</div>
+                            
+                            <div class="battle-skin-box" id="battle-skin-view">
+                                <img src="${b.image}" class="battle-skin-img">
+                                <div class="battle-skin-name">${b.title}</div>
                             </div>
 
-                            <button class="btn-green-glow" style="margin-bottom: 15px; background: ${isJoined ? '#222' : 'linear-gradient(90deg, #ff007f, #bf00ff)'}; color: #fff; padding: 12px; font-size: 13px;" onclick="joinBattle('${b._id}')" ${isJoined || isFull ? 'disabled' : ''}>
+                            <button class="battle-btn" onclick="joinBattle('${b._id}')" ${isJoined || isFull ? 'disabled' : ''}>
                                 ${isFull ? '🔴 СТАВКИ ЗАКРЫТЫ' : (isJoined ? '✅ ВЫ УЧАСТВУЕТЕ' : `УЧАСТВОВАТЬ (${b.price} ₽)`)}
                             </button>
 
-                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Участники</div>
-                            <div style="max-height: 200px; overflow-y: auto;">${participantsHtml}</div>
+                            <div class="battle-participants-title">Участники</div>
+                            <div>${participantsHtml}</div>
                         </div>
                     `;
                 }
@@ -600,7 +773,7 @@
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                     if (data.finished && data.winner) {
                         activeBattleFinishedHandled = battleId;
-                        startCountdownAndRoulette(data.battleTitle, data.participantsList, data.winner);
+                        startCountdownAndRoulette(data.battleTitle, data.participants, data.winner);
                     } else {
                         alert('✅ Место успешно куплено! Ожидаем остальных.');
                         fetchBattles(); 
@@ -628,15 +801,16 @@
                 if (cdEl) cdEl.innerText = timeLeft;
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    runInlineRoulette(skinView, participants, winner);
+                    runInlineRoulette(skinView, participants, winner, title);
                 }
             }, 1000);
         }
 
-        function runInlineRoulette(container, participants, winner) {
+        function runInlineRoulette(container, participants, winner, title) {
             let stripItems = [];
+            const safeParticipants = (participants && participants.length > 0) ? participants : [{username: winner.username, photo: winner.photo}];
             for (let i = 0; i < 40; i++) {
-                let p = participants[Math.floor(Math.random() * participants.length)];
+                let p = safeParticipants[Math.floor(Math.random() * safeParticipants.length)];
                 stripItems.push(p);
             }
             const winnerIndex = 32;
@@ -666,7 +840,7 @@
 
                 setTimeout(() => {
                     container.innerHTML = `
-                        <div style="animation: fadeIn 0.5s;">
+                        <div>
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--neon-green); margin: 0 auto 6px auto; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid #fff; box-shadow: 0 0 15px var(--neon-green);">
                                 ${winner.photo ? `<img src="${winner.photo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'">` : '👑'}
                             </div>
@@ -674,8 +848,56 @@
                             <div style="font-size: 14px; font-weight: bold; color: #fff;">@${winner.username}</div>
                         </div>
                     `;
+                    showFullscreenWinner(winner, title);
                 }, 4100);
             }, 50);
+        }
+
+        function showFullscreenWinner(winner, title) {
+            const fsModal = document.getElementById('fullscreen-winner-modal');
+            const avatarBox = document.getElementById('fs-winner-avatar');
+            const nameEl = document.getElementById('fs-winner-name');
+            const prizeEl = document.getElementById('fs-winner-prize');
+            const timerEl = document.getElementById('fs-winner-timer');
+
+            avatarBox.innerHTML = winner.photo ? `<img src="${winner.photo}" style="width:100%; height:100%; object-fit:cover;">` : '👑';
+            nameEl.innerText = `@${winner.username}`;
+            prizeEl.innerText = `Приз: ${title}`;
+
+            fsModal.classList.add('active');
+
+            let fsTimeLeft = 60;
+            const fsInterval = setInterval(() => {
+                fsTimeLeft--;
+                timerEl.innerText = `Возврат к списку через: ${fsTimeLeft} сек`;
+                if (fsTimeLeft <= 0) {
+                    clearInterval(fsInterval);
+                    fsModal.classList.remove('active');
+                    fetchBattles();
+                    fetchLeaderboard();
+                }
+            }, 1000);
+        }
+
+        async function fetchLeaderboard() {
+            try {
+                const res = await fetch('/api/battles/leaderboard');
+                const data = await res.json();
+                if (data.success && data.leaderboard) {
+                    const tbody = document.getElementById('leaderboard-tbody');
+                    if (data.leaderboard.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">Пока нет победителей</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.leaderboard.map((item, index) => `
+                        <tr>
+                            <td style="font-weight: bold; color: ${index === 0 ? 'var(--neon-green)' : (index === 1 ? 'var(--neon-cyan)' : (index === 2 ? 'var(--neon-purple)' : '#fff'))}">#${index + 1}</td>
+                            <td style="font-weight: bold;">@${item.username}</td>
+                            <td style="color: var(--neon-pink); font-weight: bold;">${item.wins}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch(e) {}
         }
 
         setInterval(() => {
@@ -737,7 +959,7 @@
             document.getElementById('tab-' + id).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             btn.classList.add('active-nav');
-            if (id === 'deals') fetchBattles(); 
+            if (id === 'deals') { fetchBattles(); fetchLeaderboard(); }
         }
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
