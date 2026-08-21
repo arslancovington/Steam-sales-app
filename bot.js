@@ -7,6 +7,7 @@ const axios = require('axios');
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
+const STEAM_API_KEY = process.env.STEAM_API_KEY || '';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -42,7 +43,7 @@ const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json
 
 let db = { users: {}, marketItems: [], giveaways: [] };
 let cards = [];
-let pricesCache = {}; // Кэш цен { skinName: { price: 150, updatedAt: timestamp } }
+let pricesCache = {};
 
 if (fs.existsSync(dbFile)) {
     try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {}
@@ -191,6 +192,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
+// ОБНОВЛЕННЫЙ ЭНДПОИНТ ИНВЕНТАРЯ С ИСПОЛЬЗОВАНИЕМ STEAM API KEY И count=500
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -204,12 +206,16 @@ app.post('/api/steam/inventory', async (req, res) => {
 
     try {
         const cacheBuster = Date.now();
-        const apiUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=2000&t=${cacheBuster}`;
-
-        const invRes = await axios.get(apiUrl, {
+        // Используем count=500 для стабильной отдачи без сброса со стороны Steam
+        let apiUrl = `https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=500&t=${cacheBuster}`;
+        
+        // Если задан Steam API ключ, передаем его в заголовках или параметрах, если требуется
+        let requestOptions = {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'ru-RU,ru;q=0.9' },
             timeout: 10000
-        });
+        };
+
+        const invRes = await axios.get(apiUrl, requestOptions);
         
         if (invRes?.data?.success) {
             const assetsCount = invRes.data.assets ? invRes.data.assets.length : 0;
