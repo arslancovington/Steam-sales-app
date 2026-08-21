@@ -69,7 +69,6 @@
         .active-nav { opacity: 1; transform: scale(1.08); }
         .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
         
-        /* Стили для прогресс-бара битвы */
         .battle-progress-bg { width: 100%; background: #111; height: 8px; border-radius: 4px; margin-top: 6px; overflow: hidden; border: 1px solid #333; }
         .battle-progress-fill { background: linear-gradient(90deg, #ff007f, #bf00ff); height: 100%; transition: width 0.4s ease; }
 
@@ -141,6 +140,14 @@
             width: 0%;
             transition: width 0.2s ease;
         }
+
+        /* Стилки для анимации рулетки Королевской Битвы */
+        .roulette-window { position: relative; width: 100%; height: 110px; background: #050807; border: 2px solid #ff007f; border-radius: 10px; overflow: hidden; margin: 15px 0; }
+        .roulette-pointer { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; background: #ff007f; z-index: 10; box-shadow: 0 0 10px #ff007f; }
+        .roulette-strip { display: flex; position: absolute; left: 0; top: 0; height: 100%; will-change: transform; transition: transform 4s cubic-bezier(0.08, 0.82, 0.17, 1); }
+        .roulette-item { min-width: 90px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); padding: 5px; }
+        .roulette-item img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 1px solid #ff007f; margin-bottom: 5px; }
+        .roulette-item span { font-size: 10px; color: #fff; width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
     </style>
 </head>
 <body>
@@ -206,7 +213,7 @@
             </div>
         </section>
 
-        <!-- === ВКЛАДКА: КОРОЛЕВСКАЯ БИТВА === -->
+        <!-- ВКЛАДКА: КОРОЛЕВСКАЯ БИТВА -->
         <section id="tab-deals" class="tab">
             <h2 class="neon-text" style="color: #ff007f; text-shadow: 0 0 8px #ff007f;">⚔️ Королевская Битва</h2>
             <p class="hint-text" style="margin-bottom: 15px;">Скидываемся на крутой скин! Как только набирается нужное число участников, рулетка рандомно выбирает победителя.</p>
@@ -214,7 +221,6 @@
                 <div class="empty-state">В данный момент нет активных битв</div>
             </div>
         </section>
-        <!-- ================================== -->
 
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
@@ -256,7 +262,6 @@
         <button class="nav-item" onclick="switchTab('inventory', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
         </button>
-        <!-- Иконка Мечей для Битвы -->
         <button class="nav-item" onclick="switchTab('deals', this)">
             <svg viewBox="0 0 24 24"><path d="M19.98 2.52c-.19-.04-.39 0-.54.12l-3.32 2.66-2.09-1.05c-.24-.12-.52-.1-.74.05L9.62 6.9 6.8 4.08C6.6 3.88 6.3 3.82 6.04 3.93 5.79 4.04 5.62 4.3 5.62 4.58v4.24l-3.5 3.5c-.39.39-.39 1.02 0 1.41l4.95 4.95c.39.39 1.02.39 1.41 0l3.5-3.5h4.24c.28 0 .54-.17.65-.42.11-.25.05-.55-.15-.75l-2.82-2.82 2.6-3.68c.15-.22.17-.5.05-.74l-1.05-2.09 2.66-3.32c.12-.15.16-.35.12-.54-.04-.19-.18-.33-.37-.37zM12 17.5l-4-4 2.5-2.5 4 4-2.5 2.5z"/></svg>
         </button>
@@ -267,6 +272,22 @@
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg>
         </button>
     </nav>
+
+    <!-- МОДАЛЬНОЕ ОКНО РУЛЕТКИ БИТВЫ -->
+    <div class="modal-overlay" id="modal-roulette">
+        <div class="modal-content" style="max-width: 340px;">
+            <h3 class="neon-text" style="color: #ff007f;">⚔️ Розыгрыш приза!</h3>
+            <p id="roulette-skin-title" style="font-size: 12px; margin-bottom: 5px; font-weight: bold;"></p>
+            
+            <div class="roulette-window">
+                <div class="roulette-pointer"></div>
+                <div class="roulette-strip" id="roulette-strip"></div>
+            </div>
+
+            <div id="roulette-result-text" style="font-size: 13px; font-weight: bold; color: var(--neon-green); min-height: 20px; margin-top: 10px;">Крутим рулетку...</div>
+            <button class="btn-green-glow" id="roulette-close-btn" style="margin-top: 15px; display: none;" onclick="closeModal('modal-roulette'); fetchBattles();">Отлично</button>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
@@ -385,7 +406,7 @@
                     syncUserProfile(),
                     fetchMarketItems(),
                     fetchGiveaways(),
-                    fetchBattles() // Загрузка Королевских битв
+                    fetchBattles()
                 ]);
 
                 if (steamId) {
@@ -609,7 +630,7 @@
             }
         }
 
-        // === ЛОГИКА КОРОЛЕВСКОЙ БИТВЫ ===
+        // === ЛОГИКА КОРОЛЕВСКОЙ БИТВЫ И АНИМАЦИЯ РУЛЕТКИ ===
         async function fetchBattles() {
             try {
                 const res = await fetch('/api/battles/list');
@@ -670,12 +691,13 @@
                     document.getElementById('user-balance').innerText = userBalance + ' ₽';
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                     
-                    if (data.finished) {
-                        alert('Битва завершена! Рулетка крутится... Победитель получит уведомление в личку от бота!');
+                    if (data.finished && data.winner) {
+                        // Запускаем красивую анимацию рулетки на клиенте
+                        startRouletteAnimation(data.battleTitle, data.participantsList, data.winner);
                     } else {
-                        alert('✅ Место успешно куплено! Ожидаем остальных.');
+                        alert('✅ Место успешно куплено! Ожидаем остальных игроков.');
+                        fetchBattles(); 
                     }
-                    fetchBattles(); 
                 } else {
                     alert('❌ Ошибка: ' + (data.error || 'Не удалось присоединиться'));
                 }
@@ -683,7 +705,48 @@
                 alert('Ошибка соединения с сервером');
             }
         }
-        // ===================================
+
+        function startRouletteAnimation(title, participants, winner) {
+            document.getElementById('roulette-skin-title').innerText = title;
+            document.getElementById('roulette-result-text').innerText = 'Крутим рулетку...';
+            document.getElementById('roulette-close-btn').style.display = 'none';
+            document.getElementById('modal-roulette').classList.add('active');
+
+            const strip = document.getElementById('roulette-strip');
+            let stripItems = [];
+            for (let i = 0; i < 45; i++) {
+                let randomParticipant = participants[Math.floor(Math.random() * participants.length)];
+                stripItems.push(randomParticipant);
+            }
+
+            const winnerIndex = 38;
+            stripItems[winnerIndex] = winner;
+
+            strip.innerHTML = stripItems.map(p => `
+                <div class="roulette-item">
+                    <img src="${p.photo || 'https://via.placeholder.com/45'}" onerror="this.src='https://via.placeholder.com/45'">
+                    <span>${p.username}</span>
+                </div>
+            `).join('');
+
+            strip.style.transition = 'none';
+            strip.style.transform = 'translateX(0px)';
+
+            setTimeout(() => {
+                const itemWidth = 90;
+                const containerCenter = 170;
+                const targetOffset = (winnerIndex * itemWidth) - containerCenter + (itemWidth / 2);
+
+                strip.style.transition = 'transform 4s cubic-bezier(0.08, 0.82, 0.17, 1)';
+                strip.style.transform = `translateX(-${targetOffset}px)`;
+
+                setTimeout(() => {
+                    document.getElementById('roulette-result-text').innerHTML = `👑 Победитель: <span style="color:#ff007f;">@${winner.username}</span>! Приз твой!`;
+                    document.getElementById('roulette-close-btn').style.display = 'block';
+                }, 4100);
+            }, 50);
+        }
+        // ==========================================================
 
         async function selectSellPlatform(platform) {
             selectedSellPlatform = platform;
