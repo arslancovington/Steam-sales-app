@@ -75,7 +75,8 @@ let battles = db.battles.length > 0 ? db.battles : [
         slots: 2, 
         participants: [], 
         finished: false, 
-        winner: null 
+        winner: null,
+        notified: false
     }
 ];
 let battleWinnersHistory = db.battleWinnersHistory || [];
@@ -186,7 +187,6 @@ app.post('/api/market/cancel', (req, res) => {
     res.json({ success: true });
 });
 
-// ИСПРАВЛЕНО: Полноценная логика покупки скина (списание у покупателя, начисление продавцу, удаление с маркета)
 app.post('/api/deals/buy', async (req, res) => {
     const { itemId, buyerTgId, buyerTradeUrl, buyerName } = req.body;
     const itemIndex = marketItems.findIndex(i => i._id === itemId);
@@ -199,20 +199,16 @@ app.post('/api/deals/buy', async (req, res) => {
         return res.json({ success: false, error: 'Недостаточно средств на балансе' });
     }
 
-    // Списываем баланс у покупателя и увеличиваем счетчик сделок
     buyer.balance -= item.price;
     buyer.completedDeals = (buyer.completedDeals || 0) + 1;
 
-    // Начисляем баланс продавцу
     const seller = getOrCreateUser(item.tgId);
     seller.balance += item.price;
     seller.completedDeals = (seller.completedDeals || 0) + 1;
 
-    // Удаляем проданный лот с маркета
     marketItems.splice(itemIndex, 1);
     saveData();
 
-    // Отправляем уведомление продавцу в личку Telegram
     try {
         await bot.sendMessage(item.tgId, `🎉 Ваш скин <b>${item.name}</b> успешно куплен за ${item.price} ₽! Средства зачислены на баланс.`, { parse_mode: 'HTML' });
     } catch (e) {}
@@ -220,7 +216,7 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-// ================= GIVEAWAYS API + NOTIFICATIONS =================
+// ================= GIVEAWAYS API =================
 app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways });
 });
@@ -248,16 +244,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-function createNewGiveaway(title, image, timer, sponsor, sponsorUsername) {
-    const newG = { _id: Date.now().toString(), title, image, timer, sponsor, sponsorUsername, participants: [], participantsCount: 0 };
-    giveaways.push(newG);
-    saveData();
-    if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-        bot.sendMessage(ADMIN_CHAT_ID, `🎁 <b>Новый розыгрыш скина!</b>\n\nПриз: <b>${title}</b>\nУспейте принять участие в мини-приложении!`, { parse_mode: 'HTML' }).catch(e => {});
-    }
-}
-
-// ================= KOROLEVSKAYA BITTVA (BATTLES) API + NOTIFICATIONS =================
+// ================= KOROLEVSKAYA BITTVA (BATTLES) API =================
 app.get('/api/battles/list', (req, res) => {
     res.json({ success: true, battles });
 });
@@ -292,26 +279,13 @@ app.post('/api/battles/join', async (req, res) => {
         battle.finished = true;
         const winnerObj = battle.participants[Math.floor(Math.random() * battle.participants.length)];
         battle.winner = winnerObj;
-
-        battleWinnersHistory.push({ tgId: winnerObj.tgId, username: winnerObj.username });
-        saveData();
-
-        try {
-            await bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы победили в Королевской Битве и забрали скин <b>${battle.title}</b>!`, { parse_mode: 'HTML' });
-        } catch (e) {}
-
-        if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            try {
-                await bot.sendMessage(ADMIN_CHAT_ID, `⚔️ <b>Королевская Битва завершена!</b>\n\nСкин: ${battle.title}\n👑 Победитель: @${winnerObj.username}`, { parse_mode: 'HTML' });
-            } catch (e) {}
-        }
-
-        setTimeout(() => createNewBattleRound(), 60000);
+        saveData(); // Сохраняем завершенную битву с победителем, но ПОКА НЕ отправляем уведомление
 
         return res.json({
             success: true,
             newBalance: user.balance,
             finished: true,
+            battleId: battle._id,
             battleTitle: battle.title,
             participants: battle.participants,
             winner: winnerObj
@@ -320,6 +294,37 @@ app.post('/api/battles/join', async (req, res) => {
 
     saveData();
     res.json({ success: true, newBalance: user.balance, finished: false });
+});
+
+// Эндпоинт вызывается клиентом после того, как прошли все анимации и аватар побудиль на экране 5 секунд
+app.post('/api/battles/complete', async (req, res) => {
+    const { battleId } = req.body;
+    const battle = battles.find(b => b._id === battleId);
+    if (!battle || !battle.finished || !battle.winner) {
+        return res.json({ success: false, error: 'Битва не найдена' });
+    }
+
+    if (battle.notified) {
+        return res.json({ success: true }); // Уведомление уже было отправлено
+    }
+
+    battle.notified = true;
+    const winnerObj = battle.winner;
+
+    battleWinnersHistory.push({ tgId: winnerObj.tgId, username: winnerObj.username });
+    saveData();
+
+    try {
+        await bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы победили в Королевской Битве и забрали скин <b>${battle.title}</b>!`, { parse_mode: 'HTML' });
+    } catch (e) {}
+
+    if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+        try {
+            await bot.sendMessage(ADMIN_CHAT_ID, `⚔️ <b>Королевская Битва завершена!</b>\n\nСкин: ${battle.title}\n👑 Победитель: @${winnerObj.username}`, { parse_mode: 'HTML' });
+        } catch (e) {}
+    }
+
+    res.json({ success: true });
 });
 
 app.get('/api/battles/leaderboard', (req, res) => {
@@ -335,30 +340,6 @@ app.get('/api/battles/leaderboard', (req, res) => {
 
     res.json({ success: true, leaderboard });
 });
-
-function createNewBattleRound() {
-    const skinsPool = [
-        { title: 'AK-47 | Красная линия (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f', price: 350 },
-        { title: 'AWP | Неоновая мошка (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FBRw7P7NYghF_u-1n5O0m_7zO6_umntd8-l-j--Y8d6m2wft8kVlY2ilcNTBcw83NQ2FqFC-w-u6gpO8uM7BzHZquCch4nfehAHzhg/360fx360f', price: 500 }
-    ];
-    const randomSkin = skinsPool[Math.floor(Math.random() * skinsPool.length)];
-
-    battles = [{
-        _id: 'b_' + Date.now(),
-        title: randomSkin.title,
-        image: randomSkin.image,
-        price: randomSkin.price,
-        slots: 2,
-        participants: [],
-        finished: false,
-        winner: null
-    }];
-    saveData();
-
-    if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-        bot.sendMessage(ADMIN_CHAT_ID, `⚔️ <b>Начался новый раунд Королевской Битвы!</b>\n\nСкин: <b>${randomSkin.title}</b>\nЦена входа: ${randomSkin.price} ₽. Залетайте в мини-приложение!`, { parse_mode: 'HTML' }).catch(e => {});
-    }
-}
 
 // ================= STEAM API =================
 app.post('/api/steam/inventory', async (req, res) => {
