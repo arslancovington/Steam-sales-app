@@ -64,7 +64,7 @@
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
         .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
 
-        /* Стили Королевской Битвы */
+        /* Дизайн Королевской Битвы */
         .battle-card {
             background: #141e19;
             border: 1px solid rgba(255, 0, 127, 0.3);
@@ -246,7 +246,7 @@
         </div>
     </div>
 
-    <!-- Полноэкранный режим победителя (длится 1 минуту) -->
+    <!-- Полноэкранный режим победителя (держится 60 секунд) -->
     <div class="fullscreen-winner-overlay" id="fullscreen-winner-modal">
         <div style="font-size: 28px; font-weight: bold; color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); margin-bottom: 20px;">🏆 ПОБЕДИТЕЛЬ БИТВЫ! 🏆</div>
         <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--neon-green); margin: 0 auto 15px auto; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid #fff; box-shadow: 0 0 25px var(--neon-green);" id="fs-winner-avatar">
@@ -424,8 +424,8 @@
         let selectedSellPlatform = 'Our P2P';
         let currentSelectedItem = null;
         let activeBattleFinishedHandled = null;
+        let isBattleAnimating = false; // Защита анимации таймера и рулетки
         let myInventory = [], marketItems = [], myListings = [];
-        const playerColors = ['#bf7fff', '#00bcd4', '#ff9800', '#e91e63', '#4caf50', '#03a9f4'];
 
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const myTgId = tgUser?.id || 123456789;
@@ -543,7 +543,7 @@
                 <div class="card" style="${!item.isTradable ? 'border-color: rgba(255,77,77,0.4);' : ''}">
                     <div class="skin-image" style="position: relative;">
                         ${!item.isTradable ? '<div style="position:absolute; top:4px; right:4px; background:rgba(255,77,77,0.9); color:white; font-size:9px; padding:2px 4px; border-radius:3px;">В холде</div>' : ''}
-                        <img src="${item.icon_url}" class="skin-img" style="${!item.isTradable ? 'filter: grayscale(80%); opacity: 0.6;' : ''}">
+                        <img src="${item.icon_url}" class="skin-img" style="${!item.isTradable ? 'filter: grayscale(80%); opacity: 0.6;' : ''}" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'">
                     </div>
                     <h4 style="font-size: 11px;">${item.name}</h4>
                     ${item.isTradable ? `<button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Продать</button>` : `<button class="btn-danger" disabled>Заблокировано</button>`}
@@ -575,21 +575,21 @@
             if (vipItems.length > 0) {
                 vipWrapper.style.display = 'block';
                 vipContainer.innerHTML = vipItems.map(i => `
-                    <div class="card vip-card"><div class="vip-badge">👑 VIP</div><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4>
+                    <div class="card vip-card"><div class="vip-badge">👑 VIP</div><div class="skin-image"><img src="${i.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'"></div><h4>${i.name}</h4>
                     <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
                     ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}</div>
                 `).join('');
             } else { vipWrapper.style.display = 'none'; vipContainer.innerHTML = ''; }
 
             regularContainer.innerHTML = regularItems.length === 0 ? '<div class="empty-state">Нет лотов</div>' : regularItems.map(i => `
-                <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img"></div><h4>${i.name}</h4>
+                <div class="card"><div class="skin-image"><img src="${i.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'"></div><h4>${i.name}</h4>
                 <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">${i.price} ₽</div>
                 ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem(${JSON.stringify(i)})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}</div>
             `).join('');
         }
         function renderMyListings() {
             document.getElementById('my-listings').innerHTML = myListings.length === 0 ? '<div class="empty-state">Нет лотов</div>' : myListings.map(i => `
-                <div class="card ${i.isVip ? 'vip-card' : ''}">${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}<div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                <div class="card ${i.isVip ? 'vip-card' : ''}">${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}<div class="skin-image"><img src="${i.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'"></div>
                 <h4>${i.name}</h4><div style="font-weight:bold; margin: 4px 0;">${i.price} ₽</div><button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button></div>
             `).join('');
         }
@@ -606,7 +606,14 @@
             if (!confirm(`Купить "${item.name}" за ${item.price} ₽?`)) return;
             try {
                 const res = await fetch('/api/deals/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: item._id, buyerTgId: myTgId, buyerTradeUrl: tradeUrl, buyerName: myUsername }) });
-                if ((await res.json()).success) { alert('Успешно!'); syncUserProfile(); fetchMarketItems(); }
+                const data = await res.json();
+                if (data.success) { 
+                    alert('Успешно!'); 
+                    userBalance = data.newBalance;
+                    document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    fetchMarketItems(); 
+                } else { alert(data.error || 'Ошибка'); }
             } catch (e) {}
         }
         async function selectSellPlatform(platform) {
@@ -638,7 +645,7 @@
             if (myListings.some(l => l.assetid === item.assetid)) return alert('Уже на продаже!');
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
-            document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
+            document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'">`;
             document.getElementById('sale-price-input').value = 150; 
             selectSellPlatform('Our P2P');
             document.getElementById('modal-sell').classList.add('active');
@@ -672,7 +679,7 @@
                         <div class="giveaway-card">
                             <div class="giveaway-header"><span class="giveaway-sponsor">🎁 Розыгрыш</span><span class="giveaway-timer">⏳ ${g.timer || 'Скоро'}</span></div>
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <div class="skin-image" style="width: 70px; height: 70px;"><img src="${g.image}" class="skin-img"></div>
+                                <div class="skin-image" style="width: 70px; height: 70px;"><img src="${g.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'"></div>
                                 <div><p class="giveaway-title">${g.title}</p><div style="font-size: 11px; color: var(--text-muted);">Участников: ${g.participantsCount || 0}</div></div>
                             </div>
                             <button class="btn-green-glow" style="margin-top: 6px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
@@ -691,6 +698,7 @@
 
         // === КОРОЛЕВСКАЯ БИТВА ===
         async function fetchBattles() {
+            if (isBattleAnimating) return; 
             try {
                 const res = await fetch('/api/battles/list');
                 const data = await res.json();
@@ -743,7 +751,7 @@
                             <div class="battle-slots-badge">${filledSlots} / ${b.slots}</div>
                             
                             <div class="battle-skin-box" id="battle-skin-view">
-                                <img src="${b.image}" class="battle-skin-img">
+                                <img src="${b.image}" class="battle-skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV0925m5S0k8jnN77ummJW4NE_3u2W9Iqt3QO38kBua2unIJfDcwU9aVyErVjqx7jrh8K_uZjMy3U36yk8pCuK23s2j7w/360fx360f'">
                                 <div class="battle-skin-name">${b.title}</div>
                             </div>
 
@@ -764,7 +772,8 @@
             try {
                 const res = await fetch('/api/battles/join', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ tgId: myTgId, battleId, username: myUsername })
+                    // Передаем аватар текущего пользователя на сервер
+                    body: JSON.stringify({ tgId: myTgId, battleId, username: myUsername, photo: myPhotoUrl })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -786,6 +795,7 @@
             const skinView = document.getElementById('battle-skin-view');
             if (!skinView) return;
 
+            isBattleAnimating = true; 
             let timeLeft = 25;
             skinView.innerHTML = `
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
@@ -873,6 +883,7 @@
                 if (fsTimeLeft <= 0) {
                     clearInterval(fsInterval);
                     fsModal.classList.remove('active');
+                    isBattleAnimating = false; // Снимаем блокировку, возвращаем опрос
                     fetchBattles();
                     fetchLeaderboard();
                 }
@@ -948,7 +959,7 @@
             if (userBalance < amount) return alert('Недостаточно средств.');
             if (!acc) return alert('Введите реквизиты.');
             try {
-                const res = await fetch('/api/billing/withdraw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: acc, method: selectedWithdrawType }) });
+                const res = await fetch('/api/billing/withdraw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount, recipientAccount: acc, method: selectedWithdrawType, username: myUsername }) });
                 if ((await res.json()).success) { alert('Заявка отправлена!'); closeModal('modal-withdraw'); syncUserProfile(); }
             } catch (err) {}
         }
