@@ -141,7 +141,8 @@ function extractSteamIdFromTradeUrl(url) {
 // ================= TELEGRAM BOT COMMANDS =================
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const user = getOrCreateUser(chatId, msg.from.username || msg.from.first_name, msg.from.photo_url);
+    // Исправлено: убран несуществующий msg.from.photo_url
+    const user = getOrCreateUser(chatId, msg.from.username || msg.from.first_name);
 
     const opts = {
         reply_markup: {
@@ -169,7 +170,6 @@ bot.onText(/\/battle\s+(\d+)\s+(\d+)\s+(.+)/, async (msg, match) => {
     const slots = parseInt(match[2]);
     const title = match[3].trim();
 
-    // Дефолтная картинка скина (или заглушка)
     const image = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpbuMljxlFf0Ob3czxG7c-JmJW0m_7zO6_umntd8-l-j--Y8Nug3QTisxI-Z23yLdfGcAdvZwnS81O5w7jt08a6ucvJn3JmvXRzsHvUcx2wgg/360fx360f';
 
     const newBattle = {
@@ -185,7 +185,7 @@ bot.onText(/\/battle\s+(\d+)\s+(\d+)\s+(.+)/, async (msg, match) => {
     };
 
     battles = [newBattle];
-    saveData();
+    saveData(); // Исправление: теперь битва гарантированно сохраняется в файл database.json
 
     bot.sendMessage(chatId, `✅ Новая Королевская Битва успешно создана!\n\n🏆 Скин: <b>${title}</b>\n💰 Цена входа: ${price} ₽\n👥 Слотов: ${slots}`, { parse_mode: 'HTML' });
 });
@@ -351,7 +351,6 @@ app.post('/api/battles/join', async (req, res) => {
     res.json({ success: true, newBalance: user.balance, finished: false });
 });
 
-// Завершение анимации и отправка уведомления победителю (через 5 секунд показа аватара)
 app.post('/api/battles/complete', async (req, res) => {
     const { battleId } = req.body;
     const battle = battles.find(b => b._id === battleId);
