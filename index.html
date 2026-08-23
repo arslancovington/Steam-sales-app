@@ -72,11 +72,11 @@
         .bet-feed-av { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #333; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; overflow: hidden; flex-shrink: 0; }
         .bet-feed-sum { font-weight: bold; color: var(--neon-green); font-size: 12px; }
 
-        /* Рулетка (время анимации увеличено до 13s) */
+        /* Рулетка */
         .roulette-window { position: relative; width: 100%; height: 180px; background: #000; overflow: hidden; border-radius: 10px; border: 1px solid var(--neon-pink); display: flex; align-items: center; }
         .roulette-pointer { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; background: var(--neon-green); z-index: 20; box-shadow: 0 0 8px var(--neon-green); }
         .roulette-strip { display: flex; position: absolute; left: 0; height: 100%; will-change: transform; transition: transform 13s cubic-bezier(0.08, 0.82, 0.17, 1); align-items: center; }
-        .roulette-item { min-width: 90px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.08); padding: 10px; }
+        .roulette-item { flex: 0 0 90px; width: 90px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.08); padding: 10px; }
         .roulette-item img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--neon-pink); margin-bottom: 6px; }
         .roulette-item span { font-size: 11px; color: #fff; width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 
@@ -285,6 +285,8 @@
         let userBalance = 0;
         let marketItems = [];
         let isSpinningHandled = false;
+        let battleEndTime = null;
+        let currentBattleStatus = 'waiting';
 
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const myTgId = tgUser?.id || 123456789;
@@ -304,6 +306,18 @@
                 hideCs16Loading();
             }
         });
+
+        // Независимый плавный тикер клиента для идеального отсчета таймера без скачков
+        setInterval(() => {
+            if (currentBattleStatus === 'active' && battleEndTime) {
+                const remaining = Math.ceil((battleEndTime - Date.now()) / 1000);
+                const timerVal = remaining > 0 ? remaining : 0;
+                let m = Math.floor(timerVal / 60).toString().padStart(2, '0');
+                let s = (timerVal % 60).toString().padStart(2, '0');
+                const timerEl = document.getElementById('jackpot-timer-text');
+                if (timerEl) timerEl.innerText = `${m}:${s}`;
+            }
+        }, 1000);
 
         function hideCs16Loading() {
             const modal = document.getElementById('cs16-loading-modal');
@@ -502,6 +516,11 @@
                 const data = await res.json();
                 if (data.success && data.battle) {
                     const b = data.battle;
+                    currentBattleStatus = b.status;
+                    if (b.endTime) {
+                        battleEndTime = b.endTime;
+                    }
+
                     renderJackpot(b);
 
                     if (b.status === 'spinning') {
@@ -524,9 +543,10 @@
         function renderJackpot(b) {
             document.getElementById('jackpot-bank-text').innerText = b.bank + ' ₽';
             
-            let m = Math.floor(b.timer / 60).toString().padStart(2, '0');
-            let s = (b.timer % 60).toString().padStart(2, '0');
-            document.getElementById('jackpot-timer-text').innerText = `${m}:${s}`;
+            // Если раунд в статусе ожидания, выводим 00:15
+            if (b.status === 'waiting') {
+                document.getElementById('jackpot-timer-text').innerText = '00:15';
+            }
 
             const arena = document.getElementById('jackpot-arena-view');
             
@@ -600,12 +620,11 @@
             const arena = document.getElementById('jackpot-arena-view');
             let stripItems = [];
             
-            // Генерируем длинную ленту для 13-секундного вращения
             for (let i = 0; i < 80; i++) {
                 let p = participants[Math.floor(Math.random() * participants.length)];
                 stripItems.push(p);
             }
-            const winnerIndex = 65; // Позиция победителя ближе к концу ленты
+            const winnerIndex = 65;
             stripItems[winnerIndex] = winner;
 
             arena.innerHTML = `
@@ -630,7 +649,6 @@
                 const targetOffset = (winnerIndex * itemWidth) - (arenaWidth / 2) + (itemWidth / 2);
                 strip.style.transform = `translateX(-${targetOffset}px)`;
 
-                // Модальное окно победителя появится после завершения 13-секундной анимации
                 setTimeout(() => {
                     showFullscreenWinnerModal(winner, bank);
                 }, 13100);
