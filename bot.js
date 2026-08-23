@@ -120,7 +120,7 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Таймер тика джекпота
+// Таймер тика джекпота (с учетом комиссии 20%)
 setInterval(() => {
     if (currentBattle.status === 'active' && currentBattle.endTime) {
         const remaining = Math.ceil((currentBattle.endTime - Date.now()) / 1000);
@@ -142,22 +142,25 @@ setInterval(() => {
                 }
             }
             
+            const totalBank = currentBattle.bank;
+            const prize = Math.round(totalBank * 0.8); // Комиссия 20%, победителю 80%
+            
             currentBattle.winner = winnerObj;
             currentBattle.status = 'finished';
             
             if (users[winnerObj.tgId]) {
-                users[winnerObj.tgId].balance += currentBattle.bank;
+                users[winnerObj.tgId].balance += prize;
                 users[winnerObj.tgId].completedDeals = (users[winnerObj.tgId].completedDeals || 0) + 1;
             }
             
             battleWinnersHistory.push({
                 tgId: winnerObj.tgId,
                 username: winnerObj.username,
-                prize: currentBattle.bank
+                prize: prize
             });
             saveData();
             
-            bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы выиграли в Королевской Битве банк <b>${currentBattle.bank} ₽</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
+            bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы выиграли в Королевской Битве банк <b>${totalBank} ₽</b>.\n💰 С учетом комиссии 20% на ваш баланс зачислено: <b>${prize} ₽</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
 
             setTimeout(() => {
                 currentBattle = {
