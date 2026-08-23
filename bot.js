@@ -56,6 +56,16 @@ let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
 let priceCache = db.priceCache || {};
 
+// Автоматическая проверка и снятие истекших VIP (48 часов)
+const nowTime = Date.now();
+marketItems = marketItems.map(item => {
+    if (item.isVip && item.vipExpiresAt && nowTime > item.vipExpiresAt) {
+        item.isVip = false;
+        item.vipExpiresAt = null;
+    }
+    return item;
+});
+
 let currentBattle = {
     _id: 'b_' + Date.now(),
     bank: 0,
@@ -115,7 +125,7 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Стабильные рыночные цены без случайных скачков
+// 🎯 Точные рыночные коэффициенты и цены (в стиле Lis-Skins / CS.MONEY)
 function getRealisticMarketPrice(name) {
     if (!name) return 150;
     const lower = name.toLowerCase();
@@ -128,19 +138,32 @@ function getRealisticMarketPrice(name) {
         'm4a4 | император (после полевых испытаний)': 2800,
         'usp-s | бесшумный выстрел (после полевых испытаний)': 950,
         'desert eagle | огненное дыхание (прямо с завода)': 4300,
-        'glock-18 | градиент (прямо с завода)': 89000,
-        'awp | история о драконе (после полевых испытаний)': 350000
+        'glock-18 | градиент (прямо с завода)': 78000,
+        'awp | история о драконе (после полевых испытаний)': 320000
     };
 
     if (exactPrices[lower]) return exactPrices[lower];
 
-    if (lower.includes('кейс') || lower.includes('case')) return 25;
-    if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return 40;
-    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) return 18500;
-    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) return 12000;
-    if (lower.includes('stattrak™') || lower.includes('stattrak')) return 750;
+    if (lower.includes('кейс') || lower.includes('case')) return 18;
+    if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return 30;
+    
+    // Коэффициенты для ножей и перчаток согласно рынку CS.MONEY / Lis-Skins
+    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка') || lower.includes('тычковые')) {
+        return 16500;
+    }
+    
+    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки') || lower.includes('рукавицы')) {
+        return 11000;
+    }
 
-    return 350;
+    if (lower.includes('stattrak™') || lower.includes('stattrak')) return 650;
+    if (lower.includes('закаленное') || lower.includes('battle-scarred')) return 90;
+    if (lower.includes('поношенное') || lower.includes('well-worn')) return 160;
+    if (lower.includes('после полевых') || lower.includes('field-tested')) return 320;
+    if (lower.includes('немного поношенное') || lower.includes('minimal wear')) return 750;
+    if (lower.includes('прямо с завода') || lower.includes('factory new')) return 1450;
+
+    return 220;
 }
 
 // Таймер джекпота
@@ -256,7 +279,7 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// Кэширование цен на 24 часа
+// Кэширование суточных цен
 app.get('/api/steam/price', async (req, res) => {
     const itemName = req.query.name;
     if (!itemName) return res.json({ success: false, error: 'Name required' });
@@ -323,6 +346,15 @@ app.post('/api/user/save', (req, res) => {
 });
 
 app.get('/api/market/items', (req, res) => {
+    // Автоочистка просроченных VIP (48 часов)
+    const currentTime = Date.now();
+    marketItems = marketItems.map(item => {
+        if (item.isVip && item.vipExpiresAt && currentTime > item.vipExpiresAt) {
+            item.isVip = false;
+            item.vipExpiresAt = null;
+        }
+        return item;
+    });
     res.json({ success: true, items: marketItems });
 });
 
@@ -335,12 +367,29 @@ app.post('/api/market/add', (req, res) => {
             return res.json({ success: false, error: 'Недостаточно средств для VIP-объявления (нужно 120 ₽)' });
         }
         user.balance -= 120;
+        item.vipExpiresAt = Date.now() + (48 * 60 * 60 * 1000); // 48 часов
+    } else {
+        item.vipExpiresAt = null;
     }
 
     item._id = Date.now().toString();
     marketItems.unshift(item);
     saveData();
     res.json({ success: true, newBalance: user.balance });
+});
+
+// Эндпоинт снятия своего предмета с продажи
+app.post('/api/market/remove', (req, res) => {
+    const { itemId, tgId } = req.body;
+    const itemIndex = marketItems.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
+    
+    if (itemIndex === -1) {
+        return res.json({ success: false, error: 'Лот не найден или вы не являетесь его владельцем' });
+    }
+
+    const removedItem = marketItems.splice(itemIndex, 1)[0];
+    saveData();
+    res.json({ success: true, removedItem });
 });
 
 app.post('/api/external/sell', (req, res) => {
@@ -354,7 +403,7 @@ app.post('/api/external/sell', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// 🛑 ЗАЩИТА ОТ ПОКУПКИ СОБСТВЕННОГО СКИНА
+// Защита от покупки собственного скина
 app.post('/api/deals/buy', async (req, res) => {
     const { itemId, buyerTgId, buyerTradeUrl, buyerName } = req.body;
     const itemIndex = marketItems.findIndex(i => i._id === itemId);
@@ -362,7 +411,6 @@ app.post('/api/deals/buy', async (req, res) => {
 
     const item = marketItems[itemIndex];
 
-    // Проверка, чтобы юзер не купил свой собственный лот
     if (String(item.tgId) === String(buyerTgId)) {
         return res.json({ success: false, error: '❌ Нельзя покупать свои собственные скины!' });
     }
@@ -735,7 +783,7 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Отдача единой HTML страницы
+// Отдача единой HTML страницы (с VIP блоком вверху и кнопкой снятия с продажи)
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="ru">
@@ -788,7 +836,7 @@ app.get('/', (req, res) => {
 
         .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
-        .card.vip-card { border: 1px solid var(--vip-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.25); background: linear-gradient(135deg, rgba(30, 30, 20, 0.8), rgba(20, 30, 25, 0.7)); }
+        .card.vip-card { border: 1px solid var(--vip-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.25); background: linear-gradient(135deg, rgba(35, 30, 15, 0.85), rgba(20, 25, 20, 0.8)); }
         .vip-badge { position: absolute; top: 4px; right: 6px; font-size: 9px; background: var(--vip-gold); color: #000; font-weight: bold; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; }
 
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 6px; }
@@ -796,6 +844,7 @@ app.get('/', (req, res) => {
         .card-title { font-size: 11px; font-weight: bold; margin: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; color: #fff; }
         
         .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 6px; text-transform: uppercase; box-shadow: 0 0 8px rgba(124,252,0,0.3); }
+        .btn-danger-glow { width: 100%; background: var(--danger-red); border: none; color: #fff; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 6px; text-transform: uppercase; }
 
         .jackpot-header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .jackpot-bank-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
@@ -874,7 +923,7 @@ app.get('/', (req, res) => {
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
-            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка актуальной суточной цены...</p>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка суточной цены со Steam...</p>
             
             <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                 <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
@@ -887,9 +936,12 @@ app.get('/', (req, res) => {
                 <input type="number" id="sell-price-input" class="topup-input" placeholder="Цена" min="10">
             </div>
 
-            <div id="vip-option-container" style="display:flex; align-items:center; gap:8px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.05); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.3);">
-                <input type="checkbox" id="vip-checkbox" style="accent-color: var(--neon-green);">
-                <label for="vip-checkbox" style="color: var(--vip-gold); cursor:pointer; font-weight:bold;">⚡ Сделать VIP-объявлением (120 ₽)</label>
+            <div id="vip-option-container" style="display:flex; flex-direction:column; gap:4px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.06); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.4);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="vip-checkbox" style="accent-color: var(--neon-green);">
+                    <label for="vip-checkbox" style="color: var(--vip-gold); cursor:pointer; font-weight:bold;">⚡ VIP-объявление (120 ₽)</label>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); padding-left: 20px;">Закреп в отдельном блоке наверху на 48 часов</div>
             </div>
             
             <div style="display:flex; gap:8px; margin-top:12px;">
@@ -940,6 +992,9 @@ app.get('/', (req, res) => {
 
     <main class="content-area">
         <section id="tab-market" class="tab active">
+            <h2 class="neon-text">⚡ VIP Объявления (48ч)</h2>
+            <div id="vip-market-listings" class="grid-layout" style="margin-bottom: 20px;"></div>
+
             <h2 class="neon-text">Маркетплейс скинов</h2>
             <div id="market-listings" class="grid-layout"></div>
         </section>
@@ -1119,19 +1174,62 @@ app.get('/', (req, res) => {
                 const data = await res.json();
                 if (data.success) {
                     marketItems = data.items;
-                    document.getElementById('market-listings').innerHTML = marketItems.length === 0 ? '<div class="empty-state" style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:15px;">Нет лотов на маркете</div>' : marketItems.map(i => \`
-                        <div class="card \${i.isVip ? 'vip-card' : ''}">
-                            \${i.isVip ? '<div class="vip-badge">VIP</div>' : ''}
-                            <div class="skin-image"><img src="\${i.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/80'"></div>
-                            <div class="card-title">\${i.name}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                                <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">\${i.price} ₽</span>
-                                <button class="btn-cyan" style="padding:4px 8px; font-size:10px;" onclick="buyItem('\${i._id}', \${i.tgId})">Купить</button>
-                            </div>
-                        </div>
-                    \`).join('');
+                    
+                    const vipListings = marketItems.filter(i => i.isVip);
+                    const regularListings = marketItems.filter(i => !i.isVip);
+
+                    // Рендер VIP блока вверху
+                    const vipContainer = document.getElementById('vip-market-listings');
+                    if (vipListings.length === 0) {
+                        vipContainer.innerHTML = '<div style="grid-column: span 2; text-align:center; color:var(--text-muted); font-size:11px; padding:10px; background:rgba(255,215,0,0.03); border-radius:8px; border:1px dashed rgba(255,215,0,0.2);">Нет активных VIP-объявлений</div>';
+                    } else {
+                        vipContainer.innerHTML = vipListings.map(i => renderItemCard(i)).join('');
+                    }
+
+                    // Рендер обычного маркета
+                    const marketContainer = document.getElementById('market-listings');
+                    if (regularListings.length === 0) {
+                        marketContainer.innerHTML = '<div class="empty-state" style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:15px;">Нет лотов на маркете</div>';
+                    } else {
+                        marketContainer.innerHTML = regularListings.map(i => renderItemCard(i)).join('');
+                    }
                 }
             } catch(e) {}
+        }
+
+        function renderItemCard(i) {
+            const isOwner = String(i.tgId) === String(myTgId);
+            return \`
+                <div class="card \${i.isVip ? 'vip-card' : ''}">
+                    \${i.isVip ? '<div class="vip-badge">VIP (48ч)</div>' : ''}
+                    <div class="skin-image"><img src="\${i.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/80'"></div>
+                    <div class="card-title">\${i.name}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                        <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">\${i.price} ₽</span>
+                        \${isOwner ? 
+                            \`<button class="btn-danger-glow" style="padding:4px 8px; font-size:10px; width:auto; margin-top:0;" onclick="removeMyItem('\${i._id}')">Снять</button>\` :
+                            \`<button class="btn-cyan" style="padding:4px 8px; font-size:10px;" onclick="buyItem('\${i._id}', \${i.tgId})">Купить</button>\`
+                        }
+                    </div>
+                </div>
+            \`;
+        }
+
+        async function removeMyItem(itemId) {
+            if (!confirm('Вы действительно хотите снять этот скин с продажи?')) return;
+            try {
+                const res = await fetch('/api/market/remove', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ itemId, tgId: myTgId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ Скин снят с продажи!');
+                    fetchMarketItems();
+                } else {
+                    alert(data.error || 'Ошибка');
+                }
+            } catch(e) { alert('Ошибка соединения'); }
         }
 
         async function buyItem(itemId, sellerTgId) {
@@ -1229,7 +1327,7 @@ app.get('/', (req, res) => {
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены со Steam...)\`;
+            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены...)\`;
             const priceInput = document.getElementById('sell-price-input');
             priceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
@@ -1240,7 +1338,7 @@ app.get('/', (req, res) => {
                 if (data.success && data.price) {
                     let finalPrice = data.price;
                     if (selectedSellingPlatform !== 'p2p') {
-                        finalPrice = Math.round(finalPrice * 0.68);
+                        finalPrice = Math.round(finalPrice * 0.65); // Коэффициент мгновенной продажи Lis-Skins / CS.MONEY (~65%)
                     }
                     priceInput.value = finalPrice;
                     document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
@@ -1270,7 +1368,7 @@ app.get('/', (req, res) => {
                     const data = await res.json();
                     let base = (data.success && data.price) ? data.price : 250;
                     if (plat !== 'p2p') {
-                        document.getElementById('sell-price-input').value = Math.round(base * 0.68);
+                        document.getElementById('sell-price-input').value = Math.round(base * 0.65);
                     } else {
                         document.getElementById('sell-price-input').value = base;
                     }
@@ -1304,7 +1402,7 @@ app.get('/', (req, res) => {
                     });
                     const data = await res.json();
                     if (data.success) {
-                        alert(isVip ? '✅ Скин успешно выставлен как VIP-объявление!' : '✅ Скин успешно выставлен на маркетплейс!');
+                        alert(isVip ? '✅ Скин выставлен в VIP-блок на 48 часов!' : '✅ Скин успешно выставлен на маркетплейс!');
                         closeModal('modal-sell-skin');
                         syncUserProfile();
                         fetchMarketItems();
