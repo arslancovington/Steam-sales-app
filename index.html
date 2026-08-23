@@ -132,7 +132,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно продажи с выбором платформ и VIP за 120 ₽ -->
+    <!-- Модальное окно продажи с умной авто-оценой и выбором платформ -->
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
@@ -146,7 +146,7 @@
 
             <div class="price-input-container">
                 <span class="currency-symbol">₽</span>
-                <input type="number" id="sell-price-input" class="topup-input" placeholder="150" min="10" value="150">
+                <input type="number" id="sell-price-input" class="topup-input" placeholder="Введите цену" min="10">
             </div>
 
             <div id="vip-option-container" style="display:flex; align-items:center; gap:8px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.05); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.3);">
@@ -341,7 +341,6 @@
             }
         });
 
-        // Независимый плавный тикер клиента для идеального отсчета таймера без скачков
         setInterval(() => {
             if (currentBattleStatus === 'active' && battleEndTime) {
                 const remaining = Math.ceil((battleEndTime - Date.now()) / 1000);
@@ -483,11 +482,31 @@
             }
         }
 
+        // Умный расчет примерной цены скина на основе его названия и типа
+        function estimatePrice(name) {
+            const lower = name.toLowerCase();
+            if (lower.includes('кейс') || lower.includes('case')) return Math.floor(Math.random() * 40) + 15;
+            if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return Math.floor(Math.random() * 80) + 20;
+            if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) return Math.floor(Math.random() * 8000) + 5000;
+            if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) return Math.floor(Math.random() * 6000) + 4000;
+            
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let base = Math.abs(hash) % 870 + 80;
+            if (lower.includes('stattrak™') || lower.includes('stattrak')) base = Math.round(base * 1.6);
+            return base;
+        }
+
         function openSellModal(name, image) {
             selectedSkinToSell = { name, image };
             selectedSellingPlatform = 'p2p';
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
+
+            const estimated = estimatePrice(name);
+            document.getElementById('sell-price-input').value = estimated;
             document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
             document.getElementById('modal-sell-skin').classList.add('active');
         }
