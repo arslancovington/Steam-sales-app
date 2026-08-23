@@ -115,7 +115,7 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Реалистичный фоллбек цен
+// Стабильные рыночные цены без случайных скачков
 function getRealisticMarketPrice(name) {
     if (!name) return 150;
     const lower = name.toLowerCase();
@@ -136,15 +136,8 @@ function getRealisticMarketPrice(name) {
 
     if (lower.includes('кейс') || lower.includes('case')) return 25;
     if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return 40;
-    
-    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка') || lower.includes('тычковые')) {
-        return 18500;
-    }
-    
-    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки') || lower.includes('рукавицы')) {
-        return 12000;
-    }
-
+    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) return 18500;
+    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) return 12000;
     if (lower.includes('stattrak™') || lower.includes('stattrak')) return 750;
 
     return 350;
@@ -263,7 +256,7 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// 🟢 ЭНДПОИНТ ЦЕН С КЕШИРОВАНИЕМ НА 24 ЧАСА (ОБНОВЛЕНИЕ РАЗ В СУТКИ)
+// Кэширование цен на 24 часа
 app.get('/api/steam/price', async (req, res) => {
     const itemName = req.query.name;
     if (!itemName) return res.json({ success: false, error: 'Name required' });
@@ -271,7 +264,6 @@ app.get('/api/steam/price', async (req, res) => {
     const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
 
-    // Проверяем наличие в кеше и актуальность (менее 24 часов)
     if (priceCache[itemName] && (now - priceCache[itemName].updatedAt < twentyFourHours)) {
         return res.json({ success: true, price: priceCache[itemName].price, cached: true });
     }
@@ -300,16 +292,11 @@ app.get('/api/steam/price', async (req, res) => {
             }
         }
 
-        // Сохраняем в кеш с текущей меткой времени (обновление раз в сутки)
-        priceCache[itemName] = {
-            price: finalPrice,
-            updatedAt: now
-        };
+        priceCache[itemName] = { price: finalPrice, updatedAt: now };
         saveData();
 
         return res.json({ success: true, price: finalPrice, cached: false });
     } catch (err) {
-        // Фоллбек, если запрос сорвался
         const fallbackPrice = priceCache[itemName]?.price || getRealisticMarketPrice(itemName);
         return res.json({ success: true, price: fallbackPrice, cached: true });
     }
@@ -367,12 +354,19 @@ app.post('/api/external/sell', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
+// 🛑 ЗАЩИТА ОТ ПОКУПКИ СОБСТВЕННОГО СКИНА
 app.post('/api/deals/buy', async (req, res) => {
     const { itemId, buyerTgId, buyerTradeUrl, buyerName } = req.body;
     const itemIndex = marketItems.findIndex(i => i._id === itemId);
     if (itemIndex === -1) return res.json({ success: false, error: 'Лот не найден' });
 
     const item = marketItems[itemIndex];
+
+    // Проверка, чтобы юзер не купил свой собственный лот
+    if (String(item.tgId) === String(buyerTgId)) {
+        return res.json({ success: false, error: '❌ Нельзя покупать свои собственные скины!' });
+    }
+
     const buyer = getOrCreateUser(buyerTgId, buyerName);
 
     if (buyer.balance < item.price) {
@@ -880,7 +874,7 @@ app.get('/', (req, res) => {
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
-            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка актуальной цены со Steam...</p>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка актуальной суточной цены...</p>
             
             <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                 <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
@@ -1132,7 +1126,7 @@ app.get('/', (req, res) => {
                             <div class="card-title">\${i.name}</div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                                 <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">\${i.price} ₽</span>
-                                <button class="btn-cyan" style="padding:4px 8px; font-size:10px;" onclick="buyItem('\${i._id}')">Купить</button>
+                                <button class="btn-cyan" style="padding:4px 8px; font-size:10px;" onclick="buyItem('\${i._id}', \${i.tgId})">Купить</button>
                             </div>
                         </div>
                     \`).join('');
@@ -1140,7 +1134,12 @@ app.get('/', (req, res) => {
             } catch(e) {}
         }
 
-        async function buyItem(itemId) {
+        async function buyItem(itemId, sellerTgId) {
+            if (String(sellerTgId) === String(myTgId)) {
+                alert('❌ Нельзя покупать свои собственные скины!');
+                return;
+            }
+
             const tradeUrlInput = document.getElementById('trade-url-input').value;
             if (!tradeUrlInput) {
                 alert('Пожалуйста, укажите ваш Trade URL в инвентаре перед покупкой!');
@@ -1230,7 +1229,7 @@ app.get('/', (req, res) => {
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены со Steam...\`;
+            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены со Steam...)\`;
             const priceInput = document.getElementById('sell-price-input');
             priceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
@@ -1244,7 +1243,7 @@ app.get('/', (req, res) => {
                         finalPrice = Math.round(finalPrice * 0.68);
                     }
                     priceInput.value = finalPrice;
-                    document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Курс обновлен суточный)\`;
+                    document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
                 } else {
                     priceInput.value = 250;
                     document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
