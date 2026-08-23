@@ -39,7 +39,6 @@
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
         .skin-img { width: 100%; height: 100%; object-fit: contain; }
         
-        /* СТИЛЬ VIP ОБЪЯВЛЕНИЙ */
         .card.vip-card {
             background: linear-gradient(135deg, rgba(40, 15, 60, 0.85), rgba(15, 25, 20, 0.85));
             border: 2px solid var(--neon-purple);
@@ -57,12 +56,56 @@
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 25px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 12px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+        /* ОБНОВЛЕННЫЙ ДИЗАЙН РОЗЫГРЫШЕЙ */
+        .giveaway-card {
+            background: linear-gradient(145deg, rgba(16, 24, 20, 0.95), rgba(10, 16, 14, 0.98));
+            border: 1px solid rgba(191, 0, 255, 0.4);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(191, 0, 255, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .giveaway-card.finished {
+            border-color: rgba(124, 252, 0, 0.4);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(124, 252, 0, 0.05);
+        }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
-        .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 3px 6px; border-radius: 4px; }
-        .giveaway-title { font-size: 14px; font-weight: bold; color: var(--text-main); margin: 0; }
+        .giveaway-badge-sponsor {
+            background: rgba(191, 0, 255, 0.15); border: 1px solid rgba(191, 0, 255, 0.4);
+            color: #d16eff; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .giveaway-badge-ended {
+            background: rgba(124, 252, 0, 0.15); border: 1px solid rgba(124, 252, 0, 0.4);
+            color: var(--neon-green); font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .giveaway-timer-badge {
+            font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: bold;
+            color: var(--neon-cyan); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px;
+        }
+        .giveaway-body { display: flex; gap: 12px; align-items: center; }
+        .giveaway-skin-box {
+            width: 75px; height: 75px; background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+        }
+        .giveaway-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .giveaway-title { font-size: 15px; font-weight: 900; color: #fff; margin: 0; letter-spacing: 0.3px; line-height: 1.2; }
+        .giveaway-meta { font-size: 11px; color: var(--text-muted); }
+        .giveaway-winner-box {
+            background: rgba(124, 252, 0, 0.08); border: 1px dashed rgba(124, 252, 0, 0.3);
+            border-radius: 8px; padding: 6px 10px; margin-top: 4px;
+        }
+        .giveaway-actions { display: flex; gap: 8px; margin-top: 4px; }
 
-        /* НАВИГАЦИЯ */
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.98); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid rgba(0, 255, 255, 0.2); z-index: 100; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
         .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
         .nav-item svg { width: 22px; height: 22px; fill: var(--text-muted); transition: 0.2s; }
@@ -85,37 +128,20 @@
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 8px 2px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
-        /* --- КОРОЛЕВСКАЯ БИТВА И C4 ТАЙМЕР --- */
         .battle-arena { background: linear-gradient(135deg, rgba(20, 10, 30, 0.95), rgba(10, 15, 20, 0.95)); border: 2px solid var(--neon-purple); border-radius: 16px; padding: 15px; box-shadow: 0 0 25px rgba(191, 0, 255, 0.2); }
         .battle-title { text-align: center; font-size: 21px; font-weight: 900; color: #fff; text-shadow: 0 0 12px var(--neon-purple); letter-spacing: 1px; margin-bottom: 5px; }
-        
         .battle-stats-card { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.75); border-radius: 12px; padding: 12px 15px; border: 1px solid rgba(0, 255, 255, 0.15); margin-bottom: 12px; }
         .bank-block .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
         .bank-block .bank-value { font-size: 24px; font-weight: 900; color: var(--neon-cyan); text-shadow: 0 0 12px rgba(0, 255, 255, 0.5); margin-top: 2px; }
         
-        /* C4 ТАЙМЕР CS2 */
         .timer-block { text-align: right; }
         .timer-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
         .c4-timer {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 26px;
-            font-weight: 900;
-            color: var(--neon-green);
-            background: #050505;
-            padding: 2px 8px;
-            border-radius: 6px;
-            border: 1px solid #1a331a;
-            box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 8px rgba(124, 252, 0, 0.3);
-            letter-spacing: 2px;
-            display: inline-block;
-            margin-top: 2px;
+            font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 900; color: var(--neon-green);
+            background: #050505; padding: 2px 8px; border-radius: 6px; border: 1px solid #1a331a;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 8px rgba(124, 252, 0, 0.3); letter-spacing: 2px; display: inline-block; margin-top: 2px;
         }
-        .c4-timer.urgent {
-            color: var(--danger-red);
-            border-color: #4a1a1a;
-            box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 15px rgba(255, 51, 51, 0.8);
-            animation: c4Blink 0.35s infinite alternate;
-        }
+        .c4-timer.urgent { color: var(--danger-red); border-color: #4a1a1a; box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 15px rgba(255, 51, 51, 0.8); animation: c4Blink 0.35s infinite alternate; }
         @keyframes c4Blink { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0.6; transform: scale(1.05); } }
 
         .chances-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #111; box-shadow: inset 0 0 6px #000; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05); }
@@ -222,7 +248,7 @@
             </div>
         </section>
 
-        <!-- ТАБ: РОЗЫГРЫШИ -->
+        <!-- ТАБ: РОЗЫГРЫШИ (ОБНОВЛЕННЫЙ ДИЗАЙН) -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Розыгрыши</h2>
             <div id="giveaways-container">
@@ -254,7 +280,7 @@
         </section>
     </main>
 
-    <!-- МОДАЛКА: ПРОДАЖА (С ВЫБОРОМ ПЛАТФОРМЫ: НАШ МАРКЕТ / LIS-SKINS / CS.MONEY) -->
+    <!-- МОДАЛКА: ПРОДАЖА -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Продать скин</h3>
@@ -267,7 +293,6 @@
                 <button type="button" class="platform-option-btn" id="sell-tab-csmoney" onclick="selectSellPlatform('csmoney')">CS.MONEY</button>
             </div>
 
-            <!-- БЛОК 1: НАШ МАРКЕТ -->
             <div id="sell-panel-our">
                 <div class="price-input-container">
                     <span class="currency-symbol">₽</span>
@@ -280,15 +305,13 @@
                 <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽)</label>
             </div>
 
-            <!-- БЛОК 2: LIS-SKINS -->
             <div id="sell-panel-lis" style="display: none; padding: 10px 0;">
-                <p style="font-size: 12px; color: var(--text-muted);">Мгновенная продажа скинов с быстрой выплатой на внешнем сервисе LIS-Skins.</p>
+                <p style="font-size: 12px; color: var(--text-muted);">Мгновенная продажа на LIS-Skins.</p>
                 <button class="btn-green-glow" onclick="window.open('https://lis-skins.com/', '_blank')" style="margin-top:10px;">Продать на LIS-Skins</button>
             </div>
 
-            <!-- БЛОК 3: CS.MONEY -->
             <div id="sell-panel-csmoney" style="display: none; padding: 10px 0;">
-                <p style="font-size: 12px; color: var(--text-muted);">Быстрый обмен и продажа по лучшим ценам на CS.MONEY.</p>
+                <p style="font-size: 12px; color: var(--text-muted);">Быстрый обмен на CS.MONEY.</p>
                 <button class="btn-green-glow" onclick="window.open('https://cs.money/', '_blank')" style="margin-top:10px;">Продать на CS.MONEY</button>
             </div>
 
@@ -385,6 +408,7 @@
             if (steamId) { localStorage.setItem('user_steam_id', steamId); loadSteamData(steamId); }
 
             setInterval(pollBattleState, 1000);
+            setInterval(fetchGiveaways, 30000);
         });
 
         function switchTab(id, btn) {
@@ -407,7 +431,6 @@
             } catch (err) {}
         }
 
-        /* ИНВЕНТАРЬ И МАРКЕТ */
         function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value.trim();
             localStorage.setItem('user_trade_url', url);
@@ -420,22 +443,35 @@
 
         async function loadSteamData(steamId) {
             try {
+                const marketRes = await fetch('/api/market/items');
+                const marketData = await marketRes.json();
+                const activeAssetIds = marketData.success ? marketData.items.map(i => String(i.assetid)) : [];
+
                 const res = await fetch('/api/steam/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ steamId, tgId: myTgId }) });
                 const data = await res.json();
                 const container = document.getElementById('steam-inventory-grid');
+                
                 if (data.success && data.items?.length > 0) {
                     myInventory = [];
                     const descMap = {}; data.descriptions.forEach(d => { descMap[d.classid + '_' + (d.instanceid || '0')] = d; });
                     data.items.forEach(item => {
                         const desc = descMap[item.classid + '_' + (item.instanceid || '0')];
-                        if (desc) myInventory.push({ assetid: item.assetid, name: desc.market_hash_name || desc.name, icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}` });
+                        if (desc) {
+                            myInventory.push({ assetid: String(item.assetid), name: desc.market_hash_name || desc.name, icon_url: `https://community.cloudflare.steamstatic.com/economy/image/${desc.icon_url}` });
+                        }
                     });
-                    container.innerHTML = myInventory.map(item => `
-                        <div class="card">
-                            <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
-                            <h4>${item.name}</h4><button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Выставить</button>
-                        </div>
-                    `).join('');
+
+                    const availableItems = myInventory.filter(item => !activeAssetIds.includes(item.assetid));
+                    if (availableItems.length > 0) {
+                        container.innerHTML = availableItems.map(item => `
+                            <div class="card">
+                                <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
+                                <h4>${item.name}</h4><button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Выставить</button>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<div class="empty-state">Все предметы из инвентаря уже выставлены на продажу</div>';
+                    }
                 } else container.innerHTML = '<div class="empty-state">Инвентарь пуст</div>';
             } catch (e) {}
         }
@@ -462,28 +498,13 @@
         }
 
         function selectSellPlatform(platform) {
-            document.getElementById('sell-tab-our').classList.remove('active');
-            document.getElementById('sell-tab-lis').classList.remove('active');
-            document.getElementById('sell-tab-csmoney').classList.remove('active');
-            
-            document.getElementById('sell-panel-our').style.display = 'none';
-            document.getElementById('sell-panel-lis').style.display = 'none';
-            document.getElementById('sell-panel-csmoney').style.display = 'none';
-            const confirmBtn = document.getElementById('confirm-sell-btn');
-
-            if (platform === 'our') {
-                document.getElementById('sell-tab-our').classList.add('active');
-                document.getElementById('sell-panel-our').style.display = 'block';
-                confirmBtn.style.display = 'block';
-            } else if (platform === 'lis') {
-                document.getElementById('sell-tab-lis').classList.add('active');
-                document.getElementById('sell-panel-lis').style.display = 'block';
-                confirmBtn.style.display = 'none';
-            } else if (platform === 'csmoney') {
-                document.getElementById('sell-tab-csmoney').classList.add('active');
-                document.getElementById('sell-panel-csmoney').style.display = 'block';
-                confirmBtn.style.display = 'none';
-            }
+            ['our', 'lis', 'csmoney'].forEach(p => {
+                document.getElementById('sell-tab-' + p).classList.remove('active');
+                document.getElementById('sell-panel-' + p).style.display = 'none';
+            });
+            document.getElementById('sell-tab-' + platform).classList.add('active');
+            document.getElementById('sell-panel-' + platform).style.display = 'block';
+            document.getElementById('confirm-sell-btn').style.display = (platform === 'our') ? 'block' : 'none';
         }
 
         async function confirmSellItem() {
@@ -492,11 +513,14 @@
             if (!price || price <= 0) { alert('Введите цену!'); return; }
             if (isVip && userBalance < 245) { alert('Недостаточно средств для VIP (245 ₽)'); return; }
 
-            const listing = { assetid: currentSelectedItem.assetid, name: currentSelectedItem.name, price, image: currentSelectedItem.icon_url, seller: myUsername, tgId: myTgId, isVip };
-            
+            const listing = { assetid: currentSelectedItem.assetid, name: currentSelectedItem.name, price, buyerPrice: Math.round(price * 1.04), image: currentSelectedItem.icon_url, seller: myUsername, tgId: myTgId, isVip };
             const res = await fetch('/api/market/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(listing) });
             const data = await res.json();
-            if (data.success) { closeModal('modal-sell'); alert('Выставлено!'); fetchMarketItems(); syncUserProfile(); } else alert(data.error);
+            if (data.success) { 
+                closeModal('modal-sell'); alert('Выставлено!'); fetchMarketItems(); syncUserProfile();
+                const steamId = localStorage.getItem('user_steam_id');
+                if (steamId) loadSteamData(steamId);
+            } else alert(data.error);
         }
 
         async function fetchMarketItems() {
@@ -505,17 +529,17 @@
             if (data.success) {
                 marketItems = data.items;
                 myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
-                document.getElementById('my-listings').innerHTML = myListings.map(i => `
+                document.getElementById('my-listings').innerHTML = myListings.length > 0 ? myListings.map(i => `
                     <div class="card ${i.isVip ? 'vip-card' : ''}">
                         ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
                         <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
                         <h4>${i.name}</h4><div style="font-weight:bold;">${i.price} ₽</div>
                         <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button>
                     </div>
-                `).join('');
+                `).join('') : '<div class="empty-state">Нет активных лотов</div>';
 
                 let sortedItems = [...marketItems].sort((a, b) => (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0));
-                document.getElementById('market-listings').innerHTML = sortedItems.map(i => `
+                document.getElementById('market-listings').innerHTML = sortedItems.length > 0 ? sortedItems.map(i => `
                     <div class="card ${i.isVip ? 'vip-card' : ''}">
                         ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
                         <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
@@ -524,15 +548,14 @@
                         <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">Оплата: ${i.buyerPrice} ₽</div>
                         ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem("${i._id}", ${i.buyerPrice})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
                     </div>
-                `).join('');
+                `).join('') : '<div class="empty-state">Маркет пуст</div>';
             }
         }
 
         async function buyItem(itemId, buyerPrice) {
             const tradeUrl = localStorage.getItem('user_trade_url');
-            if (!tradeUrl) { alert('Укажите Trade URL в инвентаре!'); switchTab('inventory', document.querySelectorAll('.nav-item')[2]); return; }
-            if (!confirm(`Купить за ${buyerPrice} ₽ (вкл. комиссию)?`)) return;
-            
+            if (!tradeUrl) { alert('Укажите Trade URL!'); switchTab('inventory', document.querySelectorAll('.nav-item')[2]); return; }
+            if (!confirm(`Купить за ${buyerPrice} ₽?`)) return;
             const res = await fetch('/api/deals/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, buyerTgId: myTgId }) });
             const data = await res.json();
             if (data.success) { alert('Успешно!'); syncUserProfile(); fetchMarketItems(); } else alert(data.error);
@@ -541,6 +564,8 @@
         async function cancelListing(itemId) {
             await fetch('/api/market/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, tgId: myTgId }) });
             fetchMarketItems(); syncUserProfile();
+            const steamId = localStorage.getItem('user_steam_id');
+            if (steamId) loadSteamData(steamId);
         }
 
         /* КОРОЛЕВСКАЯ БИТВА */
@@ -569,39 +594,22 @@
                 document.getElementById('roulette-tape').style.transform = 'translateX(0)';
                 document.getElementById('battle-winner-text').style.display = 'none';
             }
-
-            if (lastBattleStatus !== 'finished' && state.status === 'finished') {
-                setTimeout(() => { syncUserProfile(); }, 1500);
-            }
+            if (lastBattleStatus !== 'finished' && state.status === 'finished') setTimeout(() => syncUserProfile(), 1500);
             lastBattleStatus = state.status;
-
             document.getElementById('battle-bank').innerText = state.bank + ' ₽';
             
             const timerBox = document.getElementById('battle-timer');
             if (state.status === 'countdown' && state.startTime) {
                 let left = Math.max(0, Math.floor((state.startTime - serverTime) / 1000));
-                let minutes = Math.floor(left / 60).toString().padStart(2, '0');
-                let seconds = (left % 60).toString().padStart(2, '0');
-                timerBox.innerText = `${minutes}:${seconds}`;
+                timerBox.innerText = `${Math.floor(left / 60).toString().padStart(2, '0')}:${(left % 60).toString().padStart(2, '0')}`;
                 if (left <= 5) timerBox.classList.add('urgent'); else timerBox.classList.remove('urgent');
-            } else if (state.status === 'rolling' || state.status === 'finished') {
-                timerBox.innerText = '00:00'; timerBox.classList.remove('urgent');
-            } else {
-                timerBox.innerText = '00:00'; timerBox.classList.remove('urgent');
-            }
+            } else { timerBox.innerText = '00:00'; timerBox.classList.remove('urgent'); }
 
             let barHtml = '', listHtml = '';
             state.participants.forEach((p, idx) => {
                 let chance = state.bank > 0 ? (p.bet / state.bank * 100).toFixed(1) : 0;
                 barHtml += `<div class="chance-segment" style="width: ${chance}%; background: ${p.color};"></div>`;
-                listHtml += `
-                    <div class="player-row" style="border-left: 4px solid ${p.color}; animation-delay: ${idx * 0.05}s">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            ${p.avatar.length < 10 ? `<div style="font-size:18px;">${p.avatar}</div>` : `<img src="${p.avatar}" style="width:24px;height:24px;border-radius:50%;">`}
-                            <span style="font-weight:bold; font-size:13px;">@${p.username}</span>
-                        </div>
-                        <div><b style="color:var(--neon-green)">${p.bet} ₽</b> <span style="color:#aaa; font-size:11px;">(${chance}%)</span></div>
-                    </div>`;
+                listHtml += `<div class="player-row" style="border-left: 4px solid ${p.color};"><div style="display:flex; align-items:center; gap:8px;"><span>@${p.username}</span></div><div><b style="color:var(--neon-green)">${p.bet} ₽</b></div></div>`;
             });
             document.getElementById('chances-bar').innerHTML = barHtml;
             document.getElementById('battle-players').innerHTML = listHtml;
@@ -611,7 +619,6 @@
                 document.getElementById('roulette-section').style.display = 'block';
                 generateRouletteTape(state, serverTime);
             }
-
             if (state.status === 'finished' && document.getElementById('battle-winner-text').style.display === 'none') {
                 document.getElementById('battle-winner-text').style.display = 'block';
                 document.getElementById('winner-sum-text').innerText = `${state.winnerPrize} ₽`;
@@ -621,22 +628,16 @@
         function generateRouletteTape(state, serverTime) {
             const tape = document.getElementById('roulette-tape');
             tape.style.transition = 'none'; tape.style.transform = 'translateX(0)';
-            
             let itemsHtml = '';
             const winner = state.participants.find(p => p.tgId === state.winnerTgId) || state.participants[0];
-            
             for (let i = 0; i < 60; i++) {
                 let p = (i === 50) ? winner : state.participants[Math.floor(Math.random() * state.participants.length)];
-                let ava = p.avatar.length < 10 ? `<div style="font-size:30px;">${p.avatar}</div>` : `<img src="${p.avatar}">`;
-                itemsHtml += `<div class="roulette-item" style="border-color:${p.color}">${ava}</div>`;
+                itemsHtml += `<div class="roulette-item" style="border-color:${p.color}"><div style="font-size:20px;">🏆</div></div>`;
             }
             tape.innerHTML = itemsHtml;
-
             setTimeout(() => {
-                let randomOffset = Math.floor(Math.random() * 50) - 25; 
-                let distance = (50 * 85) - (document.querySelector('.roulette-wrapper').offsetWidth / 2) + 42 + randomOffset;
+                let distance = (50 * 85) - (document.querySelector('.roulette-wrapper').offsetWidth / 2) + 42;
                 let timeLeft = Math.max(0.1, (state.rollEndTime - serverTime) / 1000);
-                
                 tape.style.transition = `transform ${timeLeft}s cubic-bezier(0.15, 0.85, 0.15, 1)`;
                 tape.style.transform = `translateX(-${distance}px)`;
             }, 50);
@@ -646,37 +647,68 @@
             const amount = document.getElementById('battle-bet-amount').value;
             const res = await fetch('/api/battle/bet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, username: myUsername, photoUrl: myPhotoUrl, amount }) });
             const data = await res.json();
-            if (data.success) { document.getElementById('battle-bet-amount').value = ''; syncUserProfile(); pollBattleState(); } 
-            else alert(data.error);
+            if (data.success) { document.getElementById('battle-bet-amount').value = ''; syncUserProfile(); pollBattleState(); } else alert(data.error);
         }
 
-        /* РОЗЫГРЫШИ */
+        /* РОЗЫГРЫШИ (ОБНОВЛЕННЫЙ РЕНДЕР) */
         async function fetchGiveaways() {
             try {
                 const res = await fetch('/api/giveaways/list');
                 const data = await res.json();
+                const container = document.getElementById('giveaways-container');
                 if (data.success && data.giveaways?.length > 0) {
-                    document.getElementById('giveaways-container').innerHTML = data.giveaways.map(g => `
-                        <div class="giveaway-card">
-                            <div class="giveaway-header"><span class="giveaway-sponsor" style="color:var(--neon-purple); font-weight:bold;">🎁 Спонсор</span><span class="giveaway-timer">⏳ ${g.timer}</span></div>
-                            <div style="display: flex; gap: 10px; align-items: center; margin-top:5px;">
-                                <div class="skin-image" style="width: 65px; height: 65px; flex-shrink: 0;"><img src="${g.image}" class="skin-img"></div>
-                                <div><p class="giveaway-title">${g.title}</p><div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Участников: ${g.participantsCount}</div></div>
-                            </div>
-                            <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                <button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 8px;" onclick="window.open('https://t.me/${g.sponsorUsername.replace('@','')}', '_blank')">📢 Канал</button>
-                                <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
+                    container.innerHTML = data.giveaways.map(g => {
+                        if (g.ended) {
+                            return `
+                                <div class="giveaway-card finished">
+                                    <div class="giveaway-header">
+                                        <span class="giveaway-badge-ended">🏆 Розыгрыш завершен</span>
+                                        <span class="giveaway-timer-badge" style="color:var(--text-muted);">Итоги подведены</span>
+                                    </div>
+                                    <div class="giveaway-body">
+                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img"></div>
+                                        <div class="giveaway-info">
+                                            <p class="giveaway-title">${g.title}</p>
+                                            <div class="giveaway-winner-box">
+                                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Победитель</div>
+                                                <div style="font-size: 13px; color: var(--neon-green); font-weight: bold;">@${g.winnerUsername}</div>
+                                            </div>
+                                            <div class="giveaway-meta" style="margin-top:2px;">👥 Участников: ${g.participantsCount}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="giveaway-card">
+                                    <div class="giveaway-header">
+                                        <span class="giveaway-badge-sponsor">🎁 Активный розыгрыш</span>
+                                        <span class="giveaway-timer-badge">⏳ ${g.timerText}</span>
+                                    </div>
+                                    <div class="giveaway-body">
+                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img"></div>
+                                        <div class="giveaway-info">
+                                            <p class="giveaway-title">${g.title}</p>
+                                            <div class="giveaway-meta">Спонсор: <b style="color:var(--neon-purple);">${g.sponsor}</b></div>
+                                            <div class="giveaway-meta">Участников: <b style="color:var(--neon-cyan);">${g.participantsCount}</b></div>
+                                        </div>
+                                    </div>
+                                    <div class="giveaway-actions">
+                                        <button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 9px;" onclick="window.open('https://t.me/${g.sponsorUsername.replace('@','')}', '_blank')">📢 Канал</button>
+                                        <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }).join('');
+                } else container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
             } catch (e) {}
         }
 
         async function joinGiveaway(giveawayId) {
             const res = await fetch('/api/giveaways/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, giveawayId }) });
             const data = await res.json();
-            if (data.success) { alert('Вы участвуете!'); fetchGiveaways(); } else alert(data.error);
+            if (data.success) { alert('Вы успешно участвуете!'); fetchGiveaways(); } else alert(data.error);
         }
 
         /* МОДАЛКИ ФИНАНСОВ */
