@@ -17,6 +17,7 @@
             --text-main: #ffffff;
             --text-muted: #889988;
             --danger-red: #ff4d4d;
+            --vip-gold: #ffd700;
         }
 
         * { box-sizing: border-box; }
@@ -47,13 +48,16 @@
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; }
 
         .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .card { background: var(--card-bg); padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
-        .skin-image { width: 100%; height: 80px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 6px; }
-        .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
-        
-        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-top: 8px; text-transform: uppercase; box-shadow: 0 0 8px rgba(124,252,0,0.3); }
+        .card { background: var(--card-bg); padding: 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+        .card.vip-card { border: 1px solid var(--vip-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.25); background: linear-gradient(135deg, rgba(30, 30, 20, 0.8), rgba(20, 30, 25, 0.7)); }
+        .vip-badge { position: absolute; top: 4px; right: 6px; font-size: 9px; background: var(--vip-gold); color: #000; font-weight: bold; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; }
 
-        /* Королевская Битва */
+        .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 6px; }
+        .skin-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+        .card-title { font-size: 11px; font-weight: bold; margin: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; color: #fff; }
+        
+        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; margin-top: 6px; text-transform: uppercase; box-shadow: 0 0 8px rgba(124,252,0,0.3); }
+
         .jackpot-header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .jackpot-bank-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
         .jackpot-bank-val { font-size: 20px; font-weight: bold; color: var(--neon-green); text-shadow: 0 0 8px rgba(124,252,0,0.4); }
@@ -72,7 +76,6 @@
         .bet-feed-av { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #333; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; overflow: hidden; flex-shrink: 0; }
         .bet-feed-sum { font-weight: bold; color: var(--neon-green); font-size: 12px; }
 
-        /* Рулетка */
         .roulette-window { position: relative; width: 100%; height: 180px; background: #000; overflow: hidden; border-radius: 10px; border: 1px solid var(--neon-pink); display: flex; align-items: center; }
         .roulette-pointer { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; background: var(--neon-green); z-index: 20; box-shadow: 0 0 8px var(--neon-green); }
         .roulette-strip { display: flex; position: absolute; left: 0; height: 100%; will-change: transform; transition: transform 13s cubic-bezier(0.08, 0.82, 0.17, 1); align-items: center; }
@@ -80,13 +83,18 @@
         .roulette-item img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--neon-pink); margin-bottom: 6px; }
         .roulette-item span { font-size: 11px; color: #fff; width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 
-        /* Розыгрыши */
         .giveaway-card { background: linear-gradient(135deg, rgba(20, 30, 25, 0.9), rgba(11, 17, 16, 0.95)); border: 1px solid var(--neon-purple); border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 0 8px rgba(191,0,255,0.15); }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
         .giveaway-timer { font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; }
         .giveaway-title { font-size: 13px; font-weight: bold; color: var(--text-main); margin: 0; }
 
-        /* Победитель */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(124,252,0,0.2); font-size: 12px; }
+        .price-input-container { position: relative; margin: 12px 0; }
+        .currency-symbol { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
+        .topup-input { width: 100%; padding: 10px 10px 10px 30px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 6px; font-size: 12px; }
+
         .fullscreen-winner-overlay { position: fixed; inset: 0; background: rgba(11, 17, 16, 0.96); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
         .fullscreen-winner-overlay.active { display: flex; }
 
@@ -100,13 +108,6 @@
         .nav-item svg { width: 22px; height: 22px; fill: var(--text-muted); transition: 0.2s; }
         .active-nav { opacity: 1; transform: scale(1.05); }
         .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 6px var(--neon-cyan)); }
-
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--bg-color); padding: 18px; border-radius: 10px; width: 90%; max-width: 360px; text-align: center; border: 1px solid rgba(255,255,255,0.1); font-size: 12px; }
-        .price-input-container { position: relative; margin: 12px 0; }
-        .currency-symbol { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
-        .topup-input { width: 100%; padding: 10px 10px 10px 30px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 6px; font-size: 12px; }
 
         .cs16-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; font-family: 'Courier New', Courier, monospace; }
         .cs16-modal.active { display: flex; }
@@ -127,6 +128,35 @@
                 <div class="cs16-progress-container"><div class="cs16-progress-bar" id="cs16-bar-1" style="width: 75%;"></div></div>
                 <p id="cs16-sub-text">Loading Marketplace & Jackpot...</p>
                 <div class="cs16-progress-container"><div class="cs16-progress-bar" id="cs16-bar-2" style="width: 90%;"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно продажи с выбором платформ и VIP за 120 ₽ -->
+    <div class="modal-overlay" id="modal-sell-skin">
+        <div class="modal-content">
+            <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Выберите платформу и укажите цену</p>
+            
+            <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+                <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
+                <button class="btn-cyan" id="btn-plat-lisskins" onclick="selectPlatform('lisskins')" style="border-color:#ff9900; color:#ff9900;">Lis-Skins (Мгновенная продажа)</button>
+                <button class="btn-cyan" id="btn-plat-csmoney" onclick="selectPlatform('csmoney')" style="border-color:var(--neon-cyan); color:var(--neon-cyan);">CS.MONEY (Трейд-бот)</button>
+            </div>
+
+            <div class="price-input-container">
+                <span class="currency-symbol">₽</span>
+                <input type="number" id="sell-price-input" class="topup-input" placeholder="150" min="10" value="150">
+            </div>
+
+            <div id="vip-option-container" style="display:flex; align-items:center; gap:8px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.05); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.3);">
+                <input type="checkbox" id="vip-checkbox" style="accent-color: var(--neon-green);">
+                <label for="vip-checkbox" style="color: var(--vip-gold); cursor:pointer; font-weight:bold;">⚡ Сделать VIP-объявлением (120 ₽)</label>
+            </div>
+            
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn-cyan" onclick="closeModal('modal-sell-skin')" style="flex:1;">Отмена</button>
+                <button class="btn-green-glow" onclick="executeSkinSale()" style="width:auto; flex:1; margin-top:0;">Подтвердить</button>
             </div>
         </div>
     </div>
@@ -235,6 +265,7 @@
             </div>
         </section>
 
+        <!-- РОЗЫГРЫШИ С КНОПКОЙ ПОДПИСКИ -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Активные розыгрыши</h2>
             <div id="giveaways-container"><div class="empty-state" style="text-align:center; color:var(--text-muted); padding:15px;">Нет активных розыгрышей</div></div>
@@ -287,6 +318,9 @@
         let isSpinningHandled = false;
         let battleEndTime = null;
         let currentBattleStatus = 'waiting';
+
+        let selectedSkinToSell = null;
+        let selectedSellingPlatform = 'p2p';
 
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const myTgId = tgUser?.id || 123456789;
@@ -351,12 +385,13 @@
                 if (data.success) {
                     marketItems = data.items;
                     document.getElementById('market-listings').innerHTML = marketItems.length === 0 ? '<div class="empty-state" style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:15px;">Нет лотов на маркете</div>' : marketItems.map(i => `
-                        <div class="card">
+                        <div class="card ${i.isVip ? 'vip-card' : ''}">
+                            ${i.isVip ? '<div class="vip-badge">VIP</div>' : ''}
                             <div class="skin-image"><img src="${i.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/80'"></div>
-                            <h4 style="font-size:11px; margin:4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${i.name}</h4>
+                            <div class="card-title">${i.name}</div>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                                 <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">${i.price} ₽</span>
-                                <button class="btn-cyan" style="padding:3px 6px; font-size:10px;" onclick="buyItem('${i._id}')">Купить</button>
+                                <button class="btn-cyan" style="padding:4px 8px; font-size:10px;" onclick="buyItem('${i._id}')">Купить</button>
                             </div>
                         </div>
                     `).join('');
@@ -435,8 +470,8 @@
                         return `
                             <div class="card">
                                 <div class="skin-image"><img src="${iconUrl}" class="skin-img"></div>
-                                <h4 style="font-size:10px; margin:3px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</h4>
-                                <button class="btn-green-glow" style="padding:4px; font-size:10px;" onclick="putSkinOnMarket('${name}', '${iconUrl}')">Выставить</button>
+                                <div class="card-title">${name}</div>
+                                <button class="btn-green-glow" onclick="openSellModal('${name.replace(/'/g, "\\'")}', '${iconUrl}')">Продать / Выставить</button>
                             </div>
                         `;
                     }).join('');
@@ -448,24 +483,83 @@
             }
         }
 
-        async function putSkinOnMarket(name, image) {
-            const price = prompt(`Укажите цену продажи для "${name}" в рублях (₽):`, '150');
-            if (!price || isNaN(price)) return;
+        function openSellModal(name, image) {
+            selectedSkinToSell = { name, image };
+            selectedSellingPlatform = 'p2p';
+            document.getElementById('vip-checkbox').checked = false;
+            updatePlatformSelectionUI();
+            document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
+            document.getElementById('modal-sell-skin').classList.add('active');
+        }
 
-            try {
-                const res = await fetch('/api/market/add', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ tgId: myTgId, name, image, price: parseFloat(price), isVip: false })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert('✅ Скин успешно выставлен на маркетплейс!');
-                    fetchMarketItems();
-                    switchTab('market', document.querySelectorAll('.nav-item')[0]);
-                } else {
-                    alert(data.error || 'Ошибка');
-                }
-            } catch(e) {}
+        function selectPlatform(plat) {
+            selectedSellingPlatform = plat;
+            updatePlatformSelectionUI();
+            const vipContainer = document.getElementById('vip-option-container');
+            if (plat === 'p2p') {
+                vipContainer.style.display = 'flex';
+            } else {
+                vipContainer.style.display = 'none';
+            }
+        }
+
+        function updatePlatformSelectionUI() {
+            document.getElementById('btn-plat-p2p').style.background = selectedSellingPlatform === 'p2p' ? 'rgba(124,252,0,0.15)' : 'transparent';
+            document.getElementById('btn-plat-lisskins').style.background = selectedSellingPlatform === 'lisskins' ? 'rgba(255,153,0,0.15)' : 'transparent';
+            document.getElementById('btn-plat-csmoney').style.background = selectedSellingPlatform === 'csmoney' ? 'rgba(0,255,255,0.15)' : 'transparent';
+        }
+
+        async function executeSkinSale() {
+            const priceVal = parseFloat(document.getElementById('sell-price-input').value);
+            if (!priceVal || isNaN(priceVal) || priceVal <= 0) return alert('Введите корректную цену!');
+            if (!selectedSkinToSell) return;
+
+            const isVip = selectedSellingPlatform === 'p2p' && document.getElementById('vip-checkbox').checked;
+
+            if (isVip && userBalance < 120) {
+                alert('❌ Недостаточно средств для VIP-объявления (нужно 120 ₽ на балансе). Пополните баланс!');
+                return;
+            }
+
+            if (selectedSellingPlatform === 'p2p') {
+                try {
+                    const res = await fetch('/api/market/add', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ tgId: myTgId, name: selectedSkinToSell.name, image: selectedSkinToSell.image, price: priceVal, isVip })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(isVip ? '✅ Скин успешно выставлен как VIP-объявление!' : '✅ Скин успешно выставлен на маркетплейс!');
+                        closeModal('modal-sell-skin');
+                        syncUserProfile();
+                        fetchMarketItems();
+                        switchTab('market', document.querySelectorAll('.nav-item')[0]);
+                    } else {
+                        alert(data.error || 'Ошибка');
+                    }
+                } catch(e) {}
+            } else {
+                const platName = selectedSellingPlatform === 'lisskins' ? 'Lis-Skins' : 'CS.MONEY';
+                const confirmed = confirm(`Вы подтверждаете продажу скина "${selectedSkinToSell.name}" на платформе ${platName} за ${priceVal} ₽?`);
+                if (!confirmed) return;
+
+                try {
+                    const res = await fetch('/api/external/sell', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ tgId: myTgId, price: priceVal })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(`✅ Скин успешно продан на ${platName}! Средства зачислены на ваш баланс.`);
+                        userBalance = data.newBalance;
+                        document.getElementById('user-balance').innerText = userBalance + ' ₽';
+                        document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                        closeModal('modal-sell-skin');
+                    } else {
+                        alert(data.error || 'Ошибка продажи');
+                    }
+                } catch(e) {}
+            }
         }
 
         async function fetchGiveaways() {
@@ -478,20 +572,24 @@
                         container.innerHTML = '<div class="empty-state" style="text-align:center; color:var(--text-muted); padding:15px;">Нет активных розыгрышей</div>';
                         return;
                     }
-                    container.innerHTML = data.giveaways.map(g => `
-                        <div class="giveaway-card">
-                            <div class="giveaway-header"><span style="color:var(--neon-purple); font-weight:bold;">🎁 Розыгрыш</span><span class="giveaway-timer">⏳ ${g.timer}</span></div>
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <div class="skin-image" style="width: 60px; height: 60px;"><img src="${g.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/60'"></div>
-                                <div>
-                                    <p class="giveaway-title">${g.title}</p>
-                                    <div style="font-size: 10px; color: var(--text-muted);">Спонсор: ${g.sponsorUsername}</div>
-                                    <div style="font-size: 10px; color: var(--text-muted);">Участников: ${g.participantsCount || 0}</div>
+                    container.innerHTML = data.giveaways.map(g => {
+                        let sponsorLink = g.sponsorUsername ? (g.sponsorUsername.startsWith('http') ? g.sponsorUsername : `https://t.me/${g.sponsorUsername.replace('@','')}`) : '#';
+                        return `
+                            <div class="giveaway-card">
+                                <div class="giveaway-header"><span style="color:var(--neon-purple); font-weight:bold;">🎁 Розыгрыш</span><span class="giveaway-timer">⏳ ${g.timer}</span></div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <div class="skin-image" style="width: 60px; height: 60px; margin-bottom:0;"><img src="${g.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/60'"></div>
+                                    <div style="flex:1; overflow:hidden;">
+                                        <p class="giveaway-title" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${g.title}</p>
+                                        <div style="font-size: 10px; color: var(--text-muted);">Спонсор: ${g.sponsorUsername}</div>
+                                        <div style="font-size: 10px; color: var(--text-muted);">Участников: ${g.participantsCount || 0}</div>
+                                    </div>
                                 </div>
+                                ${g.sponsorUsername ? `<a href="${sponsorLink}" target="_blank" class="btn-cyan" style="text-align:center; text-decoration:none; display:block; padding:6px; font-size:10px; margin-top:4px;">📢 Подписаться на спонсора</a>` : ''}
+                                <button class="btn-green-glow" style="margin-top: 4px; padding:6px; font-size:11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
                             </div>
-                            <button class="btn-green-glow" style="margin-top: 4px; padding:6px; font-size:11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
             } catch(e) {}
         }
@@ -509,7 +607,6 @@
             } catch(e) {}
         }
 
-        // === ИГРОВОЙ ЦИКЛ КОРОЛЕВСКОЙ БИТВЫ (JACKPOT) ===
         async function fetchJackpotState() {
             try {
                 const res = await fetch('/api/battles/current');
@@ -543,7 +640,6 @@
         function renderJackpot(b) {
             document.getElementById('jackpot-bank-text').innerText = b.bank + ' ₽';
             
-            // Если раунд в статусе ожидания, выводим 00:15
             if (b.status === 'waiting') {
                 document.getElementById('jackpot-timer-text').innerText = '00:15';
             }
