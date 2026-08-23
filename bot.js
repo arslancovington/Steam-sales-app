@@ -6,7 +6,7 @@ const axios = require('axios');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
-const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
+const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || ''; // Токен от @CryptoBot
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://your-domain.com';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -30,25 +30,19 @@ app.get('/', (req, res) => {
 // Настройка путей для постоянного диска /data на Render с fallback на локальную директорию
 const dataDir = '/data';
 if (!fs.existsSync(dataDir)) {
-    try {
-        fs.mkdirSync(dataDir, { recursive: true });
-    } catch (e) {
-        console.error("Не удалось создать папку /data, используется локальная директория:", e.message);
-    }
+    try { fs.mkdirSync(dataDir, { recursive: true }); } catch (e) {}
 }
 
 const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
-const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
 
-let db = { users: {}, marketItems: [], giveaways: [], battles: [], battleWinnersHistory: [] };
+let db = { users: {}, marketItems: [], giveaways: [], activeDeals: [], battleWinnersHistory: [] };
 let cards = [];
-let pricesCache = {}; 
 
 if (fs.existsSync(dbFile)) {
     try { 
         db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); 
-        if (!db.battles) db.battles = [];
+        if (!db.activeDeals) db.activeDeals = [];
         if (!db.battleWinnersHistory) db.battleWinnersHistory = [];
     } catch (e) {}
 }
@@ -60,43 +54,31 @@ if (fs.existsSync(cardsFile)) {
     } catch (e) {}
 }
 
-if (fs.existsSync(pricesFile)) {
-    try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) {}
-}
-
 let users = db.users || {};
 let marketItems = db.marketItems || [];
 let giveaways = db.giveaways || [];
-let battles = db.battles.length > 0 ? db.battles : [
-    { 
-        _id: 'b1', 
-        title: 'M4A1-S | Уединение (Minimal Wear)', 
-        image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpbuMljxlFf0Ob3czxG7c-JmJW0m_7zO6_umntd8-l-j--Y8Nug3QTisxI-Z23yLdfGcAdvZwnS81O5w7jt08a6ucvJn3JmvXRzsHvUcx2wgg/360fx360f', 
-        price: 200, 
-        slots: 2, 
-        participants: [], 
-        finished: false, 
-        winner: null,
-        notified: false
-    }
-];
+let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
+
+// Классическая Королевская Битва (Джекпот)
+let currentBattle = {
+    _id: 'b_' + Date.now(),
+    bank: 0,
+    status: 'waiting', // waiting, active, spinning, finished
+    timer: 15,
+    participants: [], 
+    betsFeed: [],     
+    winner: null,
+    endTime: null
+};
 
 let cardIndexRu = 0;
 let cardIndexUz = 0;
 
 function saveData() {
     try { 
-        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, battles, battleWinnersHistory }, null, 2)); 
+        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, activeDeals, battleWinnersHistory }, null, 2)); 
     } catch (e) {}
-}
-
-function saveCards() {
-    try { fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2)); } catch (e) {}
-}
-
-function savePricesCache() {
-    try { fs.writeFileSync(pricesFile, JSON.stringify(pricesCache, null, 2)); } catch (e) {}
 }
 
 function getOrCreateUser(tgId, username = 'Игрок') {
@@ -138,56 +120,105 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
+// Таймер тика джекпота
+setInterval(() => {
+    if (currentBattle.status === 'active' && currentBattle.endTime) {
+        const remaining = Math.ceil((currentBattle.endTime - Date.now()) / 1000);
+        currentBattle.timer = remaining > 0 ? remaining : 0;
+        
+        if (currentBattle.timer <= 0 && currentBattle.participants.length > 0) {
+            currentBattle.status = 'spinning';
+            
+            let total = currentBattle.bank;
+            let randomTicket = Math.random() * total;
+            let currentSum = 0;
+            let winnerObj = currentBattle.participants[0];
+            
+            for (let p of currentBattle.participants) {
+                currentSum += p.amount;
+                if (randomTicket <= currentSum) {
+                    winnerObj = p;
+                    break;
+                }
+            }
+            
+            currentBattle.winner = winnerObj;
+            currentBattle.status = 'finished';
+            
+            if (users[winnerObj.tgId]) {
+                users[winnerObj.tgId].balance += currentBattle.bank;
+                users[winnerObj.tgId].completedDeals = (users[winnerObj.tgId].completedDeals || 0) + 1;
+            }
+            
+            battleWinnersHistory.push({
+                tgId: winnerObj.tgId,
+                username: winnerObj.username,
+                prize: currentBattle.bank
+            });
+            saveData();
+            
+            bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы выиграли в Королевской Битве банк <b>${currentBattle.bank} ₽</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
+
+            setTimeout(() => {
+                currentBattle = {
+                    _id: 'b_' + Date.now(),
+                    bank: 0,
+                    status: 'waiting',
+                    timer: 15,
+                    participants: [],
+                    betsFeed: [],
+                    winner: null,
+                    endTime: null
+                };
+            }, 8000);
+        }
+    }
+}, 1000);
+
 // ================= TELEGRAM BOT COMMANDS =================
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    // Исправлено: убран несуществующий msg.from.photo_url
     const user = getOrCreateUser(chatId, msg.from.username || msg.from.first_name);
 
-    const opts = {
+    bot.sendMessage(chatId, `👋 Привет, <b>${user.username}</b>!\n\nДобро пожаловать в официальный P2P маркетплейс CS2 скинов и Королевской Битвы.`, {
+        parse_mode: 'HTML',
         reply_markup: {
             inline_keyboard: [
                 [{ text: '🎮 Открыть P2P Маркетплейс', web_app: { url: WEB_APP_URL } }],
                 [{ text: '💬 Поддержка', url: 'https://t.me/your_support' }]
             ]
         }
-    };
-
-    bot.sendMessage(chatId, `👋 Привет, <b>${user.username}</b>!\n\nДобро пожаловать в официальный P2P маркетплейс CS2 скинов и королевских битв.`, {
-        parse_mode: 'HTML',
-        ...opts
     });
 });
 
-// АДМИН-КОМАНДА ДЛЯ СОЗДАНИЯ БИТВЫ: /battle [цена] [слоты] [название]
-bot.onText(/\/battle\s+(\d+)\s+(\d+)\s+(.+)/, async (msg, match) => {
+// Админ-команда для создания розыгрышей: /giveaway Название | @channel | URL_картинки | Таймер
+bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID' && String(chatId) !== String(ADMIN_CHAT_ID)) {
-        return bot.sendMessage(chatId, '❌ У вас нет прав для создания битв.');
+        return bot.sendMessage(chatId, '❌ У вас нет прав для создания розыгрышей.');
     }
 
-    const price = parseInt(match[1]);
-    const slots = parseInt(match[2]);
-    const title = match[3].trim();
+    const parts = match[1].split('|').map(p => p.trim());
+    if (parts.length < 4) {
+        return bot.sendMessage(chatId, '❌ Неверный формат!\nИспользуйте: `/giveaway Название | @channel | URL_картинки | 24 часа`', { parse_mode: 'Markdown' });
+    }
 
-    const image = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpbuMljxlFf0Ob3czxG7c-JmJW0m_7zO6_umntd8-l-j--Y8Nug3QTisxI-Z23yLdfGcAdvZwnS81O5w7jt08a6ucvJn3JmvXRzsHvUcx2wgg/360fx360f';
+    const [title, sponsorUsername, image, timer] = parts;
 
-    const newBattle = {
-        _id: 'b_' + Date.now(),
+    const newGiveaway = {
+        _id: 'g_' + Date.now(),
         title,
+        sponsorUsername,
         image,
-        price,
-        slots,
+        timer,
         participants: [],
-        finished: false,
-        winner: null,
-        notified: false
+        participantsCount: 0
     };
 
-    battles = [newBattle];
-    saveData(); // Исправление: теперь битва гарантированно сохраняется в файл database.json
+    giveaways.push(newGiveaway);
+    saveData();
 
-    bot.sendMessage(chatId, `✅ Новая Королевская Битва успешно создана!\n\n🏆 Скин: <b>${title}</b>\n💰 Цена входа: ${price} ₽\n👥 Слотов: ${slots}`, { parse_mode: 'HTML' });
+    bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
 // ================= USER & PROFILE API =================
@@ -211,7 +242,7 @@ app.post('/api/user/save', (req, res) => {
     res.json({ success: true, steamId: user.steamId });
 });
 
-// ================= MARKETPLACE API =================
+// ================= MARKETPLACE & ESCROW =================
 app.get('/api/market/items', (req, res) => {
     res.json({ success: true, items: marketItems });
 });
@@ -253,17 +284,40 @@ app.post('/api/deals/buy', async (req, res) => {
     }
 
     buyer.balance -= item.price;
-    buyer.completedDeals = (buyer.completedDeals || 0) + 1;
-
-    const seller = getOrCreateUser(item.tgId);
-    seller.balance += item.price;
-    seller.completedDeals = (seller.completedDeals || 0) + 1;
-
     marketItems.splice(itemIndex, 1);
+
+    const dealId = 'deal_' + Date.now();
+    const deal = {
+        _id: dealId,
+        itemId: item._id,
+        name: item.name,
+        price: item.price,
+        image: item.image,
+        sellerTgId: item.tgId,
+        buyerTgId,
+        buyerUsername: buyerName,
+        buyerTradeUrl,
+        status: 'waiting_send'
+    };
+    activeDeals.push(deal);
     saveData();
 
     try {
-        await bot.sendMessage(item.tgId, `🎉 Ваш скин <b>${item.name}</b> успешно куплен за ${item.price} ₽! Средства зачислены на баланс.`, { parse_mode: 'HTML' });
+        await bot.sendMessage(item.tgId, 
+            `📦 <b>Куплен ваш скин: ${item.name}</b>\n\n` +
+            `💰 Сумма: <b>${item.price} ₽</b>\n` +
+            `👤 Покупатель: @${buyerName}\n` +
+            `🔗 Trade URL покупателя: <code>${buyerTradeUrl || 'Не указана'}</code>\n\n` +
+            `⚠️ Передайте предмет в Steam по трейд-ссылке покупателя, после чего нажмите кнопку ниже:`,
+            {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📦 Я отправил предмет', callback_data: `deal_sent_${dealId}` }]
+                    ]
+                }
+            }
+        );
     } catch (e) {}
 
     res.json({ success: true, newBalance: buyer.balance });
@@ -286,9 +340,11 @@ app.post('/api/giveaways/join', async (req, res) => {
             const chatMember = await bot.getChatMember(giveaway.sponsorUsername, tgId);
             const isMember = ['creator', 'administrator', 'member'].includes(chatMember.status);
             if (!isMember) {
-                return res.json({ success: false, error: `Для участия необходимо подписаться на канал спонсора: ${giveaway.sponsor}` });
+                return res.json({ success: false, error: `Для участия необходимо подписаться на спонсора: ${giveaway.sponsorUsername}` });
             }
-        } catch (err) {}
+        } catch (err) {
+            return res.json({ success: false, error: `Подпишитесь на канал спонсора: ${giveaway.sponsorUsername}` });
+        }
     }
 
     giveaway.participants.push(String(tgId));
@@ -297,88 +353,71 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// ================= KOROLEVSKAYA BITTVA (BATTLES) API =================
-app.get('/api/battles/list', (req, res) => {
-    res.json({ success: true, battles });
+// ================= KOROLEVSKAYA BITTVA (JACKPOT) API =================
+app.get('/api/battles/current', (req, res) => {
+    let battleCopy = JSON.parse(JSON.stringify(currentBattle));
+    if (battleCopy.bank > 0) {
+        battleCopy.participants.forEach(p => {
+            p.chance = ((p.amount / battleCopy.bank) * 100).toFixed(2);
+        });
+    }
+    res.json({ success: true, battle: battleCopy });
 });
 
-app.post('/api/battles/join', async (req, res) => {
-    const { tgId, battleId, username, photo } = req.body;
-    const battle = battles.find(b => b._id === battleId);
-    if (!battle || battle.finished) return res.json({ success: false, error: 'Битва недоступна или уже завершена' });
+app.post('/api/battles/bet', (req, res) => {
+    const { tgId, username, photo, amount } = req.body;
+    const betAmount = parseFloat(amount);
+
+    if (!betAmount || betAmount < 10) {
+        return res.json({ success: false, error: 'Минимальная ставка 10 ₽' });
+    }
+
+    if (currentBattle.status === 'finished' || currentBattle.status === 'spinning') {
+        return res.json({ success: false, error: 'Раунд завершается, дождитесь нового' });
+    }
 
     const user = getOrCreateUser(tgId, username);
-    if (user.balance < battle.price) {
+    if (user.balance < betAmount) {
         return res.json({ success: false, error: 'Недостаточно средств на балансе' });
     }
 
-    if (!battle.participants) battle.participants = [];
-    if (battle.participants.some(p => String(p.tgId) === String(tgId))) {
-        return res.json({ success: false, error: 'Вы уже участвуете в этой битве' });
+    user.balance -= betAmount;
+    currentBattle.bank += betAmount;
+
+    if (currentBattle.status === 'waiting' || currentBattle.participants.length === 0) {
+        currentBattle.status = 'active';
+        currentBattle.endTime = Date.now() + 15000;
+        currentBattle.timer = 15;
     }
 
-    user.balance -= battle.price;
-    if (photo) user.photo = photo;
-    saveData();
+    const colors = ['#ff007f', '#00ffff', '#7cfc00', '#bf00ff', '#ffa500', '#ff4d4d', '#ffff00', '#1e90ff'];
+    let existing = currentBattle.participants.find(p => String(p.tgId) === String(tgId));
 
-    const participantData = {
-        tgId,
-        username: username || user.username || `User_${tgId}`,
-        photo: photo || user.photo || null
-    };
-
-    battle.participants.push(participantData);
-    saveData();
-
-    if (battle.participants.length >= battle.slots) {
-        battle.finished = true;
-        const winnerObj = battle.participants[Math.floor(Math.random() * battle.participants.length)];
-        battle.winner = winnerObj;
-        saveData();
-
-        return res.json({
-            success: true,
-            newBalance: user.balance,
-            finished: true,
-            battleId: battle._id,
-            battleTitle: battle.title,
-            participants: battle.participants,
-            winner: winnerObj
+    let participantColor = '';
+    if (existing) {
+        existing.amount += betAmount;
+        participantColor = existing.color;
+    } else {
+        participantColor = colors[currentBattle.participants.length % colors.length];
+        currentBattle.participants.push({
+            tgId,
+            username: username || user.username || `User_${tgId}`,
+            photo: photo || user.photo || null,
+            amount: betAmount,
+            color: participantColor
         });
     }
 
+    currentBattle.betsFeed.unshift({
+        username: username || user.username || `User_${tgId}`,
+        photo: photo || user.photo || null,
+        amount: betAmount,
+        color: participantColor
+    });
+    if (currentBattle.betsFeed.length > 10) currentBattle.betsFeed.pop();
+
     saveData();
-    res.json({ success: true, newBalance: user.balance, finished: false });
-});
-
-app.post('/api/battles/complete', async (req, res) => {
-    const { battleId } = req.body;
-    const battle = battles.find(b => b._id === battleId);
-    if (!battle || !battle.finished || !battle.winner) {
-        return res.json({ success: false, error: 'Битва не найдена' });
-    }
-
-    if (battle.notified) {
-        return res.json({ success: true });
-    }
-
-    battle.notified = true;
-    const winnerObj = battle.winner;
-
-    battleWinnersHistory.push({ tgId: winnerObj.tgId, username: winnerObj.username });
-    saveData();
-
-    try {
-        await bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы победили в Королевской Битве и забрали скин <b>${battle.title}</b>!`, { parse_mode: 'HTML' });
-    } catch (e) {}
-
-    if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-        try {
-            await bot.sendMessage(ADMIN_CHAT_ID, `⚔️ <b>Королевская Битва завершена!</b>\n\nСкин: ${battle.title}\n👑 Победитель: @${winnerObj.username}`, { parse_mode: 'HTML' });
-        } catch (e) {}
-    }
-
-    res.json({ success: true });
+    res.json({ success: true, newBalance: user.balance, battle: currentBattle });
 });
 
 app.get('/api/battles/leaderboard', (req, res) => {
@@ -423,98 +462,69 @@ app.get('/api/steam/price', async (req, res) => {
 // ================= BILLING & PAYMENTS API =================
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
-    let rubles = currency === 'crypto' ? amount * 80 : (currency === 'stars' ? amount * 1.5 : amount);
-
     try {
+        if (currency === 'crypto' && CRYPTO_BOT_TOKEN) {
+            const cryptoRes = await axios.post('https://pay.crypt.bot/api/createInvoice', {
+                asset: 'USDT',
+                amount: String(amount),
+                description: `Пополнение баланса на ${amount} USDT`
+            }, {
+                headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN }
+            });
+
+            if (cryptoRes.data && cryptoRes.data.ok) {
+                const invoice = cryptoRes.data.result;
+                await bot.sendMessage(tgId, `💎 <b>Счет на оплату через Crypto Bot</b>\n\nСумма: <b>${amount} USDT</b>`, {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [[{ text: '💳 Оплатить счет', url: invoice.pay_url }]]
+                    }
+                });
+                return res.json({ success: true });
+            }
+        }
+
         if (currency === 'p2pru' || currency === 'p2puz') {
             const isRu = (currency === 'p2pru');
             const targetType = isRu ? 'RU' : 'UZ';
             const filteredCards = cards.filter(c => (c.type || 'UZ') === targetType);
             
             if (filteredCards.length === 0) {
-                return res.json({ success: false, error: `У администратора не добавлены карты для приема ${currency.toUpperCase()}.` });
+                return res.json({ success: false, error: `Карты не найдены.` });
             }
 
-            let activeCard;
-            if (isRu) {
-                activeCard = filteredCards[cardIndexRu % filteredCards.length];
-                cardIndexRu = (cardIndexRu + 1) % filteredCards.length;
-            } else {
-                activeCard = filteredCards[cardIndexUz % filteredCards.length];
-                cardIndexUz = (cardIndexUz + 1) % filteredCards.length;
-            }
+            let activeCard = isRu ? filteredCards[cardIndexRu % filteredCards.length] : filteredCards[cardIndexUz % filteredCards.length];
+            if (isRu) cardIndexRu = (cardIndexRu + 1) % filteredCards.length;
+            else cardIndexUz = (cardIndexUz + 1) % filteredCards.length;
 
-            if (isRu) {
-                await bot.sendMessage(tgId, 
-                    `💳 Реквизиты для оплаты P2P RU\n\n` +
-                    `Сумма к оплате: **${amount} ₽**\n` +
-                    `Карта для перевода (${activeCard.holder}):\n\`${activeCard.number}\`\n\n` +
-                    `После перевода нажмите кнопку ниже, чтобы отправить отчет администратору.`, 
+            const paySum = isRu ? `${amount} ₽` : `${Math.round(amount * 175).toLocaleString()} сум`;
+            await bot.sendMessage(tgId, 
+                `💳 <b>Реквизиты для оплаты ${currency.toUpperCase()}</b>\n\n` +
+                `Сумма: <b>${paySum}</b>\n` +
+                `Карта (${activeCard.holder}):\n<code>${activeCard.number}</code>`, 
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [[{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}` }]]
+                    }
+                }
+            );
+
+            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                await bot.sendMessage(ADMIN_CHAT_ID, 
+                    `🔔 <b>Запрос на пополнение!</b>\nПользователь ID: <code>${tgId}</code>\nСумма: <b>${amount} ₽</b>`, 
                     {
-                        parse_mode: 'Markdown',
+                        parse_mode: 'HTML',
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}_${amount}` }]
+                                [
+                                    { text: `✅ Подтвердить`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
+                                    { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
+                                ]
                             ]
                         }
                     }
                 );
-
-                if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                    await bot.sendMessage(ADMIN_CHAT_ID, 
-                        `💳 Новый авто-запрос P2P RU!\n\n` +
-                        `👤 Пользователь ID: \`${tgId}\`\n` +
-                        `💰 Сумма зачисления: ${amount} ₽\n` +
-                        `🏦 Выданная карта: \`${activeCard.number}\` (${activeCard.holder})`, 
-                        {
-                            parse_mode: 'Markdown',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
-                                        { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
-                                    ]
-                                ]
-                            }
-                        }
-                    );
-                }
-            } else {
-                const sumAmount = Math.round(amount * 175);
-                await bot.sendMessage(tgId, 
-                    `💳 Реквизиты для оплаты P2P UZ\n\n` +
-                    `Сумма к оплате: **${sumAmount.toLocaleString()} сум** (${amount} ₽)\n` +
-                    `Карта для перевода (${activeCard.holder}):\n\`${activeCard.number}\`\n\n` +
-                    `После перевода нажмите кнопку ниже, чтобы отправить отчет администратору.`, 
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}_${sumAmount}` }]
-                            ]
-                        }
-                    }
-                );
-
-                if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                    await bot.sendMessage(ADMIN_CHAT_ID, 
-                        `💳 Новый авто-запрос P2P UZ!\n\n` +
-                        `👤 Пользователь ID: \`${tgId}\`\n` +
-                        `💰 Сумма зачисления: ${amount} ₽ (${sumAmount.toLocaleString()} сум)\n` +
-                        `🏦 Выданная карта: \`${activeCard.number}\` (${activeCard.holder})`, 
-                        {
-                            parse_mode: 'Markdown',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [
-                                        { text: `✅ Подтвердить (${amount} ₽)`, callback_data: `p2p_confirm_pay_${tgId}_${amount}` },
-                                        { text: `❌ Отклонить`, callback_data: `p2p_cancel_${tgId}_${amount}` }
-                                    ]
-                                ]
-                            }
-                        }
-                    );
-                }
             }
         }
         res.json({ success: true });
@@ -524,37 +534,36 @@ app.post('/api/billing/invoice', async (req, res) => {
 });
 
 app.post('/api/billing/withdraw', async (req, res) => {
-    const { tgId, amount, recipientAccount, username, method } = req.body;
+    const { tgId, amount, recipientAccount, username } = req.body;
     const user = getOrCreateUser(tgId, username);
     
-    if (user.balance < amount) {
-        return res.json({ success: false, error: 'Недостаточно средств на балансе' });
-    }
+    if (user.balance < amount) return res.json({ success: false, error: 'Недостаточно средств' });
 
     user.balance -= amount;
     saveData();
 
     try {
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            const currentUsername = username || user.username || String(tgId);
-            let adminMessage = `💸 Новая заявка на вывод средств!\n\n👤 Игрок: @${currentUsername} (ID: ${tgId})\n💰 Сумма: ${amount} ₽\n💳 Реквизиты: ${recipientAccount}`;
-
-            await bot.sendMessage(ADMIN_CHAT_ID, adminMessage, {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '✅ Подтвердить перевод', callback_data: `p2p_withdraw_done_${tgId}_${amount}` },
-                            { text: '❌ Отменить / Возврат', callback_data: `p2p_cancel_${tgId}_${amount}` }
+            await bot.sendMessage(ADMIN_CHAT_ID, 
+                `💸 <b>Заявка на вывод средств!</b>\n\nИгрок: @${username || tgId}\nСумма: <b>${amount} ₽</b>\nРеквизиты: <code>${recipientAccount}</code>`, 
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '✅ Выполнено', callback_data: `p2p_withdraw_done_${tgId}_${amount}` },
+                                { text: '❌ Возврат', callback_data: `p2p_cancel_${tgId}_${amount}` }
+                            ]
                         ]
-                    ]
+                    }
                 }
-            });
+            );
         }
         res.json({ success: true, newBalance: user.balance });
     } catch (e) {
         user.balance += amount;
         saveData();
-        res.json({ success: false, error: 'Ошибка отправки чека администраторам.' });
+        res.json({ success: false, error: 'Ошибка отправки админу.' });
     }
 });
 
@@ -562,7 +571,57 @@ app.post('/api/billing/withdraw', async (req, res) => {
 bot.on('callback_query', async (query) => {
     const data = query.data;
 
-    if (data.startsWith('p2p_confirm_pay_')) {
+    if (data.startsWith('deal_sent_')) {
+        const dealId = data.replace('deal_sent_', '');
+        const deal = activeDeals.find(d => d._id === dealId);
+        if (!deal) return bot.answerCallbackQuery(query.id, { text: 'Сделка не найдена' });
+
+        deal.status = 'waiting_receive';
+        saveData();
+
+        await bot.editMessageText(`📦 Вы подтвердили отправку предмета <b>${deal.name}</b>. Ожидаем подтверждения от покупателя.`, {
+            chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'HTML'
+        });
+
+        try {
+            await bot.sendMessage(deal.buyerTgId,
+                `📦 <b>Продавец отправил предмет: ${deal.name}</b>\n\nПроверьте свой инвентарь Steam и подтвердите получение.`,
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: { inline_keyboard: [[{ text: '✅ Я получил предмет', callback_data: `deal_recv_${dealId}` }]] }
+                }
+            );
+        } catch(e) {}
+
+        await bot.answerCallbackQuery(query.id, { text: 'Статус обновлен!' });
+    }
+    else if (data.startsWith('deal_recv_')) {
+        const dealId = data.replace('deal_recv_', '');
+        const deal = activeDeals.find(d => d._id === dealId);
+        if (!deal) return bot.answerCallbackQuery(query.id, { text: 'Сделка не найдена' });
+
+        deal.status = 'completed';
+        
+        const seller = getOrCreateUser(deal.sellerTgId);
+        seller.balance += deal.price;
+        seller.completedDeals = (seller.completedDeals || 0) + 1;
+
+        saveData();
+
+        await bot.editMessageText(`✅ Вы подтвердили получение предмета <b>${deal.name}</b>. Сделка успешно завершена!`, {
+            chat_id: query.message.chat.id, message_id: query.message.message_id, parse_mode: 'HTML'
+        });
+
+        try {
+            await bot.sendMessage(deal.sellerTgId, `🎉 Покупатель подтвердил получение предмета <b>${deal.name}</b>! Средства <b>${deal.price} ₽</b> зачислены на баланс.`, { parse_mode: 'HTML' });
+        } catch(e) {}
+
+        await bot.answerCallbackQuery(query.id, { text: 'Сделка завершена!' });
+    }
+    else if (data.startsWith('user_paid_')) {
+        await bot.answerCallbackQuery(query.id, { text: 'Отчет отправлен администратору!' });
+    }
+    else if (data.startsWith('p2p_confirm_pay_')) {
         const parts = data.split('_');
         const targetTgId = parts[3];
         const amount = parseFloat(parts[4]);
@@ -571,21 +630,17 @@ bot.on('callback_query', async (query) => {
         user.balance += amount;
         saveData();
 
-        await bot.sendMessage(targetTgId, `✅ Ваша оплата на сумму ${amount} ₽ подтверждена! Баланс успешно пополнен.`);
-        await bot.editMessageText(`✅ Пополнение на ${amount} ₽ для игрока ${targetTgId} успешно подтверждено!`, {
-            chat_id: query.message.chat.id, message_id: query.message.message_id
-        });
-        await bot.answerCallbackQuery(query.id, { text: 'Пополнение подтверждено!' });
+        await bot.sendMessage(targetTgId, `✅ Оплата на сумму <b>${amount} ₽</b> подтверждена! Баланс пополнен.`, { parse_mode: 'HTML' });
+        await bot.editMessageText(`✅ Пополнение на ${amount} ₽ подтверждено.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+        await bot.answerCallbackQuery(query.id, { text: 'Подтверждено!' });
     }
     else if (data.startsWith('p2p_withdraw_done_')) {
         const parts = data.split('_');
         const targetTgId = parts[3];
         const amount = parts[4];
 
-        await bot.sendMessage(targetTgId, `✅ Ваша заявка на вывод ${amount} ₽ успешно обработана!`);
-        await bot.editMessageText(`✅ Вывод средств на сумму ${amount} ₽ для игрока ${targetTgId} выполнен.`, {
-            chat_id: query.message.chat.id, message_id: query.message.message_id
-        });
+        await bot.sendMessage(targetTgId, `✅ Вывод <b>${amount} ₽</b> успешно выполнен!`, { parse_mode: 'HTML' });
+        await bot.editMessageText(`✅ Вывод выполнен.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
         await bot.answerCallbackQuery(query.id, { text: 'Вывод подтвержден!' });
     }
     else if (data.startsWith('p2p_cancel_')) {
@@ -593,11 +648,13 @@ bot.on('callback_query', async (query) => {
         const targetTgId = parts[2];
         const amount = parts[3];
 
-        await bot.sendMessage(targetTgId, `❌ Ваша операция на сумму ${amount} ₽ была отклонена администратором.`);
-        await bot.editMessageText(`❌ Заявка на сумму ${amount} ₽ для игрока ${targetTgId} отклонена.`, {
-            chat_id: query.message.chat.id, message_id: query.message.message_id
-        });
-        await bot.answerCallbackQuery(query.id, { text: 'Операция отклонена.' });
+        const user = getOrCreateUser(targetTgId);
+        user.balance += parseFloat(amount);
+        saveData();
+
+        await bot.sendMessage(targetTgId, `❌ Операция на сумму <b>${amount} ₽</b> отклонена (средства возвращены на баланс).`, { parse_mode: 'HTML' });
+        await bot.editMessageText(`❌ Отклонено.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+        await bot.answerCallbackQuery(query.id, { text: 'Отменено.' });
     }
 });
 
