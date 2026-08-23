@@ -56,54 +56,25 @@
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 25px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        /* ОБНОВЛЕННЫЙ ДИЗАЙН РОЗЫГРЫШЕЙ */
+        /* РОЗЫГРЫШИ */
         .giveaway-card {
             background: linear-gradient(145deg, rgba(16, 24, 20, 0.95), rgba(10, 16, 14, 0.98));
             border: 1px solid rgba(191, 0, 255, 0.4);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            position: relative;
+            border-radius: 16px; padding: 16px; margin-bottom: 14px;
+            display: flex; flex-direction: column; gap: 12px; position: relative;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(191, 0, 255, 0.05);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        .giveaway-card.finished {
-            border-color: rgba(124, 252, 0, 0.4);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(124, 252, 0, 0.05);
-        }
+        .giveaway-card.finished { border-color: rgba(124, 252, 0, 0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(124, 252, 0, 0.05); }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
-        .giveaway-badge-sponsor {
-            background: rgba(191, 0, 255, 0.15); border: 1px solid rgba(191, 0, 255, 0.4);
-            color: #d16eff; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px;
-            letter-spacing: 0.5px; text-transform: uppercase;
-        }
-        .giveaway-badge-ended {
-            background: rgba(124, 252, 0, 0.15); border: 1px solid rgba(124, 252, 0, 0.4);
-            color: var(--neon-green); font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px;
-            letter-spacing: 0.5px; text-transform: uppercase;
-        }
-        .giveaway-timer-badge {
-            font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: bold;
-            color: var(--neon-cyan); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 255, 255, 0.2);
-            padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px;
-        }
+        .giveaway-badge-sponsor { background: rgba(191, 0, 255, 0.15); border: 1px solid rgba(191, 0, 255, 0.4); color: #d16eff; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
+        .giveaway-badge-ended { background: rgba(124, 252, 0, 0.15); border: 1px solid rgba(124, 252, 0, 0.4); color: var(--neon-green); font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
+        .giveaway-timer-badge { font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: bold; color: var(--neon-cyan); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 255, 255, 0.2); padding: 4px 8px; border-radius: 6px; }
         .giveaway-body { display: flex; gap: 12px; align-items: center; }
-        .giveaway-skin-box {
-            width: 75px; height: 75px; background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
-        }
+        .giveaway-skin-box { width: 75px; height: 75px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px; }
         .giveaway-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        .giveaway-title { font-size: 15px; font-weight: 900; color: #fff; margin: 0; letter-spacing: 0.3px; line-height: 1.2; }
+        .giveaway-title { font-size: 15px; font-weight: 900; color: #fff; margin: 0; }
         .giveaway-meta { font-size: 11px; color: var(--text-muted); }
-        .giveaway-winner-box {
-            background: rgba(124, 252, 0, 0.08); border: 1px dashed rgba(124, 252, 0, 0.3);
-            border-radius: 8px; padding: 6px 10px; margin-top: 4px;
-        }
+        .giveaway-winner-box { background: rgba(124, 252, 0, 0.08); border: 1px dashed rgba(124, 252, 0, 0.3); border-radius: 8px; padding: 6px 10px; margin-top: 4px; }
         .giveaway-actions { display: flex; gap: 8px; margin-top: 4px; }
 
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.98); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid rgba(0, 255, 255, 0.2); z-index: 100; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
@@ -136,11 +107,7 @@
         
         .timer-block { text-align: right; }
         .timer-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-        .c4-timer {
-            font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 900; color: var(--neon-green);
-            background: #050505; padding: 2px 8px; border-radius: 6px; border: 1px solid #1a331a;
-            box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 8px rgba(124, 252, 0, 0.3); letter-spacing: 2px; display: inline-block; margin-top: 2px;
-        }
+        .c4-timer { font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 900; color: var(--neon-green); background: #050505; padding: 2px 8px; border-radius: 6px; border: 1px solid #1a331a; box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 8px rgba(124, 252, 0, 0.3); letter-spacing: 2px; display: inline-block; margin-top: 2px; }
         .c4-timer.urgent { color: var(--danger-red); border-color: #4a1a1a; box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 15px rgba(255, 51, 51, 0.8); animation: c4Blink 0.35s infinite alternate; }
         @keyframes c4Blink { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0.6; transform: scale(1.05); } }
 
@@ -155,15 +122,12 @@
 
         .quick-bet-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
         .quick-bet-btn { background: rgba(0,255,255,0.1); border: 1px solid rgba(0,255,255,0.3); color: var(--neon-cyan); font-weight: bold; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 12px; }
-        .quick-bet-btn:active { background: var(--neon-cyan); color: #000; }
         .bet-button-pulse { animation: glowingBtn 2s infinite; }
         @keyframes glowingBtn { 0% { box-shadow: 0 0 5px var(--neon-green); } 50% { box-shadow: 0 0 20px var(--neon-green); } 100% { box-shadow: 0 0 5px var(--neon-green); } }
 
         .player-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; max-height: 180px; overflow-y: auto; }
-        .player-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 9px 12px; border-radius: 8px; animation: slideIn 0.3s ease-out backwards; border: 1px solid rgba(255,255,255,0.03); }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-        .winner-announcement { text-align: center; padding: 15px 0; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .player-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
+        .winner-announcement { text-align: center; padding: 15px 0; }
     </style>
 </head>
 <body>
@@ -182,13 +146,13 @@
     </header>
 
     <main class="content-area">
-        <!-- ТАБ: МАРКЕТ -->
+        <!-- МАРКЕТ -->
         <section id="tab-market" class="tab active">
             <h2 class="neon-text">Маркетплейс</h2>
             <div id="market-listings" class="grid-layout"></div>
         </section>
 
-        <!-- ТАБ: АРЕНА (КОРОЛЕВСКАЯ БИТВА) -->
+        <!-- АРЕНА -->
         <section id="tab-battle" class="tab">
             <div class="battle-arena">
                 <div class="battle-title">👑 КОРОЛЕВСКАЯ БИТВА</div>
@@ -236,7 +200,7 @@
             </div>
         </section>
 
-        <!-- ТАБ: ИНВЕНТАРЬ -->
+        <!-- ИНВЕНТАРЬ -->
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Инвентарь Steam</h2>
             <div class="trade-url-box" style="display: flex; gap: 8px; margin: 10px 0;">
@@ -248,7 +212,7 @@
             </div>
         </section>
 
-        <!-- ТАБ: РОЗЫГРЫШИ (ОБНОВЛЕННЫЙ ДИЗАЙН) -->
+        <!-- РОЗЫГРЫШИ -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Розыгрыши</h2>
             <div id="giveaways-container">
@@ -256,7 +220,7 @@
             </div>
         </section>
 
-        <!-- ТАБ: ПРОФИЛЬ -->
+        <!-- ПРОФИЛЬ -->
         <section id="tab-profile" class="tab">
             <h2 class="neon-text">Профиль</h2>
             <div class="card" style="border:1px solid var(--neon-cyan); padding:15px; margin-bottom:15px; background: rgba(0,255,255,0.05);">
@@ -280,41 +244,21 @@
         </section>
     </main>
 
-    <!-- МОДАЛКА: ПРОДАЖА -->
+    <!-- МОДАЛКИ -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Продать скин</h3>
             <div class="skin-image" id="sell-modal-img-box"></div>
             <p id="sell-modal-skin-name" style="font-weight: bold; font-size: 13px; margin-bottom: 5px;"></p>
-            
-            <div class="platform-select-group">
-                <button type="button" class="platform-option-btn active" id="sell-tab-our" onclick="selectSellPlatform('our')">Наш Маркет</button>
-                <button type="button" class="platform-option-btn" id="sell-tab-lis" onclick="selectSellPlatform('lis')">LIS-Skins</button>
-                <button type="button" class="platform-option-btn" id="sell-tab-csmoney" onclick="selectSellPlatform('csmoney')">CS.MONEY</button>
+            <div class="price-input-container">
+                <span class="currency-symbol">₽</span>
+                <input type="number" id="sale-price-input" placeholder="Вы получите (₽)" oninput="updateBuyerPrice()">
             </div>
-
-            <div id="sell-panel-our">
-                <div class="price-input-container">
-                    <span class="currency-symbol">₽</span>
-                    <input type="number" id="sale-price-input" placeholder="Вы получите (₽)" oninput="updateBuyerPrice()">
-                </div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px; text-align: left;">
-                    Покупатель заплатит (комиссия 4%): <br>
-                    <span id="buyer-price-display" style="color: var(--neon-cyan); font-size: 16px; font-weight: bold;">0 ₽</span>
-                </div>
-                <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽)</label>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px; text-align: left;">
+                Покупатель заплатит (комиссия 4%): <br>
+                <span id="buyer-price-display" style="color: var(--neon-cyan); font-size: 16px; font-weight: bold;">0 ₽</span>
             </div>
-
-            <div id="sell-panel-lis" style="display: none; padding: 10px 0;">
-                <p style="font-size: 12px; color: var(--text-muted);">Мгновенная продажа на LIS-Skins.</p>
-                <button class="btn-green-glow" onclick="window.open('https://lis-skins.com/', '_blank')" style="margin-top:10px;">Продать на LIS-Skins</button>
-            </div>
-
-            <div id="sell-panel-csmoney" style="display: none; padding: 10px 0;">
-                <p style="font-size: 12px; color: var(--text-muted);">Быстрый обмен на CS.MONEY.</p>
-                <button class="btn-green-glow" onclick="window.open('https://cs.money/', '_blank')" style="margin-top:10px;">Продать на CS.MONEY</button>
-            </div>
-
+            <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽)</label>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" id="confirm-sell-btn" onclick="confirmSellItem()" style="flex:1; margin:0;">Выставить</button>
@@ -322,7 +266,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: ПОПОЛНЕНИЕ -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -344,7 +287,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: ВЫВОД -->
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
@@ -485,7 +427,6 @@
             currentSelectedItem = item;
             document.getElementById('sell-modal-skin-name').innerText = item.name;
             document.getElementById('sell-modal-img-box').innerHTML = `<img src="${item.icon_url}" class="skin-img">`;
-            selectSellPlatform('our');
             document.getElementById('vip-checkbox').checked = false;
             document.getElementById('sale-price-input').value = 150; updateBuyerPrice();
             
@@ -495,16 +436,6 @@
                 if (data.success && data.price) { document.getElementById('sale-price-input').value = data.price; updateBuyerPrice(); }
             } catch(e) {}
             document.getElementById('modal-sell').classList.add('active');
-        }
-
-        function selectSellPlatform(platform) {
-            ['our', 'lis', 'csmoney'].forEach(p => {
-                document.getElementById('sell-tab-' + p).classList.remove('active');
-                document.getElementById('sell-panel-' + p).style.display = 'none';
-            });
-            document.getElementById('sell-tab-' + platform).classList.add('active');
-            document.getElementById('sell-panel-' + platform).style.display = 'block';
-            document.getElementById('confirm-sell-btn').style.display = (platform === 'our') ? 'block' : 'none';
         }
 
         async function confirmSellItem() {
@@ -606,10 +537,24 @@
             } else { timerBox.innerText = '00:00'; timerBox.classList.remove('urgent'); }
 
             let barHtml = '', listHtml = '';
-            state.participants.forEach((p, idx) => {
+            state.participants.forEach((p) => {
                 let chance = state.bank > 0 ? (p.bet / state.bank * 100).toFixed(1) : 0;
                 barHtml += `<div class="chance-segment" style="width: ${chance}%; background: ${p.color};"></div>`;
-                listHtml += `<div class="player-row" style="border-left: 4px solid ${p.color};"><div style="display:flex; align-items:center; gap:8px;"><span>@${p.username}</span></div><div><b style="color:var(--neon-green)">${p.bet} ₽</b></div></div>`;
+                
+                // Восстановлен вывод аватарок в списке ставок
+                let avatarContent = p.avatar && p.avatar.startsWith('http') 
+                    ? `<img src="${p.avatar}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">` 
+                    : `<span style="font-size:16px;">${p.avatar || '🧑‍🚀'}</span>`;
+
+                listHtml += `
+                    <div class="player-row" style="border-left: 4px solid ${p.color};">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            ${avatarContent}
+                            <span>@${p.username}</span>
+                        </div>
+                        <div><b style="color:var(--neon-green)">${p.bet} ₽</b></div>
+                    </div>
+                `;
             });
             document.getElementById('chances-bar').innerHTML = barHtml;
             document.getElementById('battle-players').innerHTML = listHtml;
@@ -650,7 +595,7 @@
             if (data.success) { document.getElementById('battle-bet-amount').value = ''; syncUserProfile(); pollBattleState(); } else alert(data.error);
         }
 
-        /* РОЗЫГРЫШИ (ОБНОВЛЕННЫЙ РЕНДЕР) */
+        /* РОЗЫГРЫШИ */
         async function fetchGiveaways() {
             try {
                 const res = await fetch('/api/giveaways/list');
@@ -670,7 +615,7 @@
                                         <div class="giveaway-info">
                                             <p class="giveaway-title">${g.title}</p>
                                             <div class="giveaway-winner-box">
-                                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Победитель</div>
+                                                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Победитель</div>
                                                 <div style="font-size: 13px; color: var(--neon-green); font-weight: bold;">@${g.winnerUsername}</div>
                                             </div>
                                             <div class="giveaway-meta" style="margin-top:2px;">👥 Участников: ${g.participantsCount}</div>
@@ -711,7 +656,7 @@
             if (data.success) { alert('Вы успешно участвуете!'); fetchGiveaways(); } else alert(data.error);
         }
 
-        /* МОДАЛКИ ФИНАНСОВ */
+        /* ФИНАНСОВЫЕ МОДАЛКИ */
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
