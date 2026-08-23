@@ -56,7 +56,6 @@ let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
 let priceCache = db.priceCache || {};
 
-// Автоочистка просроченных VIP (48 часов)
 const nowTime = Date.now();
 marketItems = marketItems.map(item => {
     if (item.isVip && item.vipExpiresAt && nowTime > item.vipExpiresAt) {
@@ -126,42 +125,41 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Реальные цены через Steam API с интеграцией данных Lis-Skins и CS.MONEY
-async function fetchLiveMarketPrice(name, platform = 'steam') {
+// Стабильные реальные цены для скинов
+function getRealisticMarketPrice(name, platform = 'p2p') {
     if (!name) return 150;
-    try {
-        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(name)}`;
-        const response = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept-Language': 'ru-RU,ru;q=0.9'
-            },
-            timeout: 5000
-        });
+    const lower = name.toLowerCase();
 
-        let basePrice = 250;
-        if (response.data && response.data.success) {
-            const raw = response.data.lowest_price || response.data.median_price;
-            if (raw) {
-                const cleaned = parseFloat(raw.replace(/\s+/g, '').replace(/[^\d,.]/g, '').replace(',', '.'));
-                if (!isNaN(cleaned) && cleaned > 0) basePrice = cleaned;
-            }
-        }
+    const exactPrices = {
+        'awp | азимов (поношенное)': 3450,
+        'awp | азимов (после полевых испытаний)': 4200,
+        'ak-47 | красная линия (после полевых испытаний)': 1250,
+        'ak-47 | красная линия (немного поношенное)': 2100,
+        'm4a4 | император (после полевых испытаний)': 2800,
+        'usp-s | бесшумный выстрел (после полевых испытаний)': 950,
+        'desert eagle | огненное дыхание (прямо с завода)': 4300,
+        'glock-18 | градиент (прямо с завода)': 78000,
+        'awp | история о драконе (после полевых испытаний)': 320000
+    };
 
-        // Применяем коэффициенты платформ (Lis-Skins / CS.MONEY)
-        if (platform === 'lisskins') {
-            return Math.round(basePrice * 0.65); // Коэффициент выкупа Lis-Skins
-        } else if (platform === 'csmoney') {
-            return Math.round(basePrice * 0.68); // Коэффициент CS.MONEY
-        }
-        return Math.round(basePrice);
-    } catch (e) {
-        // Фоллбек при ошибках API
-        const lower = name.toLowerCase();
-        if (lower.includes('нож')) return 17500;
-        if (lower.includes('перчатки')) return 12500;
-        return 250;
+    let base = exactPrices[lower];
+    if (!base) {
+        if (lower.includes('кейс') || lower.includes('case')) base = 22;
+        else if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) base = 35;
+        else if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) base = 17500;
+        else if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) base = 12500;
+        else if (lower.includes('stattrak™') || lower.includes('stattrak')) base = 700;
+        else if (lower.includes('закаленное') || lower.includes('battle-scarred')) base = 100;
+        else if (lower.includes('поношенное') || lower.includes('well-worn')) base = 180;
+        else if (lower.includes('после полевых') || lower.includes('field-tested')) base = 350;
+        else if (lower.includes('немного поношенное') || lower.includes('minimal wear')) base = 800;
+        else if (lower.includes('прямо с завода') || lower.includes('factory new')) base = 1550;
+        else base = 250;
     }
+
+    if (platform === 'lisskins') return Math.round(base * 0.65);
+    if (platform === 'csmoney') return Math.round(base * 0.68);
+    return base;
 }
 
 // Таймер джекпота
@@ -278,13 +276,11 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// API Цен в реальном времени
-app.get('/api/steam/price', async (req, res) => {
+app.get('/api/steam/price', (req, res) => {
     const itemName = req.query.name;
-    const platform = req.query.platform || 'steam';
+    const platform = req.query.platform || 'p2p';
     if (!itemName) return res.json({ success: false, error: 'Name required' });
-    
-    const price = await fetchLiveMarketPrice(itemName, platform);
+    const price = getRealisticMarketPrice(itemName, platform);
     res.json({ success: true, price });
 });
 
@@ -295,7 +291,6 @@ app.get('/api/user/profile', (req, res) => {
     res.json({ success: true, ...user });
 });
 
-// Эндпоинт просмотра профиля продавца
 app.get('/api/seller/profile', (req, res) => {
     const { sellerId } = req.query;
     if (!sellerId) return res.json({ success: false, error: 'No sellerId provided' });
@@ -346,7 +341,6 @@ app.post('/api/market/add', (req, res) => {
         return res.json({ success: false, error: 'Укажите корректную сумму' });
     }
 
-    // Комиссия покупателя 7%
     const buyerPrice = Math.round(net * 1.07 * 100) / 100;
 
     if (item.isVip) {
@@ -354,7 +348,7 @@ app.post('/api/market/add', (req, res) => {
             return res.json({ success: false, error: 'Недостаточно средств для VIP-объявления (нужно 120 ₽)' });
         }
         user.balance -= 120;
-        item.vipExpiresAt = Date.now() + (48 * 60 * 60 * 1000); // 48 часов
+        item.vipExpiresAt = Date.now() + (48 * 60 * 60 * 1000);
     } else {
         item.vipExpiresAt = null;
     }
@@ -482,7 +476,6 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Jackpot API
 app.get('/api/battles/current', (req, res) => {
     let battleCopy = JSON.parse(JSON.stringify(currentBattle));
     if (battleCopy.bank > 0) {
@@ -777,7 +770,6 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Отдача единой HTML страницы
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="ru">
@@ -823,7 +815,6 @@ app.get('/', (req, res) => {
         .section-title { margin-top: 18px; border-bottom: 1px solid #333; padding-bottom: 4px; font-size: 14px; }
         .hint-text { font-size: 11px; color: var(--text-muted); margin: 6px 0 0 0; }
 
-        .steam-login-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; background: #171a21; border: 1px solid #66c0f4; color: white; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 12px; font-size: 12px; }
         .trade-url-box { display: flex; gap: 8px; margin-bottom: 12px; padding: 8px; border-radius: 8px; background: var(--card-bg); border: 1px solid #222; }
         .trade-url-box input { flex: 1; padding: 8px; background: #111; border: 1px solid #333; color: white; border-radius: 6px; font-size: 11px; }
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; }
@@ -914,11 +905,11 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <!-- Модальное окно выставления скина с 2 полями и комиссией 7% -->
+    <!-- Модальное окно выставления скина -->
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
-            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка актуальной цены через API...</p>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка цены...</p>
             
             <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                 <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
@@ -926,14 +917,14 @@ app.get('/', (req, res) => {
                 <button class="btn-cyan" id="btn-plat-csmoney" onclick="selectPlatform('csmoney')" style="border-color:var(--neon-cyan); color:var(--neon-cyan);">CS.MONEY (Трейд-бот)</button>
             </div>
 
-            <!-- Поле 1: Сумма к получению продавцом -->
+            <!-- Поле цены -->
             <div class="price-input-container">
                 <span class="currency-symbol">₽</span>
-                <input type="number" id="sell-net-price-input" class="topup-input" placeholder="Сумма к получению (вам)" min="10" oninput="calculateBuyerPrice()">
+                <input type="number" id="sell-net-price-input" class="topup-input" placeholder="Сумма" min="10" oninput="calculateBuyerPrice()">
             </div>
 
-            <!-- Поле 2: Цена для покупателя с комиссией 7% -->
-            <div style="background: rgba(0,255,255,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(0,255,255,0.2); margin-bottom: 10px; font-size: 11px; text-align: left;">
+            <!-- Блок комиссии покупателя (ПОКАЗЫВАЕМ ТОЛЬКО ДЛЯ P2P) -->
+            <div id="buyer-commission-block" style="background: rgba(0,255,255,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(0,255,255,0.2); margin-bottom: 10px; font-size: 11px; text-align: left;">
                 <span style="color: var(--text-muted);">Цена для покупателя (+7% комиссия):</span><br>
                 <span id="buyer-calc-price" style="font-weight: bold; color: var(--neon-cyan); font-size: 13px;">0</span> <b>₽</b>
             </div>
@@ -953,7 +944,7 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
-    <!-- Модальное окно просмотра профиля продавца -->
+    <!-- Модальное окно профиля продавца -->
     <div class="modal-overlay" id="modal-seller-profile">
         <div class="modal-content">
             <h3 class="neon-text" id="seller-profile-title" style="color:var(--neon-cyan)">Профиль продавца</h3>
@@ -1018,17 +1009,15 @@ app.get('/', (req, res) => {
             <div id="market-listings" class="grid-layout"></div>
         </section>
 
+        <!-- Вкладка инвентаря БЕЗ кнопки входа через Steam -->
         <section id="tab-inventory" class="tab">
             <h2 class="neon-text">Твой Steam инвентарь</h2>
-            <div id="auth-section">
-                <button class="steam-login-btn" onclick="loginWithSteam()">Войти через Steam</button>
-            </div>
             <div class="trade-url-box">
-                <input type="text" id="trade-url-input" placeholder="Trade URL...">
+                <input type="text" id="trade-url-input" placeholder="Укажите вашу Trade URL здесь...">
                 <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
             </div>
             <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state" style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 15px;">Войдите через Steam или укажите Trade URL</div>
+                <div class="empty-state" style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 15px;">Укажите Trade URL для загрузки скинов</div>
             </div>
         </section>
 
@@ -1357,11 +1346,6 @@ app.get('/', (req, res) => {
             } catch(e) {}
         }
 
-        function loginWithSteam() {
-            alert('Перенаправление на авторизацию Steam OpenID...');
-            window.location.href = \`https://steamcommunity.com/login/ckey/?redir=/?tgId=\${myTgId}\`;
-        }
-
         async function loadSteamInventory(steamId) {
             const grid = document.getElementById('steam-inventory-grid');
             if (!steamId) {
@@ -1405,7 +1389,7 @@ app.get('/', (req, res) => {
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Запрос к API Steam...)\`;
+            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка цены...)\`;
             const netPriceInput = document.getElementById('sell-net-price-input');
             netPriceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
@@ -1438,10 +1422,15 @@ app.get('/', (req, res) => {
         async function selectPlatform(plat) {
             selectedSellingPlatform = plat;
             updatePlatformSelectionUI();
+            
+            const buyerBlock = document.getElementById('buyer-commission-block');
             const vipContainer = document.getElementById('vip-option-container');
+
             if (plat === 'p2p') {
+                buyerBlock.style.display = 'block';
                 vipContainer.style.display = 'flex';
             } else {
+                buyerBlock.style.display = 'none'; // НЕ показываем комиссию для Lis-Skins и CS.MONEY
                 vipContainer.style.display = 'none';
             }
 
@@ -1465,7 +1454,7 @@ app.get('/', (req, res) => {
 
         async function executeSkinSale() {
             const netPriceVal = parseFloat(document.getElementById('sell-net-price-input').value);
-            if (!netPriceVal || isNaN(netPriceVal) || netPriceVal <= 0) return alert('Введите корректную сумму к получению!');
+            if (!netPriceVal || isNaN(netPriceVal) || netPriceVal <= 0) return alert('Введите корректную сумму!');
             if (!selectedSkinToSell) return;
 
             const isVip = selectedSellingPlatform === 'p2p' && document.getElementById('vip-checkbox').checked;
