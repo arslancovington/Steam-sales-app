@@ -26,13 +26,16 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Настройка путей для постоянного диска /data на Render с fallback
+/* =========================================
+   СИНХРОНИЗАЦИЯ ПОСТОЯННОГО ДИСКА (RENDER /data)
+========================================= */
 const dataDir = '/data';
 if (!fs.existsSync(dataDir)) {
     try { 
         fs.mkdirSync(dataDir, { recursive: true }); 
+        console.log('📁 Создана директория постоянного диска /data');
     } catch (e) {
-        console.error("Не удалось создать папку /data:", e.message);
+        console.error("⚠️ Не удалось создать папку /data (используется локальная директория):", e.message);
     }
 }
 
@@ -45,13 +48,13 @@ let cards = [];
 let pricesCache = {}; 
 
 if (fs.existsSync(dbFile)) { 
-    try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} 
+    try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) { console.error('Ошибка чтения database.json:', e); } 
 }
 if (fs.existsSync(cardsFile)) { 
-    try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} 
+    try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) { console.error('Ошибка чтения cards.json:', e); } 
 }
 if (fs.existsSync(pricesFile)) { 
-    try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) {} 
+    try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) { console.error('Ошибка чтения pricesCache.json:', e); } 
 }
 
 let users = db.users || {};
@@ -63,19 +66,19 @@ let cardIndexUz = 0;
 function saveData() { 
     try { 
         fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2)); 
-    } catch (e) {} 
+    } catch (e) { console.error('Ошибка сохранения database.json:', e); } 
 }
 
 function saveCards() { 
     try { 
         fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2)); 
-    } catch (e) {} 
+    } catch (e) { console.error('Ошибка сохранения cards.json:', e); } 
 }
 
 function savePricesCache() { 
     try { 
         fs.writeFileSync(pricesFile, JSON.stringify(pricesCache, null, 2)); 
-    } catch (e) {} 
+    } catch (e) { console.error('Ошибка сохранения pricesCache.json:', e); } 
 }
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
@@ -113,6 +116,7 @@ function extractSteamIdFromTradeUrl(url) {
     }
     return null;
 }
+
 
 /* =========================================
    ЛОГИКА КОРОЛЕВСКОЙ БИТВЫ
