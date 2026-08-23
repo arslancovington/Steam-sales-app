@@ -30,7 +30,7 @@ if (!fs.existsSync(dataDir)) {
 const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
 
-let db = { users: {}, marketItems: [], giveaways: [], activeDeals: [], battleWinnersHistory: [] };
+let db = { users: {}, marketItems: [], giveaways: [], activeDeals: [], battleWinnersHistory: [], priceCache: {} };
 let cards = [];
 
 if (fs.existsSync(dbFile)) {
@@ -38,6 +38,7 @@ if (fs.existsSync(dbFile)) {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); 
         if (!db.activeDeals) db.activeDeals = [];
         if (!db.battleWinnersHistory) db.battleWinnersHistory = [];
+        if (!db.priceCache) db.priceCache = {};
     } catch (e) {}
 }
 
@@ -53,6 +54,7 @@ let marketItems = db.marketItems || [];
 let giveaways = db.giveaways || [];
 let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
+let priceCache = db.priceCache || {};
 
 let currentBattle = {
     _id: 'b_' + Date.now(),
@@ -70,7 +72,7 @@ let cardIndexUz = 0;
 
 function saveData() {
     try { 
-        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, activeDeals, battleWinnersHistory }, null, 2)); 
+        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, activeDeals, battleWinnersHistory, priceCache }, null, 2)); 
     } catch (e) {}
 }
 
@@ -113,16 +115,39 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Локальный фоллбек-расчет цены, если Steam API временно недоступен
-function estimatePriceLocally(name) {
+// Реалистичный фоллбек цен
+function getRealisticMarketPrice(name) {
+    if (!name) return 150;
     const lower = name.toLowerCase();
-    if (lower.includes('кейс') || lower.includes('case')) return Math.floor(Math.random() * 40) + 15;
-    if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return Math.floor(Math.random() * 80) + 20;
-    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) return 6500;
-    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) return 5000;
-    let base = 150;
-    if (lower.includes('stattrak™') || lower.includes('stattrak')) base = 350;
-    return base;
+
+    const exactPrices = {
+        'awp | азимов (поношенное)': 3450,
+        'awp | азимов (после полевых испытаний)': 4200,
+        'ak-47 | красная линия (после полевых испытаний)': 1250,
+        'ak-47 | красная линия (немного поношенное)': 2100,
+        'm4a4 | император (после полевых испытаний)': 2800,
+        'usp-s | бесшумный выстрел (после полевых испытаний)': 950,
+        'desert eagle | огненное дыхание (прямо с завода)': 4300,
+        'glock-18 | градиент (прямо с завода)': 89000,
+        'awp | история о драконе (после полевых испытаний)': 350000
+    };
+
+    if (exactPrices[lower]) return exactPrices[lower];
+
+    if (lower.includes('кейс') || lower.includes('case')) return 25;
+    if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return 40;
+    
+    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка') || lower.includes('тычковые')) {
+        return 18500;
+    }
+    
+    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки') || lower.includes('рукавицы')) {
+        return 12000;
+    }
+
+    if (lower.includes('stattrak™') || lower.includes('stattrak')) return 750;
+
+    return 350;
 }
 
 // Таймер джекпота
@@ -238,11 +263,19 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// API Эндпоинты
+// 🟢 ЭНДПОИНТ ЦЕН С КЕШИРОВАНИЕМ НА 24 ЧАСА (ОБНОВЛЕНИЕ РАЗ В СУТКИ)
 app.get('/api/steam/price', async (req, res) => {
     const itemName = req.query.name;
     if (!itemName) return res.json({ success: false, error: 'Name required' });
     
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+
+    // Проверяем наличие в кеше и актуальность (менее 24 часов)
+    if (priceCache[itemName] && (now - priceCache[itemName].updatedAt < twentyFourHours)) {
+        return res.json({ success: true, price: priceCache[itemName].price, cached: true });
+    }
+
     try {
         const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(itemName)}`;
         const response = await fetch(url, {
@@ -253,20 +286,32 @@ app.get('/api/steam/price', async (req, res) => {
             }
         });
         
-        if (response.status === 429 || response.status === 403) {
-            return res.json({ success: true, price: estimatePriceLocally(itemName) });
+        let finalPrice = getRealisticMarketPrice(itemName);
+
+        if (response.status !== 429 && response.status !== 403) {
+            const data = await response.json();
+            if (data && data.success && (data.lowest_price || data.median_price)) {
+                const rawPrice = data.lowest_price || data.median_price;
+                const cleanedStr = rawPrice.replace(/\s+/g, '').replace(/[^\d,.]/g, '').replace(',', '.');
+                const parsed = parseFloat(cleanedStr);
+                if (!isNaN(parsed) && parsed > 0) {
+                    finalPrice = parsed;
+                }
+            }
         }
 
-        const data = await response.json();
-        if (data && data.success && (data.lowest_price || data.median_price)) {
-            const rawPrice = data.lowest_price || data.median_price;
-            const cleanPrice = parseFloat(rawPrice.replace(/[^\d,.]/g, '').replace(',', '.'));
-            return res.json({ success: true, price: isNaN(cleanPrice) ? estimatePriceLocally(itemName) : cleanPrice });
-        } else {
-            return res.json({ success: true, price: estimatePriceLocally(itemName) });
-        }
+        // Сохраняем в кеш с текущей меткой времени (обновление раз в сутки)
+        priceCache[itemName] = {
+            price: finalPrice,
+            updatedAt: now
+        };
+        saveData();
+
+        return res.json({ success: true, price: finalPrice, cached: false });
     } catch (err) {
-        return res.json({ success: true, price: estimatePriceLocally(itemName) });
+        // Фоллбек, если запрос сорвался
+        const fallbackPrice = priceCache[itemName]?.price || getRealisticMarketPrice(itemName);
+        return res.json({ success: true, price: fallbackPrice, cached: true });
     }
 });
 
@@ -696,7 +741,7 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Отдача единой HTML страницы со встроенной динамической загрузкой цен Стим
+// Отдача единой HTML страницы
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="ru">
@@ -1185,7 +1230,7 @@ app.get('/', (req, res) => {
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка цены со Steam...)\`;
+            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены со Steam...\`;
             const priceInput = document.getElementById('sell-price-input');
             priceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
@@ -1194,19 +1239,23 @@ app.get('/', (req, res) => {
                 const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(name)}\`);
                 const data = await res.json();
                 if (data.success && data.price) {
-                    priceInput.value = data.price;
-                    document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
+                    let finalPrice = data.price;
+                    if (selectedSellingPlatform !== 'p2p') {
+                        finalPrice = Math.round(finalPrice * 0.68);
+                    }
+                    priceInput.value = finalPrice;
+                    document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Курс обновлен суточный)\`;
                 } else {
-                    priceInput.value = 150;
+                    priceInput.value = 250;
                     document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
                 }
             } catch (e) {
-                priceInput.value = 150;
+                priceInput.value = 250;
                 document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
             }
         }
 
-        function selectPlatform(plat) {
+        async function selectPlatform(plat) {
             selectedSellingPlatform = plat;
             updatePlatformSelectionUI();
             const vipContainer = document.getElementById('vip-option-container');
@@ -1214,6 +1263,19 @@ app.get('/', (req, res) => {
                 vipContainer.style.display = 'flex';
             } else {
                 vipContainer.style.display = 'none';
+            }
+
+            if (selectedSkinToSell) {
+                try {
+                    const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(selectedSkinToSell.name)}\`);
+                    const data = await res.json();
+                    let base = (data.success && data.price) ? data.price : 250;
+                    if (plat !== 'p2p') {
+                        document.getElementById('sell-price-input').value = Math.round(base * 0.68);
+                    } else {
+                        document.getElementById('sell-price-input').value = base;
+                    }
+                } catch(e) {}
             }
         }
 
@@ -1254,7 +1316,7 @@ app.get('/', (req, res) => {
                 } catch(e) {}
             } else {
                 const platName = selectedSellingPlatform === 'lisskins' ? 'Lis-Skins' : 'CS.MONEY';
-                const confirmed = confirm(\`Вы подтверждаете продажу скина "\${selectedSkinToSell.name}" на платформе \${platName} за \${priceVal} ₽?\`);
+                const confirmed = confirm(\`Вы подтверждаете моментальную продажу скина "\${selectedSkinToSell.name}" на платформе \${platName} за \${priceVal} ₽?\`);
                 if (!confirmed) return;
 
                 try {
@@ -1549,7 +1611,7 @@ app.get('/', (req, res) => {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ tgId: myTgId, amount, recipientAccount, username: myUsername })
                 });
-                const data = await res.json(); торговый
+                const data = await res.json();
                 if (data.success) {
                     alert('✅ Заявка на вывод отправлена администраторам!');
                     userBalance = data.newBalance;
