@@ -6,7 +6,7 @@ const axios = require('axios');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
-const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || ''; // Токен от @CryptoBot
+const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || ''; 
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://your-domain.com';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -27,7 +27,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Настройка путей для постоянного диска /data на Render с fallback на локальную директорию
 const dataDir = '/data';
 if (!fs.existsSync(dataDir)) {
     try { fs.mkdirSync(dataDir, { recursive: true }); } catch (e) {}
@@ -60,7 +59,6 @@ let giveaways = db.giveaways || [];
 let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
 
-// Классическая Королевская Битва (Джекпот)
 let currentBattle = {
     _id: 'b_' + Date.now(),
     bank: 0,
@@ -120,13 +118,20 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Таймер тика джекпота (с учетом комиссии 20%)
+// Таймер тика джекпота (рулетка крутится ровно 13 секунд)
 setInterval(() => {
     if (currentBattle.status === 'active' && currentBattle.endTime) {
+        if (currentBattle.participants.length < 2) {
+            currentBattle.timer = 15;
+            currentBattle.endTime = null;
+            currentBattle.status = 'waiting';
+            return;
+        }
+
         const remaining = Math.ceil((currentBattle.endTime - Date.now()) / 1000);
         currentBattle.timer = remaining > 0 ? remaining : 0;
         
-        if (currentBattle.timer <= 0 && currentBattle.participants.length > 0) {
+        if (currentBattle.timer <= 0 && currentBattle.status === 'active') {
             currentBattle.status = 'spinning';
             
             let total = currentBattle.bank;
@@ -143,10 +148,9 @@ setInterval(() => {
             }
             
             const totalBank = currentBattle.bank;
-            const prize = Math.round(totalBank * 0.8); // Комиссия 20%, победителю 80%
+            const prize = Math.round(totalBank * 0.8); // 20% комиссия
             
             currentBattle.winner = winnerObj;
-            currentBattle.status = 'finished';
             
             if (users[winnerObj.tgId]) {
                 users[winnerObj.tgId].balance += prize;
@@ -162,6 +166,12 @@ setInterval(() => {
             
             bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы выиграли в Королевской Битве банк <b>${totalBank} ₽</b>.\n💰 С учетом комиссии 20% на ваш баланс зачислено: <b>${prize} ₽</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
 
+            // Статус spinning длится 13 секунд (соответствует анимации фронтенда)
+            setTimeout(() => {
+                currentBattle.status = 'finished';
+            }, 13000);
+
+            // Сброс раунда через 18.5 секунд (13 сек рулетка + 5.5 сек модалка победы)
             setTimeout(() => {
                 currentBattle = {
                     _id: 'b_' + Date.now(),
@@ -173,7 +183,7 @@ setInterval(() => {
                     winner: null,
                     endTime: null
                 };
-            }, 8000);
+            }, 18500);
         }
     }
 }, 1000);
@@ -194,7 +204,6 @@ bot.onText(/\/start/, (msg) => {
     });
 });
 
-// Админ-команда для создания розыгрышей: /giveaway Название | @channel | URL_картинки | Таймер
 bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID' && String(chatId) !== String(ADMIN_CHAT_ID)) {
@@ -224,7 +233,7 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// ================= USER & PROFILE API =================
+// ================= API =================
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser } = req.query;
     if (!tgId) return res.json({ success: false, error: 'No tgId provided' });
@@ -245,7 +254,6 @@ app.post('/api/user/save', (req, res) => {
     res.json({ success: true, steamId: user.steamId });
 });
 
-// ================= MARKETPLACE & ESCROW =================
 app.get('/api/market/items', (req, res) => {
     res.json({ success: true, items: marketItems });
 });
@@ -253,25 +261,10 @@ app.get('/api/market/items', (req, res) => {
 app.post('/api/market/add', (req, res) => {
     const item = req.body;
     const user = getOrCreateUser(item.tgId);
-
-    if (item.isVip) {
-        if (user.balance < 245) {
-            return res.json({ success: false, error: 'Недостаточно средств для VIP (требуется 245 ₽)' });
-        }
-        user.balance -= 245;
-    }
-
     item._id = Date.now().toString();
     marketItems.push(item);
     saveData();
     res.json({ success: true, newBalance: user.balance });
-});
-
-app.post('/api/market/cancel', (req, res) => {
-    const { itemId, tgId } = req.body;
-    marketItems = marketItems.filter(i => !(i._id === itemId && String(i.tgId) === String(tgId)));
-    saveData();
-    res.json({ success: true });
 });
 
 app.post('/api/deals/buy', async (req, res) => {
@@ -326,7 +319,6 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-// ================= GIVEAWAYS API =================
 app.get('/api/giveaways/list', (req, res) => {
     res.json({ success: true, giveaways });
 });
@@ -356,7 +348,7 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// ================= KOROLEVSKAYA BITTVA (JACKPOT) API =================
+// ================= JACKPOT API =================
 app.get('/api/battles/current', (req, res) => {
     let battleCopy = JSON.parse(JSON.stringify(currentBattle));
     if (battleCopy.bank > 0) {
@@ -387,12 +379,6 @@ app.post('/api/battles/bet', (req, res) => {
     user.balance -= betAmount;
     currentBattle.bank += betAmount;
 
-    if (currentBattle.status === 'waiting' || currentBattle.participants.length === 0) {
-        currentBattle.status = 'active';
-        currentBattle.endTime = Date.now() + 15000;
-        currentBattle.timer = 15;
-    }
-
     const colors = ['#ff007f', '#00ffff', '#7cfc00', '#bf00ff', '#ffa500', '#ff4d4d', '#ffff00', '#1e90ff'];
     let existing = currentBattle.participants.find(p => String(p.tgId) === String(tgId));
 
@@ -409,6 +395,13 @@ app.post('/api/battles/bet', (req, res) => {
             amount: betAmount,
             color: participantColor
         });
+    }
+
+    // Таймер запускается строго от 2 участников
+    if (currentBattle.participants.length >= 2 && currentBattle.status === 'waiting') {
+        currentBattle.status = 'active';
+        currentBattle.endTime = Date.now() + 15000;
+        currentBattle.timer = 15;
     }
 
     currentBattle.betsFeed.unshift({
@@ -437,7 +430,6 @@ app.get('/api/battles/leaderboard', (req, res) => {
     res.json({ success: true, leaderboard });
 });
 
-// ================= STEAM API =================
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -458,11 +450,6 @@ app.post('/api/steam/inventory', async (req, res) => {
     }
 });
 
-app.get('/api/steam/price', async (req, res) => {
-    res.json({ success: true, price: 200 });
-});
-
-// ================= BILLING & PAYMENTS API =================
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     try {
@@ -570,7 +557,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-// ================= TELEGRAM BOT CALLBACKS =================
 bot.on('callback_query', async (query) => {
     const data = query.data;
 
@@ -604,11 +590,9 @@ bot.on('callback_query', async (query) => {
         if (!deal) return bot.answerCallbackQuery(query.id, { text: 'Сделка не найдена' });
 
         deal.status = 'completed';
-        
         const seller = getOrCreateUser(deal.sellerTgId);
         seller.balance += deal.price;
         seller.completedDeals = (seller.completedDeals || 0) + 1;
-
         saveData();
 
         await bot.editMessageText(`✅ Вы подтвердили получение предмета <b>${deal.name}</b>. Сделка успешно завершена!`, {
@@ -620,9 +604,6 @@ bot.on('callback_query', async (query) => {
         } catch(e) {}
 
         await bot.answerCallbackQuery(query.id, { text: 'Сделка завершена!' });
-    }
-    else if (data.startsWith('user_paid_')) {
-        await bot.answerCallbackQuery(query.id, { text: 'Отчет отправлен администратору!' });
     }
     else if (data.startsWith('p2p_confirm_pay_')) {
         const parts = data.split('_');
@@ -661,7 +642,6 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// ================= START SERVER =================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
