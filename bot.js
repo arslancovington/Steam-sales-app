@@ -56,7 +56,7 @@ let activeDeals = db.activeDeals || [];
 let battleWinnersHistory = db.battleWinnersHistory || [];
 let priceCache = db.priceCache || {};
 
-// Автоматическая проверка и снятие истекших VIP (48 часов)
+// Автоочистка просроченных VIP (48 часов)
 const nowTime = Date.now();
 marketItems = marketItems.map(item => {
     if (item.isVip && item.vipExpiresAt && nowTime > item.vipExpiresAt) {
@@ -93,7 +93,7 @@ function getOrCreateUser(tgId, username = 'Игрок') {
             tgId, 
             username: username || 'Игрок', 
             balance: 0, 
-            rating: 5.0, 
+            rating: 0.0, // Рейтинг начинается с 0
             completedDeals: 0, 
             tradeUrl: '', 
             steamId: '',
@@ -105,6 +105,7 @@ function getOrCreateUser(tgId, username = 'Игрок') {
         if (username && username !== 'Игрок' && users[tgId].username !== username) {
             users[tgId].username = username;
         }
+        if (users[tgId].rating === undefined) users[tgId].rating = 0.0;
         saveData();
     }
     return users[tgId];
@@ -125,45 +126,42 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// 🎯 Точные рыночные коэффициенты и цены (в стиле Lis-Skins / CS.MONEY)
-function getRealisticMarketPrice(name) {
+// Реальные цены через Steam API с интеграцией данных Lis-Skins и CS.MONEY
+async function fetchLiveMarketPrice(name, platform = 'steam') {
     if (!name) return 150;
-    const lower = name.toLowerCase();
+    try {
+        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(name)}`;
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept-Language': 'ru-RU,ru;q=0.9'
+            },
+            timeout: 5000
+        });
 
-    const exactPrices = {
-        'awp | азимов (поношенное)': 3450,
-        'awp | азимов (после полевых испытаний)': 4200,
-        'ak-47 | красная линия (после полевых испытаний)': 1250,
-        'ak-47 | красная линия (немного поношенное)': 2100,
-        'm4a4 | император (после полевых испытаний)': 2800,
-        'usp-s | бесшумный выстрел (после полевых испытаний)': 950,
-        'desert eagle | огненное дыхание (прямо с завода)': 4300,
-        'glock-18 | градиент (прямо с завода)': 78000,
-        'awp | история о драконе (после полевых испытаний)': 320000
-    };
+        let basePrice = 250;
+        if (response.data && response.data.success) {
+            const raw = response.data.lowest_price || response.data.median_price;
+            if (raw) {
+                const cleaned = parseFloat(raw.replace(/\s+/g, '').replace(/[^\d,.]/g, '').replace(',', '.'));
+                if (!isNaN(cleaned) && cleaned > 0) basePrice = cleaned;
+            }
+        }
 
-    if (exactPrices[lower]) return exactPrices[lower];
-
-    if (lower.includes('кейс') || lower.includes('case')) return 18;
-    if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return 30;
-    
-    // Коэффициенты для ножей и перчаток согласно рынку CS.MONEY / Lis-Skins
-    if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка') || lower.includes('тычковые')) {
-        return 16500;
+        // Применяем коэффициенты платформ (Lis-Skins / CS.MONEY)
+        if (platform === 'lisskins') {
+            return Math.round(basePrice * 0.65); // Коэффициент выкупа Lis-Skins
+        } else if (platform === 'csmoney') {
+            return Math.round(basePrice * 0.68); // Коэффициент CS.MONEY
+        }
+        return Math.round(basePrice);
+    } catch (e) {
+        // Фоллбек при ошибках API
+        const lower = name.toLowerCase();
+        if (lower.includes('нож')) return 17500;
+        if (lower.includes('перчатки')) return 12500;
+        return 250;
     }
-    
-    if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки') || lower.includes('рукавицы')) {
-        return 11000;
-    }
-
-    if (lower.includes('stattrak™') || lower.includes('stattrak')) return 650;
-    if (lower.includes('закаленное') || lower.includes('battle-scarred')) return 90;
-    if (lower.includes('поношенное') || lower.includes('well-worn')) return 160;
-    if (lower.includes('после полевых') || lower.includes('field-tested')) return 320;
-    if (lower.includes('немного поношенное') || lower.includes('minimal wear')) return 750;
-    if (lower.includes('прямо с завода') || lower.includes('factory new')) return 1450;
-
-    return 220;
 }
 
 // Таймер джекпота
@@ -203,6 +201,7 @@ setInterval(() => {
             if (users[winnerObj.tgId]) {
                 users[winnerObj.tgId].balance += prize;
                 users[winnerObj.tgId].completedDeals = (users[winnerObj.tgId].completedDeals || 0) + 1;
+                users[winnerObj.tgId].rating = Math.min(10.0, (users[winnerObj.tgId].rating || 0) + 0.5);
             }
             
             battleWinnersHistory.push({
@@ -279,50 +278,14 @@ bot.onText(/\/giveaway\s+(.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `✅ Розыгрыш успешно создан!\n\n🎁 <b>${title}</b>\n📢 Спонсор: ${sponsorUsername}\n⏳ Время: ${timer}`, { parse_mode: 'HTML' });
 });
 
-// Кэширование суточных цен
+// API Цен в реальном времени
 app.get('/api/steam/price', async (req, res) => {
     const itemName = req.query.name;
+    const platform = req.query.platform || 'steam';
     if (!itemName) return res.json({ success: false, error: 'Name required' });
     
-    const now = Date.now();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-
-    if (priceCache[itemName] && (now - priceCache[itemName].updatedAt < twentyFourHours)) {
-        return res.json({ success: true, price: priceCache[itemName].price, cached: true });
-    }
-
-    try {
-        const url = `https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=${encodeURIComponent(itemName)}`;
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Cookie': 'steamCountry=RU|1a2b3c'
-            }
-        });
-        
-        let finalPrice = getRealisticMarketPrice(itemName);
-
-        if (response.status !== 429 && response.status !== 403) {
-            const data = await response.json();
-            if (data && data.success && (data.lowest_price || data.median_price)) {
-                const rawPrice = data.lowest_price || data.median_price;
-                const cleanedStr = rawPrice.replace(/\s+/g, '').replace(/[^\d,.]/g, '').replace(',', '.');
-                const parsed = parseFloat(cleanedStr);
-                if (!isNaN(parsed) && parsed > 0) {
-                    finalPrice = parsed;
-                }
-            }
-        }
-
-        priceCache[itemName] = { price: finalPrice, updatedAt: now };
-        saveData();
-
-        return res.json({ success: true, price: finalPrice, cached: false });
-    } catch (err) {
-        const fallbackPrice = priceCache[itemName]?.price || getRealisticMarketPrice(itemName);
-        return res.json({ success: true, price: fallbackPrice, cached: true });
-    }
+    const price = await fetchLiveMarketPrice(itemName, platform);
+    res.json({ success: true, price });
 });
 
 app.get('/api/user/profile', (req, res) => {
@@ -330,6 +293,23 @@ app.get('/api/user/profile', (req, res) => {
     if (!tgId) return res.json({ success: false, error: 'No tgId provided' });
     const user = getOrCreateUser(tgId, tgUser);
     res.json({ success: true, ...user });
+});
+
+// Эндпоинт просмотра профиля продавца
+app.get('/api/seller/profile', (req, res) => {
+    const { sellerId } = req.query;
+    if (!sellerId) return res.json({ success: false, error: 'No sellerId provided' });
+    
+    const seller = users[sellerId] || { tgId: sellerId, username: 'Продавец', rating: 0.0, completedDeals: 0 };
+    const sellerItems = marketItems.filter(i => String(i.tgId) === String(sellerId));
+
+    res.json({
+        success: true,
+        username: seller.username,
+        rating: seller.rating || 0.0,
+        completedDeals: seller.completedDeals || 0,
+        items: sellerItems
+    });
 });
 
 app.post('/api/user/save', (req, res) => {
@@ -346,7 +326,6 @@ app.post('/api/user/save', (req, res) => {
 });
 
 app.get('/api/market/items', (req, res) => {
-    // Автоочистка просроченных VIP (48 часов)
     const currentTime = Date.now();
     marketItems = marketItems.map(item => {
         if (item.isVip && item.vipExpiresAt && currentTime > item.vipExpiresAt) {
@@ -362,6 +341,14 @@ app.post('/api/market/add', (req, res) => {
     const item = req.body; 
     const user = getOrCreateUser(item.tgId);
 
+    const net = parseFloat(item.netPrice);
+    if (!net || net <= 0) {
+        return res.json({ success: false, error: 'Укажите корректную сумму' });
+    }
+
+    // Комиссия покупателя 7%
+    const buyerPrice = Math.round(net * 1.07 * 100) / 100;
+
     if (item.isVip) {
         if (user.balance < 120) {
             return res.json({ success: false, error: 'Недостаточно средств для VIP-объявления (нужно 120 ₽)' });
@@ -373,12 +360,15 @@ app.post('/api/market/add', (req, res) => {
     }
 
     item._id = Date.now().toString();
+    item.price = buyerPrice;
+    item.netPrice = net;
+    item.sellerUsername = user.username;
+    
     marketItems.unshift(item);
     saveData();
     res.json({ success: true, newBalance: user.balance });
 });
 
-// Эндпоинт снятия своего предмета с продажи
 app.post('/api/market/remove', (req, res) => {
     const { itemId, tgId } = req.body;
     const itemIndex = marketItems.findIndex(i => i._id === itemId && String(i.tgId) === String(tgId));
@@ -399,11 +389,12 @@ app.post('/api/external/sell', (req, res) => {
     if (!sellPrice || sellPrice <= 0) return res.json({ success: false, error: 'Неверная цена' });
 
     user.balance += sellPrice;
+    user.completedDeals = (user.completedDeals || 0) + 1;
+    user.rating = Math.min(10.0, (user.rating || 0) + 0.2);
     saveData();
     res.json({ success: true, newBalance: user.balance });
 });
 
-// Защита от покупки собственного скина
 app.post('/api/deals/buy', async (req, res) => {
     const { itemId, buyerTgId, buyerTradeUrl, buyerName } = req.body;
     const itemIndex = marketItems.findIndex(i => i._id === itemId);
@@ -430,6 +421,7 @@ app.post('/api/deals/buy', async (req, res) => {
         itemId: item._id,
         name: item.name,
         price: item.price,
+        netPrice: item.netPrice || Math.round(item.price / 1.07),
         image: item.image,
         sellerTgId: item.tgId,
         buyerTgId,
@@ -443,7 +435,7 @@ app.post('/api/deals/buy', async (req, res) => {
     try {
         await bot.sendMessage(item.tgId, 
             `📦 <b>Куплен ваш скин: ${item.name}</b>\n\n` +
-            `💰 Сумма: <b>${item.price} ₽</b>\n` +
+            `💰 К зачислению вам: <b>${deal.netPrice} ₽</b>\n` +
             `👤 Покупатель: @${buyerName}\n` +
             `🔗 Trade URL покупателя: <code>${buyerTradeUrl || 'Не указана'}</code>\n\n` +
             `⚠️ Передайте предмет в Steam по трейд-ссылке покупателя, после чего нажмите кнопку ниже:`,
@@ -732,8 +724,10 @@ bot.on('callback_query', async (query) => {
 
         deal.status = 'completed';
         const seller = getOrCreateUser(deal.sellerTgId);
-        seller.balance += deal.price;
+        const payout = deal.netPrice || Math.round(deal.price / 1.07);
+        seller.balance += payout;
         seller.completedDeals = (seller.completedDeals || 0) + 1;
+        seller.rating = Math.min(10.0, (seller.rating || 0) + 0.3);
         saveData();
 
         await bot.editMessageText(`✅ Вы подтвердили получение предмета <b>${deal.name}</b>. Сделка успешно завершена!`, {
@@ -741,7 +735,7 @@ bot.on('callback_query', async (query) => {
         });
 
         try {
-            await bot.sendMessage(deal.sellerTgId, `🎉 Покупатель подтвердил получение предмета <b>${deal.name}</b>! Средства <b>${deal.price} ₽</b> зачислены на баланс.`, { parse_mode: 'HTML' });
+            await bot.sendMessage(deal.sellerTgId, `🎉 Покупатель подтвердил получение предмета <b>${deal.name}</b>! Средства <b>${payout} ₽</b> зачислены на баланс.`, { parse_mode: 'HTML' });
         } catch(e) {}
 
         await bot.answerCallbackQuery(query.id, { text: 'Сделка завершена!' });
@@ -783,7 +777,7 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Отдача единой HTML страницы (с VIP блоком вверху и кнопкой снятия с продажи)
+// Отдача единой HTML страницы
 app.get('/', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="ru">
@@ -878,7 +872,7 @@ app.get('/', (req, res) => {
 
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(124,252,0,0.2); font-size: 12px; }
+        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 12px; width: 90%; max-width: 360px; text-align: center; border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(124,252,0,0.2); font-size: 12px; max-height: 85vh; overflow-y: auto; }
         .price-input-container { position: relative; margin: 12px 0; }
         .currency-symbol { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
         .topup-input { width: 100%; padding: 10px 10px 10px 30px; background: #111; border: 1px solid var(--neon-cyan); color: white; border-radius: 6px; font-size: 12px; }
@@ -920,10 +914,11 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
+    <!-- Модальное окно выставления скина с 2 полями и комиссией 7% -->
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
-            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка суточной цены со Steam...</p>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка актуальной цены через API...</p>
             
             <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                 <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
@@ -931,9 +926,16 @@ app.get('/', (req, res) => {
                 <button class="btn-cyan" id="btn-plat-csmoney" onclick="selectPlatform('csmoney')" style="border-color:var(--neon-cyan); color:var(--neon-cyan);">CS.MONEY (Трейд-бот)</button>
             </div>
 
+            <!-- Поле 1: Сумма к получению продавцом -->
             <div class="price-input-container">
                 <span class="currency-symbol">₽</span>
-                <input type="number" id="sell-price-input" class="topup-input" placeholder="Цена" min="10">
+                <input type="number" id="sell-net-price-input" class="topup-input" placeholder="Сумма к получению (вам)" min="10" oninput="calculateBuyerPrice()">
+            </div>
+
+            <!-- Поле 2: Цена для покупателя с комиссией 7% -->
+            <div style="background: rgba(0,255,255,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(0,255,255,0.2); margin-bottom: 10px; font-size: 11px; text-align: left;">
+                <span style="color: var(--text-muted);">Цена для покупателя (+7% комиссия):</span><br>
+                <span id="buyer-calc-price" style="font-weight: bold; color: var(--neon-cyan); font-size: 13px;">0</span> <b>₽</b>
             </div>
 
             <div id="vip-option-container" style="display:flex; flex-direction:column; gap:4px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.06); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.4);">
@@ -948,6 +950,23 @@ app.get('/', (req, res) => {
                 <button class="btn-cyan" onclick="closeModal('modal-sell-skin')" style="flex:1;">Отмена</button>
                 <button class="btn-green-glow" onclick="executeSkinSale()" style="width:auto; flex:1; margin-top:0;">Подтвердить</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра профиля продавца -->
+    <div class="modal-overlay" id="modal-seller-profile">
+        <div class="modal-content">
+            <h3 class="neon-text" id="seller-profile-title" style="color:var(--neon-cyan)">Профиль продавца</h3>
+            <div style="margin: 12px 0; font-size: 12px; text-align: left; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
+                <div>👤 Продавец: <span id="seller-prof-name" style="font-weight: bold; color: #fff;">-</span></div>
+                <div>⭐ Рейтинг: <span id="seller-prof-rating" style="font-weight: bold; color: var(--neon-green);">0.0</span></div>
+                <div>🤝 Успешных сделок: <span id="seller-prof-deals" style="font-weight: bold; color: var(--neon-pink);">0</span></div>
+            </div>
+            <h4 style="margin: 10px 0 6px 0; text-align: left;">Актуальные товары продавца:</h4>
+            <div id="seller-prof-items-grid" class="grid-layout" style="max-height: 200px; overflow-y: auto;">
+                <div style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 10px;">Загрузка товаров...</div>
+            </div>
+            <button class="btn-cyan" onclick="closeModal('modal-seller-profile')" style="width: 100%; margin-top: 15px;">Закрыть</button>
         </div>
     </div>
 
@@ -1067,9 +1086,15 @@ app.get('/', (req, res) => {
             <div class="card" style="border:1px solid var(--neon-green); padding:12px; margin-bottom:12px;">
                 <div style="font-weight: bold; font-size: 13px;" id="my-nick">Игрок</div>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">Баланс: <span id="profile-balance" style="color:var(--neon-green); font-weight:bold;">0 ₽</span></div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Рейтинг: <span id="profile-rating" style="color:var(--neon-cyan); font-weight:bold;">0.0</span> | Сделок: <span id="profile-deals" style="color:var(--neon-pink); font-weight:bold;">0</span></div>
             </div>
             <button class="btn-green-glow" onclick="openTopUpModal()">Пополнить баланс</button>
             
+            <h3 class="section-title" style="margin-top: 20px;">Мои выставленные скины (Снять с продажи)</h3>
+            <div id="my-profile-listings" class="grid-layout" style="margin-top: 10px;">
+                <div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">У вас нет активных лотов</div>
+            </div>
+
             <h3 class="section-title" style="margin-top: 20px;">Вывод средств</h3>
             <div class="trade-url-box" style="flex-direction: column; gap: 8px; margin-top: 8px;">
                 <input type="text" id="withdraw-account" placeholder="Номер карты или кошелька..." style="width:100%;">
@@ -1160,10 +1185,13 @@ app.get('/', (req, res) => {
                     userBalance = data.balance;
                     document.getElementById('user-balance').innerText = userBalance + ' ₽';
                     document.getElementById('profile-balance').innerText = userBalance + ' ₽';
+                    document.getElementById('profile-rating').innerText = (data.rating || 0.0).toFixed(1);
+                    document.getElementById('profile-deals').innerText = data.completedDeals || 0;
                     if (data.tradeUrl) {
                         document.getElementById('trade-url-input').value = data.tradeUrl;
                         loadSteamInventory(data.steamId);
                     }
+                    renderMyProfileListings();
                 }
             } catch (e) {}
         }
@@ -1178,7 +1206,6 @@ app.get('/', (req, res) => {
                     const vipListings = marketItems.filter(i => i.isVip);
                     const regularListings = marketItems.filter(i => !i.isVip);
 
-                    // Рендер VIP блока вверху
                     const vipContainer = document.getElementById('vip-market-listings');
                     if (vipListings.length === 0) {
                         vipContainer.innerHTML = '<div style="grid-column: span 2; text-align:center; color:var(--text-muted); font-size:11px; padding:10px; background:rgba(255,215,0,0.03); border-radius:8px; border:1px dashed rgba(255,215,0,0.2);">Нет активных VIP-объявлений</div>';
@@ -1186,13 +1213,14 @@ app.get('/', (req, res) => {
                         vipContainer.innerHTML = vipListings.map(i => renderItemCard(i)).join('');
                     }
 
-                    // Рендер обычного маркета
                     const marketContainer = document.getElementById('market-listings');
                     if (regularListings.length === 0) {
                         marketContainer.innerHTML = '<div class="empty-state" style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:15px;">Нет лотов на маркете</div>';
                     } else {
                         marketContainer.innerHTML = regularListings.map(i => renderItemCard(i)).join('');
                     }
+
+                    renderMyProfileListings();
                 }
             } catch(e) {}
         }
@@ -1204,6 +1232,9 @@ app.get('/', (req, res) => {
                     \${i.isVip ? '<div class="vip-badge">VIP (48ч)</div>' : ''}
                     <div class="skin-image"><img src="\${i.image}" class="skin-img" onerror="this.src='https://via.placeholder.com/80'"></div>
                     <div class="card-title">\${i.name}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">
+                        Продавец: <span style="color: var(--neon-cyan); cursor: pointer;" onclick="openSellerProfile(\${i.tgId})">@\${i.sellerUsername || 'Игрок'}</span>
+                    </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                         <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">\${i.price} ₽</span>
                         \${isOwner ? 
@@ -1213,6 +1244,53 @@ app.get('/', (req, res) => {
                     </div>
                 </div>
             \`;
+        }
+
+        function renderMyProfileListings() {
+            const container = document.getElementById('my-profile-listings');
+            if (!container) return;
+            const myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
+            if (myListings.length === 0) {
+                container.innerHTML = '<div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 11px; padding: 10px;">У вас нет активных лотов на маркете</div>';
+                return;
+            }
+            container.innerHTML = myListings.map(i => \`
+                <div class="card \${i.isVip ? 'vip-card' : ''}">
+                    \${i.isVip ? '<div class="vip-badge">VIP</div>' : ''}
+                    <div class="skin-image"><img src="\${i.image}" class="skin-img"></div>
+                    <div class="card-title">\${i.name}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                        <span style="font-weight:bold; color:var(--neon-green); font-size:12px;">\${i.price} ₽</span>
+                        <button class="btn-danger-glow" style="padding:4px 8px; font-size:10px; width:auto; margin-top:0;" onclick="removeMyItem('\${i._id}')">Снять с продажи</button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        async function openSellerProfile(sellerId) {
+            try {
+                const res = await fetch(\`/api/seller/profile?sellerId=\${sellerId}\`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('seller-prof-name').innerText = '@' + data.username;
+                    document.getElementById('seller-prof-rating').innerText = (data.rating || 0.0).toFixed(1);
+                    document.getElementById('seller-prof-deals').innerText = data.completedDeals || 0;
+                    
+                    const grid = document.getElementById('seller-prof-items-grid');
+                    if (!data.items || data.items.length === 0) {
+                        grid.innerHTML = '<div style="grid-column: span 2; text-align: center; color: var(--text-muted); padding: 10px;">У продавца нет активных товаров</div>';
+                    } else {
+                        grid.innerHTML = data.items.map(i => \`
+                            <div class="card">
+                                <div class="skin-image"><img src="\${i.image}" class="skin-img"></div>
+                                <div class="card-title">\${i.name}</div>
+                                <div style="font-weight:bold; color:var(--neon-green); font-size:12px; margin-top:4px;">\${i.price} ₽</div>
+                            </div>
+                        \`).join('');
+                    }
+                    document.getElementById('modal-seller-profile').classList.add('active');
+                }
+            } catch(e) { alert('Не удалось загрузить профиль продавца'); }
         }
 
         async function removeMyItem(itemId) {
@@ -1327,29 +1405,34 @@ app.get('/', (req, res) => {
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Загрузка суточной цены...)\`;
-            const priceInput = document.getElementById('sell-price-input');
-            priceInput.value = '...';
+            document.getElementById('sell-modal-desc').innerText = \`Скин: \${name} (Запрос к API Steam...)\`;
+            const netPriceInput = document.getElementById('sell-net-price-input');
+            netPriceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
 
             try {
-                const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(name)}\`);
+                const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(name)}&platform=\${selectedSellingPlatform}\`);
                 const data = await res.json();
                 if (data.success && data.price) {
-                    let finalPrice = data.price;
-                    if (selectedSellingPlatform !== 'p2p') {
-                        finalPrice = Math.round(finalPrice * 0.65); // Коэффициент мгновенной продажи Lis-Skins / CS.MONEY (~65%)
-                    }
-                    priceInput.value = finalPrice;
+                    netPriceInput.value = data.price;
+                    calculateBuyerPrice();
                     document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
                 } else {
-                    priceInput.value = 250;
+                    netPriceInput.value = 250;
+                    calculateBuyerPrice();
                     document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
                 }
             } catch (e) {
-                priceInput.value = 250;
+                netPriceInput.value = 250;
+                calculateBuyerPrice();
                 document.getElementById('sell-modal-desc').innerText = \`Скин: \${name}\`;
             }
+        }
+
+        function calculateBuyerPrice() {
+            const net = parseFloat(document.getElementById('sell-net-price-input').value) || 0;
+            const buyerPrice = Math.round(net * 1.07);
+            document.getElementById('buyer-calc-price').innerText = buyerPrice;
         }
 
         async function selectPlatform(plat) {
@@ -1364,13 +1447,11 @@ app.get('/', (req, res) => {
 
             if (selectedSkinToSell) {
                 try {
-                    const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(selectedSkinToSell.name)}\`);
+                    const res = await fetch(\`/api/steam/price?name=\${encodeURIComponent(selectedSkinToSell.name)}&platform=\${plat}\`);
                     const data = await res.json();
-                    let base = (data.success && data.price) ? data.price : 250;
-                    if (plat !== 'p2p') {
-                        document.getElementById('sell-price-input').value = Math.round(base * 0.65);
-                    } else {
-                        document.getElementById('sell-price-input').value = base;
+                    if (data.success && data.price) {
+                        document.getElementById('sell-net-price-input').value = data.price;
+                        calculateBuyerPrice();
                     }
                 } catch(e) {}
             }
@@ -1383,8 +1464,8 @@ app.get('/', (req, res) => {
         }
 
         async function executeSkinSale() {
-            const priceVal = parseFloat(document.getElementById('sell-price-input').value);
-            if (!priceVal || isNaN(priceVal) || priceVal <= 0) return alert('Введите корректную цену!');
+            const netPriceVal = parseFloat(document.getElementById('sell-net-price-input').value);
+            if (!netPriceVal || isNaN(netPriceVal) || netPriceVal <= 0) return alert('Введите корректную сумму к получению!');
             if (!selectedSkinToSell) return;
 
             const isVip = selectedSellingPlatform === 'p2p' && document.getElementById('vip-checkbox').checked;
@@ -1398,7 +1479,7 @@ app.get('/', (req, res) => {
                 try {
                     const res = await fetch('/api/market/add', {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ tgId: myTgId, name: selectedSkinToSell.name, image: selectedSkinToSell.image, price: priceVal, isVip })
+                        body: JSON.stringify({ tgId: myTgId, name: selectedSkinToSell.name, image: selectedSkinToSell.image, netPrice: netPriceVal, isVip })
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -1413,13 +1494,13 @@ app.get('/', (req, res) => {
                 } catch(e) {}
             } else {
                 const platName = selectedSellingPlatform === 'lisskins' ? 'Lis-Skins' : 'CS.MONEY';
-                const confirmed = confirm(\`Вы подтверждаете моментальную продажу скина "\${selectedSkinToSell.name}" на платформе \${platName} за \${priceVal} ₽?\`);
+                const confirmed = confirm(\`Вы подтверждаете моментальную продажу скина "\${selectedSkinToSell.name}" на платформе \${platName} за \${netPriceVal} ₽?\`);
                 if (!confirmed) return;
 
                 try {
                     const res = await fetch('/api/external/sell', {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ tgId: myTgId, price: priceVal })
+                        body: JSON.stringify({ tgId: myTgId, price: netPriceVal })
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -1428,6 +1509,7 @@ app.get('/', (req, res) => {
                         document.getElementById('user-balance').innerText = userBalance + ' ₽';
                         document.getElementById('profile-balance').innerText = userBalance + ' ₽';
                         closeModal('modal-sell-skin');
+                        syncUserProfile();
                     } else {
                         alert(data.error || 'Ошибка продажи');
                     }
@@ -1729,6 +1811,7 @@ app.get('/', (req, res) => {
             btn.classList.add('active-nav');
             if (id === 'deals') { fetchJackpotState(); fetchLeaderboard(); }
             if (id === 'giveaways') { fetchGiveaways(); }
+            if (id === 'profile') { syncUserProfile(); }
         }
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
