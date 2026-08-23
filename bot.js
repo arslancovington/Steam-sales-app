@@ -118,7 +118,7 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Таймер тика джекпота (рулетка крутится ровно 13 секунд)
+// Точный серверный таймер
 setInterval(() => {
     if (currentBattle.status === 'active' && currentBattle.endTime) {
         if (currentBattle.participants.length < 2) {
@@ -148,7 +148,7 @@ setInterval(() => {
             }
             
             const totalBank = currentBattle.bank;
-            const prize = Math.round(totalBank * 0.8); // 20% комиссия
+            const prize = Math.round(totalBank * 0.8);
             
             currentBattle.winner = winnerObj;
             
@@ -166,12 +166,12 @@ setInterval(() => {
             
             bot.sendMessage(winnerObj.tgId, `🏆 Поздравляем! Вы выиграли в Королевской Битве банк <b>${totalBank} ₽</b>.\n💰 С учетом комиссии 20% на ваш баланс зачислено: <b>${prize} ₽</b>!`, { parse_mode: 'HTML' }).catch(()=>{});
 
-            // Статус spinning длится 13 секунд (соответствует анимации фронтенда)
+            // 13 секунд анимации рулетки
             setTimeout(() => {
                 currentBattle.status = 'finished';
             }, 13000);
 
-            // Сброс раунда через 18.5 секунд (13 сек рулетка + 5.5 сек модалка победы)
+            // Сброс раунда
             setTimeout(() => {
                 currentBattle = {
                     _id: 'b_' + Date.now(),
@@ -397,7 +397,6 @@ app.post('/api/battles/bet', (req, res) => {
         });
     }
 
-    // Таймер запускается строго от 2 участников
     if (currentBattle.participants.length >= 2 && currentBattle.status === 'waiting') {
         currentBattle.status = 'active';
         currentBattle.endTime = Date.now() + 15000;
