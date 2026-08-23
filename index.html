@@ -132,11 +132,11 @@
         </div>
     </div>
 
-    <!-- Модальное окно продажи с умной авто-оценой и выбором платформ -->
+    <!-- Модальное окно продажи с реальными ценами со Стима -->
     <div class="modal-overlay" id="modal-sell-skin">
         <div class="modal-content">
             <h3 class="neon-text" style="color:var(--neon-green)">Выставить скин</h3>
-            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Выберите платформу и укажите цену</p>
+            <p class="hint-text" id="sell-modal-desc" style="margin: 6px 0 12px 0;">Загрузка цены со Steam...</p>
             
             <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                 <button class="btn-cyan" id="btn-plat-p2p" onclick="selectPlatform('p2p')" style="border-color:var(--neon-green); color:var(--neon-green);">Наш P2P Маркет</button>
@@ -146,7 +146,7 @@
 
             <div class="price-input-container">
                 <span class="currency-symbol">₽</span>
-                <input type="number" id="sell-price-input" class="topup-input" placeholder="Введите цену" min="10">
+                <input type="number" id="sell-price-input" class="topup-input" placeholder="Цена" min="10">
             </div>
 
             <div id="vip-option-container" style="display:flex; align-items:center; gap:8px; margin: 10px 0; font-size:11px; text-align:left; background:rgba(255,215,0,0.05); padding:8px; border-radius:6px; border:1px solid rgba(255,215,0,0.3);">
@@ -482,33 +482,32 @@
             }
         }
 
-        // Умный расчет примерной цены скина на основе его названия и типа
-        function estimatePrice(name) {
-            const lower = name.toLowerCase();
-            if (lower.includes('кейс') || lower.includes('case')) return Math.floor(Math.random() * 40) + 15;
-            if (lower.includes('наклейка') || lower.includes('sticker') || lower.includes('граффити')) return Math.floor(Math.random() * 80) + 20;
-            if (lower.includes('нож') || lower.includes('knife') || lower.includes('керамбит') || lower.includes('штык') || lower.includes('коготь') || lower.includes('бабочка')) return Math.floor(Math.random() * 8000) + 5000;
-            if (lower.includes('перчатки') || lower.includes('gloves') || lower.includes('обмотки')) return Math.floor(Math.random() * 6000) + 4000;
-            
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) {
-                hash = name.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            let base = Math.abs(hash) % 870 + 80;
-            if (lower.includes('stattrak™') || lower.includes('stattrak')) base = Math.round(base * 1.6);
-            return base;
-        }
-
-        function openSellModal(name, image) {
+        // Запрос реальной цены со Стим Маркета через бэкенд
+        async function openSellModal(name, image) {
             selectedSkinToSell = { name, image };
             selectedSellingPlatform = 'p2p';
             document.getElementById('vip-checkbox').checked = false;
             updatePlatformSelectionUI();
 
-            const estimated = estimatePrice(name);
-            document.getElementById('sell-price-input').value = estimated;
-            document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
+            document.getElementById('sell-modal-desc').innerText = `Скин: ${name} (Загрузка цены со Steam...)`;
+            const priceInput = document.getElementById('sell-price-input');
+            priceInput.value = '...';
             document.getElementById('modal-sell-skin').classList.add('active');
+
+            try {
+                const res = await fetch(`/api/steam/price?name=${encodeURIComponent(name)}`);
+                const data = await res.json();
+                if (data.success && data.price) {
+                    priceInput.value = data.price;
+                    document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
+                } else {
+                    priceInput.value = 100;
+                    document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
+                }
+            } catch (e) {
+                priceInput.value = 100;
+                document.getElementById('sell-modal-desc').innerText = `Скин: ${name}`;
+            }
         }
 
         function selectPlatform(plat) {
