@@ -458,9 +458,10 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Команда глобальной рассылки /broadcast
+    // Команда глобальной рассылки /broadcast с проверкой по msg.from.id
     if (text.startsWith('/broadcast')) {
-        if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) {
+        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
+        if (senderId !== String(ADMIN_CHAT_ID)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
         }
 
@@ -476,10 +477,11 @@ bot.on('message', async (msg) => {
         const recipients = new Set([...chats, ...Object.keys(users)]);
 
         for (const recipientId of recipients) {
+            if (!recipientId || recipientId === 'undefined' || recipientId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
                 await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown' });
                 successCount++;
-                await new Promise(resolve => setTimeout(resolve, 35));
+                await new Promise(resolve => setTimeout(resolve, 50));
             } catch (err) {
                 failCount++;
             }
@@ -491,6 +493,11 @@ bot.on('message', async (msg) => {
 
     // Команда удаления розыгрышей /delgiveaway
     if (text.startsWith('/delgiveaway')) {
+        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
+        if (senderId !== String(ADMIN_CHAT_ID)) {
+            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
+        }
+
         const activeGiveaways = giveaways.filter(g => !g.ended);
         if (activeGiveaways.length === 0) {
             return await bot.sendMessage(msg.chat.id, '❌ Нет активных розыгрышей для удаления.');
@@ -502,6 +509,11 @@ bot.on('message', async (msg) => {
     }
 
     if (text.startsWith('/newgiveaway')) {
+        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
+        if (senderId !== String(ADMIN_CHAT_ID)) {
+            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
+        }
+
         const lines = text.split('\n');
         let title = '', sponsor = '', timerLine = '';
         lines.forEach(l => {
@@ -553,10 +565,9 @@ bot.on('message', async (msg) => {
         
         const dateStr = new Date(endTime).toLocaleString('ru-RU');
         
-        // Отправка подтверждения создателю
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" запущен!\n⏰ Окончание: *${dateStr}*`, { parse_mode: 'Markdown' });
 
-        // Автоматическая рассылка уведомления во все чаты, группы и лички
+        // Автоматическая рассылка нового розыгрыша во все чаты и к пользователям
         const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
         const broadcastKeyboard = {
             inline_keyboard: [
@@ -566,6 +577,7 @@ bot.on('message', async (msg) => {
 
         const recipients = new Set([...chats, ...Object.keys(users)]);
         for (const recipientId of recipients) {
+            if (!recipientId || recipientId === 'undefined' || recipientId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
                 await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
                 await new Promise(resolve => setTimeout(resolve, 35));
@@ -577,7 +589,6 @@ bot.on('message', async (msg) => {
 bot.on('callback_query', async (query) => {
     const data = query.data, parts = data.split('_');
 
-    // Обработка удаления розыгрыша через инлайн-кнопку
     if (data.startsWith('del_gw_')) {
         const gwId = data.replace('del_gw_', '');
         const index = giveaways.findIndex(g => g._id === gwId);
