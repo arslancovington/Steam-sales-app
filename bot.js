@@ -12,6 +12,9 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 
+let botUserId = null;
+bot.getMe().then(me => { botUserId = me.id; }).catch(e => {});
+
 bot.on('polling_error', (error) => console.error('⚠️ Ошибка Telegram:', error.code, error.message));
 bot.on('error', (error) => console.error('⚠️ Общая ошибка бота:', error.code, error.message));
 
@@ -74,7 +77,6 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Универсальная проверка прав администратора (ЛС или админ-чат/группа)
 function isAdmin(msg) {
     const userId = String(msg.from ? msg.from.id : '');
     const chatId = String(msg.chat.id);
@@ -428,7 +430,6 @@ bot.on('pre_checkout_query', async (query) => {
 });
 
 bot.on('message', async (msg) => {
-    // Сохраняем чаты и группы, где бот активен, для автоматических рассылок
     if (msg.chat && msg.chat.type !== 'private') {
         if (!chats.includes(msg.chat.id)) {
             chats.push(msg.chat.id);
@@ -457,6 +458,10 @@ bot.on('message', async (msg) => {
     if (!text) return;
 
     if (text.startsWith('/start')) {
+        const userId = msg.from ? msg.from.id : msg.chat.id;
+        const username = msg.from ? (msg.from.username || msg.from.first_name) : 'Игрок';
+        getOrCreateUser(userId, username, msg.from?.photo_url);
+
         await bot.sendMessage(msg.chat.id, '🎮 Добро пожаловать в **P2P Skin Sales**!\n\nТоргуйте скинами, участвуйте в битвах и розыгрышах прямо в Telegram.', {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -466,7 +471,7 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Команда глобальной рассылки /broadcast
+    // Команда глобальной рассылки /broadcast (только в каналы/чаты, где бот администратор)
     if (text.startsWith('/broadcast')) {
         if (!isAdmin(msg)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
@@ -477,28 +482,35 @@ bot.on('message', async (msg) => {
             return await bot.sendMessage(msg.chat.id, '❌ Введите текст для рассылки.\nПример:\n`/broadcast Важное сообщение!`', { parse_mode: 'Markdown' });
         }
 
-        await bot.sendMessage(msg.chat.id, '⏳ Начинаю рассылку...');
+        await bot.sendMessage(msg.chat.id, '⏳ Проверяю права и начинаю рассылку в каналы...');
 
         let successCount = 0;
         let failCount = 0;
-        const recipients = new Set([...chats, ...Object.keys(users)]);
 
-        for (const recipientId of recipients) {
-            if (!recipientId || recipientId === 'undefined' || recipientId === 'YOUR_ADMIN_CHAT_ID') continue;
+        for (const chatId of chats) {
+            if (!chatId || chatId === 'undefined' || chatId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
-                await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown' });
-                successCount++;
-                await new Promise(resolve => setTimeout(resolve, 50));
+                if (!botUserId) {
+                    const me = await bot.getMe();
+                    botUserId = me.id;
+                }
+                const member = await bot.getChatMember(chatId, botUserId);
+                if (['creator', 'administrator'].includes(member.status)) {
+                    await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown' });
+                    successCount++;
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                } else {
+                    failCount++;
+                }
             } catch (err) {
                 failCount++;
             }
         }
 
-        await bot.sendMessage(msg.chat.id, `📢 **Рассылка завершена!**\n\n✅ Успешно доставлено: ${successCount}\n❌ Ошибок: ${failCount}`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(msg.chat.id, `📢 **Рассылка по каналам завершена!**\n\n✅ Успешно доставлено: ${successCount}\n❌ Пропущено/ошибок (нет прав админа): ${failCount}`, { parse_mode: 'Markdown' });
         return;
     }
 
-    // Команда удаления розыгрышей /delgiveaway
     if (text.startsWith('/delgiveaway')) {
         if (!isAdmin(msg)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
@@ -572,7 +584,7 @@ bot.on('message', async (msg) => {
         
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" запущен!\n⏰ Окончание: *${dateStr}*`, { parse_mode: 'Markdown' });
 
-        // Автоматическая рассылка нового розыгрыша во все чаты и к пользователям
+        // Автоматическая рассылка нового розыгрыша только в те каналы/чаты, где бот администратор
         const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
         const broadcastKeyboard = {
             inline_keyboard: [
@@ -580,12 +592,18 @@ bot.on('message', async (msg) => {
             ]
         };
 
-        const recipients = new Set([...chats, ...Object.keys(users)]);
-        for (const recipientId of recipients) {
-            if (!recipientId || recipientId === 'undefined' || recipientId === 'YOUR_ADMIN_CHAT_ID') continue;
+        for (const chatId of chats) {
+            if (!chatId || chatId === 'undefined' || chatId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
-                await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
-                await new Promise(resolve => setTimeout(resolve, 35));
+                if (!botUserId) {
+                    const me = await bot.getMe();
+                    botUserId = me.id;
+                }
+                const member = await bot.getChatMember(chatId, botUserId);
+                if (['creator', 'administrator'].includes(member.status)) {
+                    await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
+                    await new Promise(resolve => setTimeout(resolve, 35));
+                }
             } catch (err) {}
         }
     }
