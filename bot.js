@@ -458,6 +458,37 @@ bot.on('message', async (msg) => {
         return;
     }
 
+    // Команда глобальной рассылки /broadcast
+    if (text.startsWith('/broadcast')) {
+        if (String(msg.chat.id) !== String(ADMIN_CHAT_ID)) {
+            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
+        }
+
+        const broadcastText = text.replace('/broadcast', '').trim();
+        if (!broadcastText) {
+            return await bot.sendMessage(msg.chat.id, '❌ Введите текст для рассылки.\nПример:\n`/broadcast Важное сообщение!`', { parse_mode: 'Markdown' });
+        }
+
+        await bot.sendMessage(msg.chat.id, '⏳ Начинаю рассылку...');
+
+        let successCount = 0;
+        let failCount = 0;
+        const recipients = new Set([...chats, ...Object.keys(users)]);
+
+        for (const recipientId of recipients) {
+            try {
+                await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown' });
+                successCount++;
+                await new Promise(resolve => setTimeout(resolve, 35));
+            } catch (err) {
+                failCount++;
+            }
+        }
+
+        await bot.sendMessage(msg.chat.id, `📢 **Рассылка завершена!**\n\n✅ Успешно доставлено: ${successCount}\n❌ Ошибок: ${failCount}`, { parse_mode: 'Markdown' });
+        return;
+    }
+
     // Команда удаления розыгрышей /delgiveaway
     if (text.startsWith('/delgiveaway')) {
         const activeGiveaways = giveaways.filter(g => !g.ended);
@@ -525,7 +556,7 @@ bot.on('message', async (msg) => {
         // Отправка подтверждения создателю
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" запущен!\n⏰ Окончание: *${dateStr}*`, { parse_mode: 'Markdown' });
 
-        // Рассылка уведомления во все чаты/группы, где бот добавлен
+        // Автоматическая рассылка уведомления во все чаты, группы и лички
         const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
         const broadcastKeyboard = {
             inline_keyboard: [
@@ -533,9 +564,11 @@ bot.on('message', async (msg) => {
             ]
         };
 
-        for (const chatId of chats) {
+        const recipients = new Set([...chats, ...Object.keys(users)]);
+        for (const recipientId of recipients) {
             try {
-                await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
+                await bot.sendMessage(recipientId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
+                await new Promise(resolve => setTimeout(resolve, 35));
             } catch (err) {}
         }
     }
@@ -544,7 +577,7 @@ bot.on('message', async (msg) => {
 bot.on('callback_query', async (query) => {
     const data = query.data, parts = data.split('_');
 
-    // Обработка удаления розыгрыша по кнопке
+    // Обработка удаления розыгрыша через инлайн-кнопку
     if (data.startsWith('del_gw_')) {
         const gwId = data.replace('del_gw_', '');
         const index = giveaways.findIndex(g => g._id === gwId);
