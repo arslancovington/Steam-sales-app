@@ -31,7 +31,7 @@ const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : pa
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
 const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
 
-let db = { users: {}, marketItems: [], giveaways: [] };
+let db = { users: {}, marketItems: [], giveaways: [], chats: [] };
 let cards = [];
 let pricesCache = {}; 
 
@@ -42,11 +42,12 @@ if (fs.existsSync(pricesFile)) { try { pricesCache = JSON.parse(fs.readFileSync(
 let users = db.users || {};
 let marketItems = db.marketItems || [];
 let giveaways = db.giveaways || [];
+let chats = db.chats || [];
 let cardIndexRu = 0;
 let cardIndexUz = 0;
 
 function saveData() { 
-    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways }, null, 2)); } catch (e) {} 
+    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats }, null, 2)); } catch (e) {} 
 }
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
@@ -256,7 +257,7 @@ app.post('/api/deals/buy', async (req, res) => {
 });
 
 /* =========================================
-   РОЗЫГРЫШИ И СТИМ API (С ЗАЩИТОЙ ОТ БЛОКИРОВОК)
+   РОЗЫГРЫШИ И СТИМ API
 ========================================= */
 app.get('/api/giveaways/list', (req, res) => res.json({ success: true, giveaways }));
 
@@ -282,7 +283,6 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Инвентарь с фоллбэком (тестовыми скинами, если Steam блокирует IP хостинга)
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -297,11 +297,8 @@ app.post('/api/steam/inventory', async (req, res) => {
                 return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
             }
         }
-    } catch (e) {
-        // Steam заблокировал IP или недоступен -> возвращаем демо-инвентарь для тестов
-    }
+    } catch (e) {}
 
-    // Резервный демонстрационный инвентарь CS2, чтобы маркет никогда не был пустым при блокировках Steam
     res.json({
         success: true,
         items: [
@@ -327,7 +324,7 @@ app.get('/api/steam/price', async (req, res) => {
 });
 
 /* =========================================
-   ПЛАТЕЖИ, ВЫВОДЫ И ВЕБХУК CRYPTO BOT
+   ПЛАТЕЖИ, ВЫВОДЫ И ВЕБХУК
 ========================================= */
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
@@ -423,6 +420,14 @@ bot.on('pre_checkout_query', async (query) => {
 });
 
 bot.on('message', async (msg) => {
+    // Сохраняем чаты и группы, где бот активен, для автоматических рассылок
+    if (msg.chat && msg.chat.type !== 'private') {
+        if (!chats.includes(msg.chat.id)) {
+            chats.push(msg.chat.id);
+            saveData();
+        }
+    }
+
     if (msg.successful_payment) {
         const payload = msg.successful_payment.invoice_payload;
         if (payload && payload.startsWith('topup_')) {
@@ -451,6 +456,18 @@ bot.on('message', async (msg) => {
             }
         });
         return;
+    }
+
+    // Команда удаления розыгрышей /delgiveaway
+    if (text.startsWith('/delgiveaway')) {
+        const activeGiveaways = giveaways.filter(g => !g.ended);
+        if (activeGiveaways.length === 0) {
+            return await bot.sendMessage(msg.chat.id, '❌ Нет активных розыгрышей для удаления.');
+        }
+        const buttons = activeGiveaways.map(g => [{ text: `🗑 Удалить: ${g.title}`, callback_data: `del_gw_${g._id}` }]);
+        return await bot.sendMessage(msg.chat.id, '📋 Выберите розыгрыш для удаления:', {
+            reply_markup: { inline_keyboard: buttons }
+        });
     }
 
     if (text.startsWith('/newgiveaway')) {
@@ -504,12 +521,44 @@ bot.on('message', async (msg) => {
         saveData();
         
         const dateStr = new Date(endTime).toLocaleString('ru-RU');
+        
+        // Отправка подтверждения создателю
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" запущен!\n⏰ Окончание: *${dateStr}*`, { parse_mode: 'Markdown' });
+
+        // Рассылка уведомления во все чаты/группы, где бот добавлен
+        const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
+        const broadcastKeyboard = {
+            inline_keyboard: [
+                [{ text: '🚀 Участвовать в розыгрыше', web_app: { url: WEBAPP_URL } }]
+            ]
+        };
+
+        for (const chatId of chats) {
+            try {
+                await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
+            } catch (err) {}
+        }
     }
 });
 
 bot.on('callback_query', async (query) => {
     const data = query.data, parts = data.split('_');
+
+    // Обработка удаления розыгрыша по кнопке
+    if (data.startsWith('del_gw_')) {
+        const gwId = data.replace('del_gw_', '');
+        const index = giveaways.findIndex(g => g._id === gwId);
+        if (index !== -1) {
+            const removedTitle = giveaways[index].title;
+            giveaways.splice(index, 1);
+            saveData();
+            await bot.editMessageText(`✅ Розыгрыш "${removedTitle}" успешно удален.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+        } else {
+            await bot.answerCallbackQuery(query.id, { text: 'Розыгрыш уже удален или не найден', show_alert: true });
+        }
+        return;
+    }
+
     if (data.startsWith('p2p_confirm_pay_')) {
         const tgId = parts[3], amount = parseFloat(parts[4]);
         getOrCreateUser(tgId).balance += amount; saveData();
