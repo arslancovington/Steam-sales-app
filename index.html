@@ -95,7 +95,7 @@
         .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 10px; cursor: pointer; text-align: center; }
         .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
 
-        .topup-methods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 10px 0; }
+        .topup-methods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; } /* Изменил на 5 колонок */
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 8px 2px; cursor: pointer; text-align: center; }
         .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
 
@@ -271,6 +271,7 @@
             <h3 class="neon-text">Пополнить баланс</h3>
             <div class="topup-methods">
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">💎</div>
+                <div class="topup-method-card" id="method-skins" onclick="selectTopupMethod('skins')">🔫</div>
                 <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">⭐</div>
                 <div class="topup-method-card" id="method-p2puz" onclick="selectTopupMethod('p2puz')">🇺🇿</div>
                 <div class="topup-method-card" id="method-p2pru" onclick="selectTopupMethod('p2pru')">🇷🇺</div>
@@ -351,7 +352,29 @@
 
             setInterval(pollBattleState, 1000);
             setInterval(fetchGiveaways, 30000);
+            
+            // Запуск живого таймера для розыгрышей (обновление каждую секунду)
+            setInterval(updateLiveTimers, 1000);
         });
+
+        // ФУНКЦИЯ ЖИВОГО ТАЙМЕРА ДЛЯ РОЗЫГРЫШЕЙ
+        function updateLiveTimers() {
+            document.querySelectorAll('.live-gw-timer').forEach(el => {
+                const endTime = parseInt(el.getAttribute('data-endtime'));
+                if (!endTime) return;
+                
+                const left = Math.max(0, endTime - Date.now());
+                if (left <= 0) {
+                    el.innerText = '⏳ Подведение итогов...';
+                } else {
+                    const d = Math.floor(left / 86400000);
+                    const h = Math.floor((left % 86400000) / 3600000).toString().padStart(2, '0');
+                    const m = Math.floor((left % 3600000) / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((left % 60000) / 1000).toString().padStart(2, '0');
+                    el.innerText = d > 0 ? `⏳ ${d}д ${h}:${m}:${s}` : `⏳ ${h}:${m}:${s}`;
+                }
+            });
+        }
 
         function switchTab(id, btn) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -595,7 +618,7 @@
             if (data.success) { document.getElementById('battle-bet-amount').value = ''; syncUserProfile(); pollBattleState(); } else alert(data.error);
         }
 
-        /* РОЗЫГРЫШИ */
+        /* РОЗЫГРЫШИ СО ВСТРОЕННЫМ ЖИВЫМ ТАЙМЕРОМ */
         async function fetchGiveaways() {
             try {
                 const res = await fetch('/api/giveaways/list');
@@ -611,7 +634,7 @@
                                         <span class="giveaway-timer-badge" style="color:var(--text-muted);">Итоги подведены</span>
                                     </div>
                                     <div class="giveaway-body">
-                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img"></div>
+                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f'"></div>
                                         <div class="giveaway-info">
                                             <p class="giveaway-title">${g.title}</p>
                                             <div class="giveaway-winner-box">
@@ -624,14 +647,15 @@
                                 </div>
                             `;
                         } else {
+                            // Если таймер сломан или отсутствует, заменяем на класс live-gw-timer
                             return `
                                 <div class="giveaway-card">
                                     <div class="giveaway-header">
                                         <span class="giveaway-badge-sponsor">🎁 Активный розыгрыш</span>
-                                        <span class="giveaway-timer-badge">⏳ ${g.timerText}</span>
+                                        <span class="giveaway-timer-badge live-gw-timer" data-endtime="${g.endTime}">⏳ Вычисление...</span>
                                     </div>
                                     <div class="giveaway-body">
-                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img"></div>
+                                        <div class="giveaway-skin-box"><img src="${g.image}" class="skin-img" onerror="this.src='https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f'"></div>
                                         <div class="giveaway-info">
                                             <p class="giveaway-title">${g.title}</p>
                                             <div class="giveaway-meta">Спонсор: <b style="color:var(--neon-purple);">${g.sponsor}</b></div>
@@ -646,6 +670,7 @@
                             `;
                         }
                     }).join('');
+                    updateLiveTimers(); // Сразу обновляем значения, чтобы не было задержки в 1 сек
                 } else container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
             } catch (e) {}
         }
@@ -656,7 +681,7 @@
             if (data.success) { alert('Вы успешно участвуете!'); fetchGiveaways(); } else alert(data.error);
         }
 
-        /* ФИНАНСОВЫЕ МОДАЛКИ */
+        /* ФИНАНСОВЫЕ МОДАЛКИ (ИНТЕГРИРОВАНА ОПЛАТА СКИНАМИ) */
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -665,22 +690,48 @@
             selectedTopupType = type;
             document.querySelectorAll('.topup-method-card').forEach(c => c.classList.remove('active'));
             document.getElementById('method-' + type).classList.add('active');
+            
             const symbol = document.getElementById('topup-symbol'), input = document.getElementById('topup-amount-input');
-            if (type === 'crypto') { symbol.innerText = 'USDT'; input.placeholder = '5'; }
-            else if (type === 'stars') { symbol.innerText = '⭐'; input.placeholder = '100'; }
-            else { symbol.innerText = '₽'; input.placeholder = '500'; }
+            
+            // Логика блокировки инпута для пополнения скинами
+            if (type === 'skins') {
+                symbol.innerText = '🔫'; 
+                input.value = '';
+                input.placeholder = 'Сумма авто (скинами)';
+                input.disabled = true;
+            } else {
+                input.disabled = false;
+                if (type === 'crypto') { symbol.innerText = 'USDT'; input.placeholder = '5'; }
+                else if (type === 'stars') { symbol.innerText = '⭐'; input.placeholder = '100'; }
+                else { symbol.innerText = '₽'; input.placeholder = '500'; }
+            }
             updateTopupCalculation();
         }
 
         function updateTopupCalculation() {
             const amount = parseFloat(document.getElementById('topup-amount-input').value) || 0;
             const hint = document.getElementById('topup-hint');
-            if (selectedTopupType === 'p2puz') hint.innerText = amount > 0 ? `К оплате: ${Math.round(amount * 175).toLocaleString()} сум` : 'Курс: 1 ₽ = 175 сум';
+            
+            if (selectedTopupType === 'skins') hint.innerText = 'Вы будете перенаправлены на шлюз приема скинов.';
+            else if (selectedTopupType === 'p2puz') hint.innerText = amount > 0 ? `К оплате: ${Math.round(amount * 175).toLocaleString()} сум` : 'Курс: 1 ₽ = 175 сум';
             else if (selectedTopupType === 'p2pru') hint.innerText = amount > 0 ? `К оплате: ${amount} ₽ на карту РФ` : 'Перевод на карту РФ';
             else hint.innerText = 'Сумма зачислится после оплаты.';
         }
 
         async function processTopUp() {
+            // Обработка запроса на оплату скинами
+            if (selectedTopupType === 'skins') {
+                let currency = 'Skins';
+                const res = await fetch('/api/billing/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount: 0, currency }) });
+                const data = await res.json();
+                if (data.success) { 
+                    closeModal('modal-topup'); 
+                    alert('Счет (ссылка на трейд-бота) отправлен в личные сообщения!'); 
+                    Telegram.WebApp.close(); 
+                } else alert(data.error);
+                return;
+            }
+
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
             if (isNaN(amount) || amount <= 0) { alert('Введите корректную сумму'); return; }
             let currency = selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'Stars' : (selectedTopupType === 'p2pru' ? 'P2P RU' : 'P2P UZ'));
