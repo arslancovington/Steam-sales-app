@@ -74,6 +74,14 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
+// Универсальная проверка прав администратора (ЛС или админ-чат/группа)
+function isAdmin(msg) {
+    const userId = String(msg.from ? msg.from.id : '');
+    const chatId = String(msg.chat.id);
+    const adminId = String(ADMIN_CHAT_ID);
+    return userId === adminId || chatId === adminId;
+}
+
 /* =========================================
    ФОНОВЫЕ ПРОЦЕССЫ (БИТВЫ И РОЗЫГРЫШИ)
 ========================================= */
@@ -458,10 +466,9 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Команда глобальной рассылки /broadcast с проверкой по msg.from.id
+    // Команда глобальной рассылки /broadcast
     if (text.startsWith('/broadcast')) {
-        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
-        if (senderId !== String(ADMIN_CHAT_ID)) {
+        if (!isAdmin(msg)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
         }
 
@@ -493,8 +500,7 @@ bot.on('message', async (msg) => {
 
     // Команда удаления розыгрышей /delgiveaway
     if (text.startsWith('/delgiveaway')) {
-        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
-        if (senderId !== String(ADMIN_CHAT_ID)) {
+        if (!isAdmin(msg)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
         }
 
@@ -509,8 +515,7 @@ bot.on('message', async (msg) => {
     }
 
     if (text.startsWith('/newgiveaway')) {
-        const senderId = String(msg.from ? msg.from.id : msg.chat.id);
-        if (senderId !== String(ADMIN_CHAT_ID)) {
+        if (!isAdmin(msg)) {
             return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
         }
 
