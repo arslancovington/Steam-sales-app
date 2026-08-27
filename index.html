@@ -1,3 +1,4 @@
+Полный и актуальный файл index.html, полностью согласованный с новым бэкендом (интеграция рынка DMarket с отображением скидок, наценкой 6% и отправкой детальных данных о покупке в админ-чат):
 <!DOCTYPE html>
 <html lang="ru">
 <head> 
@@ -106,7 +107,7 @@
         .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
         .platform-option-btn.active { background: rgba(255, 153, 0, 0.1); border-color: var(--main-orange); color: var(--main-orange); font-weight: bold; }
 
-        .topup-methods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; }
+        .topup-methods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 10px 0; }
         .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 8px 2px; cursor: pointer; text-align: center; font-size: 16px; }
         .topup-method-card.active { border-color: var(--main-orange); background: rgba(255, 153, 0, 0.05); }
 
@@ -159,7 +160,7 @@
     </header>
 
     <main class="content-area">
-        <!-- 1. МАРКЕТПЛЕЙС (АКТИВЕН С ПОИСКОМ И ФИЛЬТРАМИ) -->
+        <!-- 1. МАРКЕТПЛЕЙС -->
         <section id="tab-market" class="tab active">
             <h2 class="neon-text">P2P Маркетплейс</h2>
             <div class="filter-box">
@@ -229,13 +230,11 @@
             </div>
         </section>
 
-        <!-- 4. МАГАЗИН СКИНОВ (ЗАГЛУШКА "СКОРО") -->
+        <!-- 4. МАГАЗИН СКИНОВ (DMARKET РЫНОК) -->
         <section id="tab-shop" class="tab">
-            <h2 class="neon-text">Магазин скинов</h2>
-            <div class="empty-state" style="margin-top: 30px;">
-                <div style="font-size: 24px; margin-bottom: 8px;">🚀</div>
-                <div style="font-size: 16px; font-weight: bold; color: var(--main-orange); margin-bottom: 4px;">Скоро</div>
-                <div style="color: var(--text-muted); font-size: 12px;">Магазин скинов находится в разработке и откроется совсем скоро!</div>
+            <h2 class="neon-text">Магазин скинов (DMarket)</h2>
+            <div id="shop-container" class="grid-layout">
+                <div class="empty-state" style="grid-column: span 2;">Загрузка рынка DMarket...</div>
             </div>
         </section>
 
@@ -304,7 +303,6 @@
             <h3 class="neon-text">Пополнить баланс</h3>
             <div class="topup-methods">
                 <div class="topup-method-card active" id="method-crypto" onclick="selectTopupMethod('crypto')">💎</div>
-                <div class="topup-method-card" id="method-skins" onclick="selectTopupMethod('skins')">🔫</div>
                 <div class="topup-method-card" id="method-stars" onclick="selectTopupMethod('stars')">⭐</div>
                 <div class="topup-method-card" id="method-p2puz" onclick="selectTopupMethod('p2puz')">🇺🇿</div>
                 <div class="topup-method-card" id="method-p2pru" onclick="selectTopupMethod('p2pru')">🇷🇺</div>
@@ -387,7 +385,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
             
-            await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways()]);
+            await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways(), loadShop()]);
             if (steamId) { 
                 localStorage.setItem('user_steam_id', steamId); 
                 loadSteamData(steamId); 
@@ -427,6 +425,7 @@
             btn.classList.add('active-nav');
 
             if (id === 'market') fetchMarketItems();
+            if (id === 'shop') loadShop();
             if (id === 'inventory') {
                 const savedUrl = localStorage.getItem('user_trade_url');
                 if (savedUrl && document.getElementById('trade-url-input').value === '') {
@@ -456,6 +455,50 @@
             } catch (err) {}
         }
 
+        /* --- МАГАЗИН СКИНОВ (DMARKET) --- */
+        async function loadShop() {
+            try {
+                const res = await fetch('/api/shop/items');
+                const data = await res.json();
+                const container = document.getElementById('shop-container');
+                if (data.success && data.items && data.items.length > 0) {
+                    container.innerHTML = data.items.map(item => `
+                        <div class="card" style="position: relative;">
+                            ${item.discount ? `<div style="position: absolute; top: 6px; left: 6px; background: rgba(255,51,51,0.2); border: 1px solid #ff3333; color: #ff3333; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 4px; z-index: 2;">${item.discount}</div>` : ''}
+                            <div class="skin-image"><img src="${item.image}" class="skin-img" onerror="this.src='' "></div>
+                            <h4>${item.name}</h4>
+                            <div style="font-size: 15px; font-weight: 900; color: var(--main-orange); margin-bottom: 8px;">${item.price} ₽</div>
+                            <button class="btn-orange-glow" onclick="buyShopItem('${item.id}', '${item.name.replace(/'/g, "\\'")}', ${item.price})">Купить</button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="empty-state" style="grid-column: span 2;">Товары с DMarket временно недоступны</div>';
+                }
+            } catch (e) {
+                document.getElementById('shop-container').innerHTML = '<div class="empty-state" style="grid-column: span 2;">Ошибка загрузки каталога DMarket</div>';
+            }
+        }
+
+        async function buyShopItem(itemId, itemName, itemPrice) {
+            if (!confirm(`Купить "${itemName}" за ${itemPrice} ₽?`)) return;
+            try {
+                const res = await fetch('/api/shop/buy', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ tgId: myTgId, itemId, itemName, itemPrice }) 
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('✅ Заказ успешно оформлен! Администратор получил заявку.');
+                    syncUserProfile();
+                } else {
+                    alert('❌ Ошибка: ' + result.error);
+                }
+            } catch (e) {
+                alert('Техническая ошибка связи с сервером');
+            }
+        }
+
         /* --- P2P МАРКЕТПЛЕЙС --- */
         async function fetchMarketItems() {
             try {
@@ -481,8 +524,12 @@
         }
 
         function filterMarketItems() {
-            const query = document.getElementById('market-search').value.toLowerCase();
-            const sortType = document.getElementById('market-sort').value;
+            const searchInput = document.getElementById('market-search');
+            const sortSelect = document.getElementById('market-sort');
+            if (!searchInput || !sortSelect) return;
+
+            const query = searchInput.value.toLowerCase();
+            const sortType = sortSelect.value;
 
             let filtered = globalMarketItems.filter(item => item.name.toLowerCase().includes(query));
 
@@ -814,17 +861,10 @@
             
             const symbol = document.getElementById('topup-symbol'), input = document.getElementById('topup-amount-input');
             
-            if (type === 'skins') {
-                symbol.innerText = '🔫'; 
-                input.value = '';
-                input.placeholder = 'Сумма авто (скинами)';
-                input.disabled = true;
-            } else {
-                input.disabled = false;
-                if (type === 'crypto') { symbol.innerText = 'USDT'; input.placeholder = '5'; }
-                else if (type === 'stars') { symbol.innerText = '⭐'; input.placeholder = '100'; }
-                else { symbol.innerText = '₽'; input.placeholder = '500'; }
-            }
+            input.disabled = false;
+            if (type === 'crypto') { symbol.innerText = 'USDT'; input.placeholder = '5'; }
+            else if (type === 'stars') { symbol.innerText = '⭐'; input.placeholder = '100'; }
+            else { symbol.innerText = '₽'; input.placeholder = '500'; }
             updateTopupCalculation();
         }
 
@@ -832,23 +872,12 @@
             const amount = parseFloat(document.getElementById('topup-amount-input').value) || 0;
             const hint = document.getElementById('topup-hint');
             
-            if (selectedTopupType === 'skins') hint.innerText = 'Вы будете перенаправлены на шлюз приема скинов через Waxpeer.';
-            else if (selectedTopupType === 'p2puz') hint.innerText = amount > 0 ? `К оплате: ${Math.round(amount * 175).toLocaleString()} сум` : 'Курс: 1 ₽ = 175 сум';
+            if (selectedTopupType === 'p2puz') hint.innerText = amount > 0 ? `К оплате: ${Math.round(amount * 175).toLocaleString()} сум` : 'Курс: 1 ₽ = 175 сум';
             else if (selectedTopupType === 'p2pru') hint.innerText = amount > 0 ? `К оплате: ${amount} ₽ на карту РФ` : 'Перевод на карту РФ';
             else hint.innerText = 'Сумма зачислится после оплаты.';
         }
 
         async function processTopUp() {
-            if (selectedTopupType === 'skins') {
-                const res = await fetch('/api/waxpeer/deposit-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId }) });
-                const data = await res.json();
-                if (data.success && data.url) { 
-                    closeModal('modal-topup'); 
-                    Telegram.WebApp.openLink(data.url); 
-                } else alert('Не удалось создать ссылку для депозита.');
-                return;
-            }
-
             const amount = parseFloat(document.getElementById('topup-amount-input').value);
             if (isNaN(amount) || amount <= 0) { alert('Введите корректную сумму'); return; }
             let currency = selectedTopupType === 'crypto' ? 'USDT' : (selectedTopupType === 'stars' ? 'Stars' : (selectedTopupType === 'p2pru' ? 'P2P RU' : 'P2P UZ'));
@@ -889,3 +918,4 @@
     </script>
 </body>
 </html>
+
