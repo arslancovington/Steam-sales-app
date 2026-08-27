@@ -8,9 +8,11 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
-const WAXPEER_API_KEY = process.env.WAXPEER_API_KEY || 'YOUR_WAXPEER_API_KEY';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
+const DMARKET_PUBLIC_KEY = process.env.DMARKET_PUBLIC_KEY || '';
+
+const USD_TO_RUB = 95; // Курс доллара к рублю (можно настроить)
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -80,18 +82,16 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
-// Проверка рабочего времени магазина (с 9:00 до 23:00 по МСК)
 function isShopOpen() {
     try {
         const now = new Date();
         const mskHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow', hour: 'numeric', hour12: false }));
         return mskHour >= 9 && mskHour < 23;
     } catch (e) {
-        return true; // Если не удалось определить часовой пояс, разрешаем по умолчанию
+        return true;
     }
 }
 
-// Универсальная проверка прав администратора
 function isAdmin(msg) {
     const userId = String(msg.from ? msg.from.id : '');
     const chatId = String(msg.chat.id);
@@ -111,8 +111,6 @@ function resetBattleState() {
 
 setInterval(async () => {
     const now = Date.now();
-    
-    // Логика Королевской битвы
     if (battleState.status === 'countdown' && now >= battleState.startTime) {
         battleState.status = 'rolling';
         battleState.rollEndTime = now + 13000; 
@@ -135,7 +133,6 @@ setInterval(async () => {
         setTimeout(() => { battleState = resetBattleState(); }, 7000);
     }
 
-    // Логика Розыгрышей
     let giveawaysUpdated = false;
     giveaways.forEach(g => {
         if (!g.ended && g.endTime && now >= g.endTime) {
@@ -179,7 +176,6 @@ setInterval(async () => {
     }
 
     if (giveawaysUpdated) saveData();
-
 }, 15000);
 
 /* =========================================
@@ -278,18 +274,9 @@ app.post('/api/steam/inventory', async (req, res) => {
         if (invRes?.data?.success && invRes.data.assets?.length > 0) {
             return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
         }
-    } catch (e) {
-        console.error('⚠️ Ошибка запроса инвентаря Steam через агента:', e.message);
-    }
+    } catch (e) {}
 
-    res.json({ success: false, error: 'Не удалось загрузить инвентарь. Проверьте правильность Trade URL и убедитесь, что профиль и инвентарь CS2 открыты в Steam.' });
-});
-
-app.get('/api/steam/price', async (req, res) => {
-    let skinName = req.query.name;
-    if (!skinName) return res.json({ success: true, price: 150 });
-    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
-    res.json({ success: true, price: 150 });
+    res.json({ success: false, error: 'Не удалось загрузить инвентарь.' });
 });
 
 /* =========================================
@@ -347,60 +334,86 @@ app.post('/api/deals/buy', async (req, res) => {
 });
 
 /* =========================================
-   API: МАГАЗИН SKIN HUB (С наценкой 7% и ручной выдачей)
+   API: ИНТЕГРАЦИЯ DMARKET (РЫНОК + СКИДКИ + 6% МАРЖА)
 ========================================= */
-const shopItems = [
-    { id: 's1', name: 'AK-47 | Redline (FT)', basePrice: 1500, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's2', name: 'AWP | Asiimov (FT)', basePrice: 6500, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's3', name: 'Deagle | Printstream (FT)', basePrice: 4200, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's4', name: 'M4A1-S | Cyrex (FN)', basePrice: 2100, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' }
-];
+app.get('/api/shop/items', async (req, res) => {
+    try {
+        // Запрос к публичному API DMarket для CS2 (gameId = a8db)
+        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', {
+            params: {
+                gameId: 'a8db',
+                limit: 40,
+                orderBy: 'best_discount',
+                orderDir: 'desc',
+                currency: 'USD'
+            },
+            headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
+            timeout: 8000
+        });
 
-app.get('/api/shop/items', (req, res) => {
-    // Наценка 7% на базовую цену
-    const itemsWithMarkup = shopItems.map(item => ({
-        id: item.id, 
-        name: item.name, 
-        image: item.image, 
-        price: Math.round(item.basePrice * 1.07)
-    }));
-    res.json({ success: true, items: itemsWithMarkup });
+        if (dmarketRes.data && dmarketRes.data.objects) {
+            const items = dmarketRes.data.objects.map(obj => {
+                const priceUsd = obj.price ? (obj.price.USD / 100) : 0;
+                // Наценка 6% и перевод в рубли
+                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
+                
+                // Вычисление скидки, если она есть на DMarket
+                let discount = null;
+                if (obj.discount) {
+                    discount = `${obj.discount}%`;
+                } else if (obj.extra && obj.extra.discount) {
+                    discount = `${obj.extra.discount}%`;
+                }
+
+                return {
+                    id: obj.itemId || obj.gameId,
+                    name: obj.title,
+                    image: obj.image,
+                    price: priceRub,
+                    discount: discount
+                };
+            }).filter(i => i.price > 0);
+
+            return res.json({ success: true, items });
+        }
+        res.json({ success: true, items: [] });
+    } catch (e) {
+        console.error('⚠️ Ошибка загрузки рынка DMarket:', e.message);
+        res.json({ success: false, error: 'Не удалось загрузить каталог DMarket' });
+    }
 });
 
 app.post('/api/shop/buy', async (req, res) => {
-    const { tgId, itemId } = req.body;
+    const { tgId, itemId, itemName, itemPrice } = req.body;
     
-    // Проверка рабочего времени (с 9:00 до 23:00 по МСК)
     if (!isShopOpen()) {
         return res.json({ success: false, error: 'Магазин работает с 09:00 до 23:00 по МСК. Оформите заказ в рабочие часы!' });
     }
 
     const user = getOrCreateUser(tgId);
-    const item = shopItems.find(i => i.id === itemId);
+    const finalPrice = parseFloat(itemPrice);
 
-    if (!item) return res.json({ success: false, error: 'Товар не найден' });
-    const finalPrice = Math.round(item.basePrice * 1.07);
+    if (isNaN(finalPrice) || user.balance < finalPrice) {
+        return res.json({ success: false, error: 'Недостаточно средств на балансе Skin Hub' });
+    }
+    if (!user.tradeUrl) {
+        return res.json({ success: false, error: 'Укажите ваш Trade URL в профиле!' });
+    }
 
-    if (user.balance < finalPrice) return res.json({ success: false, error: 'Недостаточно средств на балансе Skin Hub' });
-    if (!user.tradeUrl) return res.json({ success: false, error: 'Укажите ваш Trade URL в профиле!' });
-
-    // Списываем баланс у пользователя
     user.balance -= finalPrice;
     saveData();
 
     try {
-        // Уведомление пользователю
         try { 
-            await bot.sendMessage(tgId, `🛍 **Заказ оформлен!**\nСкин *${item.name}* успешно куплен за ${finalPrice} ₽.\nАдминистратор уже получил заявку и отправляет вам обмен в Steam.`); 
+            await bot.sendMessage(tgId, `🛍 **Заказ оформлен!**\nСкин *${itemName || 'Предмет'}* успешно куплен за ${finalPrice} ₽.\nАдминистратор уже получил заявку и отправляет вам обмен в Steam.`); 
         } catch(e) {}
 
-        // Уведомление администратору с требуемыми полями
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             await bot.sendMessage(ADMIN_CHAT_ID, 
-                `🔥 **Новая покупка в Магазине!**\n\n` +
+                `🔥 **Новая покупка в Магазине (DMarket)!**\n\n` +
                 `👤 Ник: @${user.username || 'Игрок'}\n` +
                 `🆔 Айди: \`${user.tgId}\`\n` +
-                `🏷 Название предмета: *${item.name}*\n` +
+                `🏷 Название предмета: *${itemName || 'Товар'}*\n` +
                 `💰 Сумма предмета: ${finalPrice} ₽\n` +
                 `🔗 Трейд ссылка покупателя:\n\`${user.tradeUrl}\``, 
                 { parse_mode: 'Markdown' }
@@ -409,7 +422,6 @@ app.post('/api/shop/buy', async (req, res) => {
 
         res.json({ success: true, newBalance: user.balance });
     } catch (error) {
-        // В случае системной сбои возвращаем средства назад
         user.balance += finalPrice;
         saveData();
         res.json({ success: false, error: 'Произошла ошибка при оформлении. Средства возвращены на баланс.' });
@@ -504,7 +516,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
 });
 
 /* =========================================
-   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ (Админ + Розыгрыши)
+   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ
 ========================================= */
 bot.on('pre_checkout_query', async (query) => {
     try { await bot.answerPreCheckoutQuery(query.id, true); } catch (e) {}
