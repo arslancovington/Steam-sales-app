@@ -2,129 +2,141 @@
 <html lang="ru">
 <head> 
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Skin Sales — Marketplace</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Skin Hub — Marketplace</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
         :root {
-            --bg-color: #0b1110;
+            --bg-color: #0f1015;
+            --card-bg: #1a1c23;
+            --main-orange: #FF9900;
             --neon-green: #7cfc00;
             --neon-cyan: #00ffff;
             --neon-purple: #bf00ff;
-            --card-bg: rgba(20, 30, 25, 0.75);
             --text-main: #ffffff;
-            --text-muted: #889988;
+            --text-muted: #8e929f;
             --danger-red: #ff3333;
         }
 
         * { box-sizing: border-box; }
-        body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 0; padding-bottom: 90px; overflow-x: hidden; }
+        body { background-color: var(--bg-color); color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 0; padding-bottom: 95px; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
 
-        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: rgba(11, 17, 16, 0.95); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(0, 255, 255, 0.2); }
+        /* --- ШАПКА --- */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: rgba(26, 28, 35, 0.95); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #2a2d38; }
         .bot-profile { display: flex; align-items: center; gap: 10px; }
-        .bot-name { font-weight: bold; font-size: 14px; color: var(--neon-cyan); letter-spacing: 0.5px; }
-        .balance-widget { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--neon-green); font-size: 15px; background: rgba(124, 252, 0, 0.05); }
-        .add-funds-btn { background: transparent; color: var(--neon-green); border: none; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+        
+        .logo-container { display: inline-flex; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+        .logo-skin { background-color: #000000; color: #ffffff; padding: 4px 6px 4px 10px; border-radius: 6px 0 0 6px; }
+        .logo-hub { background-color: var(--main-orange); color: #000000; padding: 4px 10px 4px 6px; border-radius: 0 6px 6px 0; }
+
+        .balance-widget { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255, 153, 0, 0.3); font-size: 15px; background: rgba(255, 153, 0, 0.1); color: var(--main-orange); font-weight: bold; }
+        .add-funds-btn { background: transparent; color: var(--main-orange); border: none; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
 
         .tab { display: none; padding: 15px; }
         .tab.active { display: block; }
-        .neon-text { color: var(--text-main); text-shadow: 0 0 6px var(--neon-green); margin-top: 0; }
+        .neon-text { color: var(--text-main); margin-top: 0; }
         .hint-text { font-size: 11px; color: var(--text-muted); margin: 8px 0 0 0; }
-        .section-title { margin-top: 22px; border-bottom: 1px solid #222; padding-bottom: 5px; font-size: 15px; }
+        .section-title { margin-top: 22px; border-bottom: 1px solid #2a2d38; padding-bottom: 5px; font-size: 15px; }
 
-        .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .card { background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; position: relative; }
-        .card h4 { margin: 6px 0 4px 0; font-size: 12px; height: 30px; overflow: hidden; }
+        /* --- ФИЛЬТРЫ МАРКЕТА --- */
+        .filter-box { display: flex; gap: 10px; margin-bottom: 15px; }
+        .search-input, .select-filter { background: #000; color: #fff; border: 1px solid #2a2d38; border-radius: 8px; padding: 10px; font-size: 14px; outline: none; }
+        .search-input { flex-grow: 1; }
+        .select-filter { width: 130px; }
+
+        /* --- СЕТКИ И КАРТОЧКИ --- */
+        .grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .card { background: var(--card-bg); padding: 12px; border-radius: 12px; border: 1px solid #2a2d38; display: flex; flex-direction: column; position: relative; text-align: center; }
+        .card h4 { margin: 6px 0 4px 0; font-size: 13px; height: 30px; overflow: hidden; }
         .skin-image { width: 100%; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); border-radius: 8px; }
-        .skin-img { width: 100%; height: 100%; object-fit: contain; }
+        .skin-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 8px 8px rgba(0,0,0,0.4)); }
         
         .card.vip-card {
             background: linear-gradient(135deg, rgba(40, 15, 60, 0.85), rgba(15, 25, 20, 0.85));
             border: 2px solid var(--neon-purple);
-            box-shadow: 0 0 15px rgba(191, 0, 255, 0.35), inset 0 0 10px rgba(191, 0, 255, 0.2);
+            box-shadow: 0 0 15px rgba(191, 0, 255, 0.35);
         }
         .vip-badge {
             position: absolute; top: -8px; right: -8px;
             background: linear-gradient(135deg, #bf00ff, #ff0055); color: white;
-            font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 6px;
-            box-shadow: 0 0 8px #bf00ff; letter-spacing: 0.5px; z-index: 5;
+            font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 6px; z-index: 5;
         }
 
-        .btn-green-glow { width: 100%; background: var(--neon-green); border: none; color: #000; font-weight: bold; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-top: 4px; box-shadow: 0 0 10px rgba(124, 252, 0, 0.3); }
+        .btn-orange-glow { width: 100%; background: var(--main-orange); border: none; color: #000; font-weight: bold; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-top: 6px; box-shadow: 0 0 10px rgba(255, 153, 0, 0.3); }
         .btn-cyan { background: transparent; color: var(--neon-cyan); border: 1px solid var(--neon-cyan); padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .btn-danger { background: transparent; border: 1px solid var(--danger-red); color: var(--danger-red); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 10px; width: 100%; margin-top: 6px; font-weight: bold; }
         .empty-state { grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 13px; padding: 25px; border: 1px dashed #2b3a32; border-radius: 10px; }
 
-        /* РОЗЫГРЫШИ */
+        /* --- РОЗЫГРЫШИ --- */
         .giveaway-card {
             background: linear-gradient(145deg, rgba(16, 24, 20, 0.95), rgba(10, 16, 14, 0.98));
             border: 1px solid rgba(191, 0, 255, 0.4);
             border-radius: 16px; padding: 16px; margin-bottom: 14px;
             display: flex; flex-direction: column; gap: 12px; position: relative;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(191, 0, 255, 0.05);
         }
-        .giveaway-card.finished { border-color: rgba(124, 252, 0, 0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(124, 252, 0, 0.05); }
+        .giveaway-card.finished { border-color: rgba(124, 252, 0, 0.4); }
         .giveaway-header { display: flex; justify-content: space-between; align-items: center; }
         .giveaway-badge-sponsor { background: rgba(191, 0, 255, 0.15); border: 1px solid rgba(191, 0, 255, 0.4); color: #d16eff; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
         .giveaway-badge-ended { background: rgba(124, 252, 0, 0.15); border: 1px solid rgba(124, 252, 0, 0.4); color: var(--neon-green); font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
         .giveaway-timer-badge { font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: bold; color: var(--neon-cyan); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(0, 255, 255, 0.2); padding: 4px 8px; border-radius: 6px; }
         .giveaway-body { display: flex; gap: 12px; align-items: center; }
-        .giveaway-skin-box { width: 75px; height: 75px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px; }
-        .giveaway-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .giveaway-skin-box { width: 75px; height: 75px; background: rgba(0, 0, 0, 0.35); border: 1px solid #2a2d38; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px; }
+        .giveaway-info { flex: 1; display: flex; flex-direction: column; gap: 4px; text-align: left; }
         .giveaway-title { font-size: 15px; font-weight: 900; color: #fff; margin: 0; }
         .giveaway-meta { font-size: 11px; color: var(--text-muted); }
         .giveaway-winner-box { background: rgba(124, 252, 0, 0.08); border: 1px dashed rgba(124, 252, 0, 0.3); border-radius: 8px; padding: 6px 10px; margin-top: 4px; }
         .giveaway-actions { display: flex; gap: 8px; margin-top: 4px; }
 
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(11, 17, 16, 0.98); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid rgba(0, 255, 255, 0.2); z-index: 100; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-        .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.4; transition: 0.2s; }
-        .nav-item svg { width: 22px; height: 22px; fill: var(--text-muted); transition: 0.2s; }
+        /* --- НИЖНЯЯ НАВИГАЦИЯ НА 6 КНОПОК --- */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(26, 28, 35, 0.98); display: grid; grid-template-columns: repeat(6, 1fr); padding: 10px 0; border-top: 1px solid #2a2d38; z-index: 100; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+        .nav-item { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; opacity: 0.5; transition: 0.2s; }
+        .nav-item svg { width: 20px; height: 20px; fill: var(--text-muted); transition: 0.2s; }
         .active-nav { opacity: 1; transform: scale(1.05); }
-        .active-nav svg { fill: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
+        .active-nav svg { fill: var(--main-orange); filter: drop-shadow(0 0 8px var(--main-orange)); }
 
+        /* --- МОДАЛКИ --- */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
         .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 16px; width: 90%; max-width: 380px; text-align: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 0 20px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 16px; width: 90%; max-width: 380px; text-align: center; border: 1px solid #2a2d38; box-shadow: 0 0 20px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
         
         .price-input-container { position: relative; margin: 10px 0; }
-        .currency-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--neon-cyan); font-weight: bold; }
-        .price-input-container input, .topup-input { width: 100%; padding: 12px 12px 12px 34px; background: rgba(0,0,0,0.5); border: 1px solid var(--neon-cyan); color: white; border-radius: 8px; font-size: 15px; outline: none; }
+        .currency-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--main-orange); font-weight: bold; }
+        .price-input-container input, .topup-input { width: 100%; padding: 12px 12px 12px 34px; background: rgba(0,0,0,0.5); border: 1px solid #2a2d38; color: white; border-radius: 8px; font-size: 15px; outline: none; }
 
-        .platform-select-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 10px 0; }
-        .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 10px; cursor: pointer; text-align: center; }
-        .platform-option-btn.active { background: rgba(0, 255, 255, 0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); font-weight: bold; }
+        .platform-select-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin: 10px 0; }
+        .platform-option-btn { background: #111; border: 1px solid #333; color: var(--text-muted); padding: 8px 4px; border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center; }
+        .platform-option-btn.active { background: rgba(255, 153, 0, 0.1); border-color: var(--main-orange); color: var(--main-orange); font-weight: bold; }
 
-        .topup-methods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; } /* Изменил на 5 колонок */
-        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 8px 2px; cursor: pointer; text-align: center; }
-        .topup-method-card.active { border-color: var(--neon-green); background: rgba(124, 252, 0, 0.05); }
+        .topup-methods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; }
+        .topup-method-card { background: rgba(0,0,0,0.4); border: 1px solid #333; border-radius: 8px; padding: 8px 2px; cursor: pointer; text-align: center; font-size: 16px; }
+        .topup-method-card.active { border-color: var(--main-orange); background: rgba(255, 153, 0, 0.05); }
 
+        /* --- БИТВА --- */
         .battle-arena { background: linear-gradient(135deg, rgba(20, 10, 30, 0.95), rgba(10, 15, 20, 0.95)); border: 2px solid var(--neon-purple); border-radius: 16px; padding: 15px; box-shadow: 0 0 25px rgba(191, 0, 255, 0.2); }
         .battle-title { text-align: center; font-size: 21px; font-weight: 900; color: #fff; text-shadow: 0 0 12px var(--neon-purple); letter-spacing: 1px; margin-bottom: 5px; }
         .battle-stats-card { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.75); border-radius: 12px; padding: 12px 15px; border: 1px solid rgba(0, 255, 255, 0.15); margin-bottom: 12px; }
         .bank-block .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-        .bank-block .bank-value { font-size: 24px; font-weight: 900; color: var(--neon-cyan); text-shadow: 0 0 12px rgba(0, 255, 255, 0.5); margin-top: 2px; }
+        .bank-block .bank-value { font-size: 24px; font-weight: 900; color: var(--main-orange); text-shadow: 0 0 12px rgba(255, 153, 0, 0.5); margin-top: 2px; }
         
         .timer-block { text-align: right; }
         .timer-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-        .c4-timer { font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 900; color: var(--neon-green); background: #050505; padding: 2px 8px; border-radius: 6px; border: 1px solid #1a331a; box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 8px rgba(124, 252, 0, 0.3); letter-spacing: 2px; display: inline-block; margin-top: 2px; }
-        .c4-timer.urgent { color: var(--danger-red); border-color: #4a1a1a; box-shadow: inset 0 0 8px rgba(0,0,0,0.9), 0 0 15px rgba(255, 51, 51, 0.8); animation: c4Blink 0.35s infinite alternate; }
+        .c4-timer { font-family: 'Courier New', Courier, monospace; font-size: 26px; font-weight: 900; color: var(--neon-green); background: #050505; padding: 2px 8px; border-radius: 6px; border: 1px solid #1a331a; letter-spacing: 2px; display: inline-block; margin-top: 2px; }
+        .c4-timer.urgent { color: var(--danger-red); border-color: #4a1a1a; animation: c4Blink 0.35s infinite alternate; }
         @keyframes c4Blink { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0.6; transform: scale(1.05); } }
 
-        .chances-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #111; box-shadow: inset 0 0 6px #000; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05); }
+        .chances-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: #111; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05); }
         .chance-segment { height: 100%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 
-        .roulette-wrapper { width: 100%; height: 95px; background: #030303; border: 2px solid var(--neon-cyan); border-radius: 12px; overflow: hidden; position: relative; margin: 15px 0; box-shadow: inset 0 0 30px #000, 0 0 20px rgba(0, 255, 255, 0.25); }
+        .roulette-wrapper { width: 100%; height: 95px; background: #030303; border: 2px solid var(--main-orange); border-radius: 12px; overflow: hidden; position: relative; margin: 15px 0; }
         .roulette-tape { display: flex; height: 100%; align-items: center; width: max-content; }
         .roulette-item { width: 75px; height: 75px; margin: 0 5px; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid transparent; background: #111; }
         .roulette-item img { width: 100%; height: 100%; object-fit: cover; }
-        .roulette-center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; background: var(--neon-green); box-shadow: 0 0 15px var(--neon-green), 0 0 30px var(--neon-green); z-index: 10; transform: translateX(-50%); }
+        .roulette-center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; background: var(--neon-green); box-shadow: 0 0 15px var(--neon-green); z-index: 10; transform: translateX(-50%); }
 
         .quick-bet-panel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
-        .quick-bet-btn { background: rgba(0,255,255,0.1); border: 1px solid rgba(0,255,255,0.3); color: var(--neon-cyan); font-weight: bold; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 12px; }
-        .bet-button-pulse { animation: glowingBtn 2s infinite; }
-        @keyframes glowingBtn { 0% { box-shadow: 0 0 5px var(--neon-green); } 50% { box-shadow: 0 0 20px var(--neon-green); } 100% { box-shadow: 0 0 5px var(--neon-green); } }
-
+        .quick-bet-btn { background: rgba(255,153,0,0.1); border: 1px solid rgba(255,153,0,0.3); color: var(--main-orange); font-weight: bold; padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        
         .player-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; max-height: 180px; overflow-y: auto; }
         .player-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); }
         .winner-announcement { text-align: center; padding: 15px 0; }
@@ -132,12 +144,15 @@
 </head>
 <body>
 
+    <!-- ШАПКА -->
     <header class="top-bar">
         <div class="bot-profile">
-            <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(124,252,0,0.2) 0%, transparent 100%); border: 1px solid var(--neon-green);" id="user-avatar-box">
-                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: var(--neon-green);"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,153,0,0.1); border: 1px solid var(--main-orange);" id="user-avatar-box">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: var(--main-orange);"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
-            <span class="bot-name">P2P SKIN SALES</span>
+            <div class="logo-container">
+                <span class="logo-skin">skin</span><span class="logo-hub">hub</span>
+            </div>
         </div>
         <div class="balance-widget">
             <span id="user-balance">0 ₽</span>
@@ -146,13 +161,21 @@
     </header>
 
     <main class="content-area">
-        <!-- МАРКЕТ -->
-        <section id="tab-market" class="tab active">
-            <h2 class="neon-text">Маркетплейс</h2>
+        <!-- 1. МАРКЕТПЛЕЙС С ФИЛЬТРАМИ -->
+        <section id="tab-market" class="tab">
+            <h2 class="neon-text">P2P Маркетплейс</h2>
+            <div class="filter-box">
+                <input type="text" id="market-search" class="search-input" placeholder="Поиск скина..." oninput="filterMarketItems()">
+                <select id="market-sort" class="select-filter" onchange="filterMarketItems()">
+                    <option value="cheap">Дешевые</option>
+                    <option value="expensive">Дорогие</option>
+                    <option value="new">Новые</option>
+                </select>
+            </div>
             <div id="market-listings" class="grid-layout"></div>
         </section>
 
-        <!-- АРЕНА -->
+        <!-- 2. АРЕНА (КОРОЛЕВСКАЯ БИТВА) -->
         <section id="tab-battle" class="tab">
             <div class="battle-arena">
                 <div class="battle-title">👑 КОРОЛЕВСКАЯ БИТВА</div>
@@ -178,7 +201,7 @@
                     </div>
                     <div class="winner-announcement" id="battle-winner-text" style="display: none;">
                         <div style="font-size: 13px; color: var(--text-muted);">Победитель забирает куш:</div>
-                        <div style="font-size: 28px; font-weight: 900; color: var(--neon-green); text-shadow: 0 0 15px var(--neon-green);" id="winner-sum-text">0 ₽</div>
+                        <div style="font-size: 28px; font-weight: 900; color: var(--neon-green);" id="winner-sum-text">0 ₽</div>
                     </div>
                 </div>
 
@@ -193,26 +216,14 @@
                         <span class="currency-symbol">₽</span>
                         <input type="number" id="battle-bet-amount" placeholder="Сумма ставки (от 10₽)">
                     </div>
-                    <button class="btn-green-glow bet-button-pulse" style="font-size: 15px; padding: 12px;" onclick="placeBattleBet()">СДЕЛАТЬ СТАВКУ</button>
+                    <button class="btn-orange-glow" style="font-size: 15px; padding: 12px;" onclick="placeBattleBet()">СДЕЛАТЬ СТАВКУ</button>
                 </div>
 
                 <div class="player-list" id="battle-players"></div>
             </div>
         </section>
 
-        <!-- ИНВЕНТАРЬ -->
-        <section id="tab-inventory" class="tab">
-            <h2 class="neon-text">Инвентарь Steam</h2>
-            <div class="trade-url-box" style="display: flex; gap: 8px; margin: 10px 0;">
-                <input type="text" id="trade-url-input" placeholder="Trade URL..." style="flex:1; padding:10px; background:#111; border:1px solid #333; color:white; border-radius:6px;">
-                <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
-            </div>
-            <div id="steam-inventory-grid" class="grid-layout">
-                <div class="empty-state">Укажите Trade URL для просмотра инвентаря</div>
-            </div>
-        </section>
-
-        <!-- РОЗЫГРЫШИ -->
+        <!-- 3. РОЗЫГРЫШИ -->
         <section id="tab-giveaways" class="tab">
             <h2 class="neon-text">🎁 Розыгрыши</h2>
             <div id="giveaways-container">
@@ -220,10 +231,30 @@
             </div>
         </section>
 
-        <!-- ПРОФИЛЬ -->
+        <!-- 4. МАГАЗИН WAXPEER (Активна по умолчанию) -->
+        <section id="tab-shop" class="tab active">
+            <h2 class="neon-text">Магазин скинов</h2>
+            <div id="shop-container" class="grid-layout">
+                <div class="empty-state" style="grid-column: span 2;">Загрузка витрины...</div>
+            </div>
+        </section>
+
+        <!-- 5. ИНВЕНТАРЬ STEAM -->
+        <section id="tab-inventory" class="tab">
+            <h2 class="neon-text">Инвентарь Steam</h2>
+            <div class="trade-url-box" style="display: flex; gap: 8px; margin: 10px 0;">
+                <input type="text" id="trade-url-input" placeholder="Trade URL..." style="flex:1; padding:10px; background:#111; border:1px solid #2a2d38; color:white; border-radius:6px; outline:none;">
+                <button class="btn-cyan" onclick="saveTradeUrl()">Сохранить</button>
+            </div>
+            <div id="steam-inventory-grid" class="grid-layout">
+                <div class="empty-state">Укажите Trade URL для просмотра инвентаря</div>
+            </div>
+        </section>
+
+        <!-- 6. ПРОФИЛЬ -->
         <section id="tab-profile" class="tab">
             <h2 class="neon-text">Профиль</h2>
-            <div class="card" style="border:1px solid var(--neon-cyan); padding:15px; margin-bottom:15px; background: rgba(0,255,255,0.05);">
+            <div class="card" style="border:1px solid var(--main-orange); padding:15px; margin-bottom:15px; background: rgba(255,153,0,0.05);">
                 <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
                     <div>
                         <div style="font-weight:bold; font-size:16px;" id="my-nick">Игрок</div>
@@ -231,12 +262,12 @@
                     </div>
                     <div style="text-align:right;">
                         <div style="font-size:10px; color:var(--text-muted);">Баланс</div>
-                        <div style="font-weight:bold; font-size:18px; color:var(--neon-green);" id="profile-balance">0 ₽</div>
+                        <div style="font-weight:bold; font-size:18px; color:var(--main-orange);" id="profile-balance">0 ₽</div>
                     </div>
                 </div>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="btn-green-glow" onclick="openTopUpModal()" style="margin:0;">Пополнить</button>
+                <button class="btn-orange-glow" onclick="openTopUpModal()" style="margin:0;">Пополнить</button>
                 <button class="btn-cyan" onclick="openWithdrawModal()" style="flex:1;">Вывести</button>
             </div>
             <h3 class="section-title">🏷️ Мои лоты</h3>
@@ -244,7 +275,7 @@
         </section>
     </main>
 
-    <!-- МОДАЛКИ -->
+    <!-- МОДАЛКА: ПРОДАЖА -->
     <div class="modal-overlay" id="modal-sell">
         <div class="modal-content">
             <h3 class="neon-text">Продать скин</h3>
@@ -256,16 +287,17 @@
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px; text-align: left;">
                 Покупатель заплатит (комиссия 4%): <br>
-                <span id="buyer-price-display" style="color: var(--neon-cyan); font-size: 16px; font-weight: bold;">0 ₽</span>
+                <span id="buyer-price-display" style="color: var(--main-orange); font-size: 16px; font-weight: bold;">0 ₽</span>
             </div>
             <label style="display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; color: var(--neon-purple); cursor: pointer;"><input type="checkbox" id="vip-checkbox"> VIP-объявление (245 ₽)</label>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-sell')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" id="confirm-sell-btn" onclick="confirmSellItem()" style="flex:1; margin:0;">Выставить</button>
+                <button class="btn-orange-glow" onclick="confirmSellItem()" style="flex:1; margin:0;">Выставить</button>
             </div>
         </div>
     </div>
 
+    <!-- МОДАЛКА: ПОПОЛНЕНИЕ -->
     <div class="modal-overlay" id="modal-topup">
         <div class="modal-content">
             <h3 class="neon-text">Пополнить баланс</h3>
@@ -283,11 +315,12 @@
             <p class="hint-text" id="topup-hint">Сумма зачислится после подтверждения.</p>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-topup')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processTopUp()" style="flex:1; margin:0;">Оплатить</button>
+                <button class="btn-orange-glow" onclick="processTopUp()" style="flex:1; margin:0;">Оплатить</button>
             </div>
         </div>
     </div>
 
+    <!-- МОДАЛКА: ВЫВОД -->
     <div class="modal-overlay" id="modal-withdraw">
         <div class="modal-content">
             <h3 class="neon-text">Вывод средств</h3>
@@ -297,31 +330,35 @@
             </div>
             <p class="hint-text" id="withdraw-desc">Мин. вывод 500 ₽.</p>
             <div class="price-input-container"><span class="currency-symbol">₽</span><input type="number" id="withdraw-amount-input" class="topup-input" placeholder="Сумма в рублях"></div>
-            <div class="price-input-container"><span class="currency-symbol" id="withdraw-acc-symbol" style="color:var(--neon-green);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" placeholder="Аккаунт или карта"></div>
+            <div class="price-input-container"><span class="currency-symbol" id="withdraw-acc-symbol" style="color:var(--main-orange);">💎</span><input type="text" id="withdraw-crypto-account-input" class="topup-input" style="padding-left:38px;" placeholder="Аккаунт или карта"></div>
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn-cyan" onclick="closeModal('modal-withdraw')" style="flex:1;">Отмена</button>
-                <button class="btn-green-glow" onclick="processWithdraw()" style="flex:1; margin:0;">Вывести</button>
+                <button class="btn-orange-glow" onclick="processWithdraw()" style="flex:1; margin:0;">Вывести</button>
             </div>
         </div>
     </div>
 
-    <!-- НАВИГАЦИЯ -->
+    <!-- НИЖНЯЯ НАВИГАЦИЯ НА 6 КНОПОК -->
     <nav class="bottom-nav">
-        <button class="nav-item active-nav" onclick="switchTab('market', this)">
+        <button class="nav-item" onclick="switchTab('market', this)">
             <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
             <span style="font-size:10px; margin-top:3px;">Маркет</span>
         </button>
         <button class="nav-item" onclick="switchTab('battle', this)">
             <svg viewBox="0 0 24 24"><path d="M14 2.5l-2.5 2.5H16l2.5-2.5zM3 13.5l1.5-1.5L2 9.5 3.5 8 6 10.5 7.5 9 3 4.5l1.5-1.5L9 7.5 10.5 6 8 3.5 9.5 2l4.5 4.5 1.5-1.5-3-3 2.5-2.5L22 7l-2.5 2.5-3-3-1.5 1.5 4.5 4.5-1.5 1.5-2.5-2.5-1.5 1.5L16.5 20l-1.5 1.5L10.5 17 9 18.5 11.5 21 10 22.5 3 15.5l1.5-1.5 2.5 2.5 1.5-1.5z"/></svg>
-            <span style="font-size:10px; margin-top:3px; color:var(--neon-purple); font-weight:bold;">Битва</span>
+            <span style="font-size:10px; margin-top:3px; color:var(--neon-purple); font-weight:bold;">Битвы</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('giveaways', this)">
+            <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1mouseX.../zM20 19H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
+            <span style="font-size:10px; margin-top:3px;">Розыгрыши</span>
+        </button>
+        <button class="nav-item active-nav" onclick="switchTab('shop', this)">
+            <svg viewBox="0 0 24 24"><path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z"/></svg>
+            <span style="font-size:10px; margin-top:3px;">Магазин</span>
         </button>
         <button class="nav-item" onclick="switchTab('inventory', this)">
             <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
             <span style="font-size:10px; margin-top:3px;">Инвентарь</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('giveaways', this)">
-            <svg viewBox="0 0 24 24"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7.1 10.86l1.62 1.18L12 8l3.28 4.04 1.62-1.18L14.92 8H20v6z"/></svg>
-            <span style="font-size:10px; margin-top:3px;">Розыгрыши</span>
         </button>
         <button class="nav-item" onclick="switchTab('profile', this)">
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM7.07 18.28c.43-.9 3.05-1.78 4.93-1.78s4.5.88 4.93 1.78C15.57 19.36 13.86 20 12 20s-3.57-.64-4.93-1.72zm11.29-1.45c-1.43-1.74-4.9-2.33-6.36-2.33s-4.93.59-6.36 2.33C4.62 15.49 4 13.82 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 1.82-.62 3.49-1.64 4.83zM12 6c-1.94 0-3.5 1.56-3.5 3.5S10.06 13 12 13s3.5-1.56 3.5-3.5S13.94 6 12 6zm0 5c-.83 0-1.5-.67-1.5-1.5S11.17 8 12 8s1.5.67 1.5 1.5S12.83 11 12 11z"/></svg>
@@ -336,6 +373,7 @@
         const myPhotoUrl = tgUser?.photo_url || null;
         let currentSelectedItem = null, currentBattleId = null, userBalance = 0;
         let marketItems = [], myListings = [], myInventory = [];
+        let globalMarketItems = []; // Кэш для P2P маркета
         let selectedTopupType = 'crypto', selectedWithdrawType = 'crypto';
 
         window.addEventListener('DOMContentLoaded', async () => {
@@ -347,22 +385,19 @@
             
             const urlParams = new URLSearchParams(window.location.search);
             let steamId = urlParams.get('steamId') || localStorage.getItem('user_steam_id');
-            await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways()]);
+            
+            await Promise.allSettled([syncUserProfile(), fetchMarketItems(), fetchGiveaways(), loadShop()]);
             if (steamId) { localStorage.setItem('user_steam_id', steamId); loadSteamData(steamId); }
 
             setInterval(pollBattleState, 1000);
             setInterval(fetchGiveaways, 30000);
-            
-            // Запуск живого таймера для розыгрышей (обновление каждую секунду)
             setInterval(updateLiveTimers, 1000);
         });
 
-        // ФУНКЦИЯ ЖИВОГО ТАЙМЕРА ДЛЯ РОЗЫГРЫШЕЙ
         function updateLiveTimers() {
             document.querySelectorAll('.live-gw-timer').forEach(el => {
                 const endTime = parseInt(el.getAttribute('data-endtime'));
                 if (!endTime) return;
-                
                 const left = Math.max(0, endTime - Date.now());
                 if (left <= 0) {
                     el.innerText = '⏳ Подведение итогов...';
@@ -381,6 +416,10 @@
             document.getElementById('tab-' + id).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             btn.classList.add('active-nav');
+
+            if (id === 'shop') loadShop();
+            if (id === 'market') fetchMarketItems();
+            if (id === 'giveaways') fetchGiveaways();
         }
 
         async function syncUserProfile() {
@@ -396,12 +435,107 @@
             } catch (err) {}
         }
 
-        function saveTradeUrl() {
+        /* --- МАГАЗИН SKIN HUB (Waxpeer) --- */
+        async function loadShop() {
+            try {
+                const res = await fetch('/api/shop/items');
+                const data = await res.json();
+                const container = document.getElementById('shop-container');
+                if (data.success && data.items) {
+                    container.innerHTML = data.items.map(item => `
+                        <div class="card">
+                            <div class="skin-image"><img src="${item.image}" class="skin-img"></div>
+                            <h4>${item.name}</h4>
+                            <div style="font-size: 15px; font-weight: 900; color: var(--main-orange); margin-bottom: 8px;">${item.price} ₽</div>
+                            <button class="btn-orange-glow" onclick="buyShopItem('${item.id}', ${item.price})">Купить</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                document.getElementById('shop-container').innerHTML = '<div class="empty-state">Ошибка загрузки витрины</div>';
+            }
+        }
+
+        async function buyShopItem(itemId, price) {
+            if (!confirm(`Купить скин за ${price} ₽?`)) return;
+            try {
+                const res = await fetch('/api/shop/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, itemId }) });
+                const result = await res.json();
+                if (result.success) {
+                    alert('✅ Успешно! Скин отправлен в ваш Steam.');
+                    syncUserProfile();
+                } else {
+                    alert('❌ Ошибка: ' + result.error);
+                }
+            } catch (e) {
+                alert('Техническая ошибка');
+            }
+        }
+
+        /* --- P2P МАРКЕТ С ФИЛЬТРАМИ --- */
+        async function fetchMarketItems() {
+            try {
+                const res = await fetch('/api/market/items');
+                const data = await res.json();
+                if (data.success) {
+                    globalMarketItems = data.items || [];
+                    marketItems = globalMarketItems;
+                    
+                    myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
+                    document.getElementById('my-listings').innerHTML = myListings.length > 0 ? myListings.map(i => `
+                        <div class="card ${i.isVip ? 'vip-card' : ''}">
+                            ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
+                            <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                            <h4>${i.name}</h4><div style="font-weight:bold; color:var(--main-orange);">${i.price} ₽</div>
+                            <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button>
+                        </div>
+                    `).join('') : '<div class="empty-state">Нет активных лотов</div>';
+
+                    filterMarketItems();
+                }
+            } catch (e) {}
+        }
+
+        function filterMarketItems() {
+            const query = document.getElementById('market-search').value.toLowerCase();
+            const sortType = document.getElementById('market-sort').value;
+
+            let filtered = globalMarketItems.filter(item => item.name.toLowerCase().includes(query));
+
+            filtered.sort((a, b) => {
+                const priceA = a.buyerPrice || a.price;
+                const priceB = b.buyerPrice || b.price;
+                if (sortType === 'cheap') return priceA - priceB;
+                if (sortType === 'expensive') return priceB - priceA;
+                if (sortType === 'new') return b._id - a._id;
+            });
+
+            let sortedItems = [...filtered].sort((a, b) => (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0));
+            const container = document.getElementById('market-listings');
+
+            if (sortedItems.length === 0) {
+                container.innerHTML = '<div class="empty-state">Ничего не найдено</div>';
+                return;
+            }
+
+            container.innerHTML = sortedItems.map(i => `
+                <div class="card ${i.isVip ? 'vip-card' : ''}">
+                    ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
+                    <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
+                    <h4>${i.name}</h4>
+                    <div style="font-size:10px; color:var(--text-muted)">Цена: ${i.price}₽</div>
+                    <div style="font-weight:bold; color:var(--main-orange); margin: 4px 0;">Оплата: ${i.buyerPrice} ₽</div>
+                    ${String(i.tgId) !== String(myTgId) ? `<button class="btn-orange-glow" onclick='buyItem("${i._id}", ${i.buyerPrice})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
+                </div>
+            `).join('');
+        }
+
+        async function saveTradeUrl() {
             const url = document.getElementById('trade-url-input').value.trim();
             localStorage.setItem('user_trade_url', url);
             fetch('/api/user/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, tradeUrl: url }) })
             .then(res => res.json()).then(data => {
-                if (data.success && data.steamId) { localStorage.setItem('user_steam_id', data.steamId); loadSteamData(data.steamId); } 
+                if (data.success && data.steamId) { localStorage.setItem('user_steam_id', data.steamId); loadSteamData(data.steamId); alert('Trade URL сохранен!'); } 
                 else alert('Не удалось распознать SteamID.');
             });
         }
@@ -431,7 +565,7 @@
                         container.innerHTML = availableItems.map(item => `
                             <div class="card">
                                 <div class="skin-image"><img src="${item.icon_url}" class="skin-img"></div>
-                                <h4>${item.name}</h4><button class="btn-green-glow" onclick='openSellModal(${JSON.stringify(item)})'>Выставить</button>
+                                <h4>${item.name}</h4><button class="btn-orange-glow" onclick='openSellModal(${JSON.stringify(item)})'>Выставить</button>
                             </div>
                         `).join('');
                     } else {
@@ -477,38 +611,9 @@
             } else alert(data.error);
         }
 
-        async function fetchMarketItems() {
-            const res = await fetch('/api/market/items');
-            const data = await res.json();
-            if (data.success) {
-                marketItems = data.items;
-                myListings = marketItems.filter(i => String(i.tgId) === String(myTgId));
-                document.getElementById('my-listings').innerHTML = myListings.length > 0 ? myListings.map(i => `
-                    <div class="card ${i.isVip ? 'vip-card' : ''}">
-                        ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
-                        <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
-                        <h4>${i.name}</h4><div style="font-weight:bold;">${i.price} ₽</div>
-                        <button class="btn-danger" onclick="cancelListing('${i._id}')">Снять</button>
-                    </div>
-                `).join('') : '<div class="empty-state">Нет активных лотов</div>';
-
-                let sortedItems = [...marketItems].sort((a, b) => (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0));
-                document.getElementById('market-listings').innerHTML = sortedItems.length > 0 ? sortedItems.map(i => `
-                    <div class="card ${i.isVip ? 'vip-card' : ''}">
-                        ${i.isVip ? '<div class="vip-badge">👑 VIP</div>' : ''}
-                        <div class="skin-image"><img src="${i.image}" class="skin-img"></div>
-                        <h4>${i.name}</h4>
-                        <div style="font-size:10px; color:#889988">Продавец: ${i.price}₽</div>
-                        <div style="font-weight:bold; color:var(--neon-green); margin: 4px 0;">Оплата: ${i.buyerPrice} ₽</div>
-                        ${String(i.tgId) !== String(myTgId) ? `<button class="btn-green-glow" onclick='buyItem("${i._id}", ${i.buyerPrice})'>Купить</button>` : `<div style="font-size:10px; color:var(--text-muted)">Ваш лот</div>`}
-                    </div>
-                `).join('') : '<div class="empty-state">Маркет пуст</div>';
-            }
-        }
-
         async function buyItem(itemId, buyerPrice) {
             const tradeUrl = localStorage.getItem('user_trade_url');
-            if (!tradeUrl) { alert('Укажите Trade URL!'); switchTab('inventory', document.querySelectorAll('.nav-item')[2]); return; }
+            if (!tradeUrl) { alert('Укажите Trade URL!'); switchTab('inventory', document.querySelectorAll('.nav-item')[4]); return; }
             if (!confirm(`Купить за ${buyerPrice} ₽?`)) return;
             const res = await fetch('/api/deals/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, buyerTgId: myTgId }) });
             const data = await res.json();
@@ -564,7 +669,6 @@
                 let chance = state.bank > 0 ? (p.bet / state.bank * 100).toFixed(1) : 0;
                 barHtml += `<div class="chance-segment" style="width: ${chance}%; background: ${p.color};"></div>`;
                 
-                // Восстановлен вывод аватарок в списке ставок
                 let avatarContent = p.avatar && p.avatar.startsWith('http') 
                     ? `<img src="${p.avatar}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">` 
                     : `<span style="font-size:16px;">${p.avatar || '🧑‍🚀'}</span>`;
@@ -575,7 +679,7 @@
                             ${avatarContent}
                             <span>@${p.username}</span>
                         </div>
-                        <div><b style="color:var(--neon-green)">${p.bet} ₽</b></div>
+                        <div><b style="color:var(--main-orange)">${p.bet} ₽</b></div>
                     </div>
                 `;
             });
@@ -618,7 +722,7 @@
             if (data.success) { document.getElementById('battle-bet-amount').value = ''; syncUserProfile(); pollBattleState(); } else alert(data.error);
         }
 
-        /* РОЗЫГРЫШИ СО ВСТРОЕННЫМ ЖИВЫМ ТАЙМЕРОМ */
+        /* РОЗЫГРЫШИ */
         async function fetchGiveaways() {
             try {
                 const res = await fetch('/api/giveaways/list');
@@ -647,7 +751,6 @@
                                 </div>
                             `;
                         } else {
-                            // Если таймер сломан или отсутствует, заменяем на класс live-gw-timer
                             return `
                                 <div class="giveaway-card">
                                     <div class="giveaway-header">
@@ -664,13 +767,13 @@
                                     </div>
                                     <div class="giveaway-actions">
                                         <button class="btn-cyan" style="flex: 1; font-size: 11px; padding: 9px;" onclick="window.open('https://t.me/${g.sponsorUsername.replace('@','')}', '_blank')">📢 Канал</button>
-                                        <button class="btn-green-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
+                                        <button class="btn-orange-glow" style="flex: 1; margin-top: 0; font-size: 11px;" onclick="joinGiveaway('${g._id}')">Участвовать</button>
                                     </div>
                                 </div>
                             `;
                         }
                     }).join('');
-                    updateLiveTimers(); // Сразу обновляем значения, чтобы не было задержки в 1 сек
+                    updateLiveTimers();
                 } else container.innerHTML = '<div class="empty-state">Нет активных розыгрышей</div>';
             } catch (e) {}
         }
@@ -681,7 +784,7 @@
             if (data.success) { alert('Вы успешно участвуете!'); fetchGiveaways(); } else alert(data.error);
         }
 
-        /* ФИНАНСОВЫЕ МОДАЛКИ (ИНТЕГРИРОВАНА ОПЛАТА СКИНАМИ) */
+        /* ФИНАНСОВЫЕ МОДАЛКИ */
         function openTopUpModal() { document.getElementById('modal-topup').classList.add('active'); }
         function openWithdrawModal() { document.getElementById('modal-withdraw').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -693,7 +796,6 @@
             
             const symbol = document.getElementById('topup-symbol'), input = document.getElementById('topup-amount-input');
             
-            // Логика блокировки инпута для пополнения скинами
             if (type === 'skins') {
                 symbol.innerText = '🔫'; 
                 input.value = '';
@@ -712,23 +814,20 @@
             const amount = parseFloat(document.getElementById('topup-amount-input').value) || 0;
             const hint = document.getElementById('topup-hint');
             
-            if (selectedTopupType === 'skins') hint.innerText = 'Вы будете перенаправлены на шлюз приема скинов.';
+            if (selectedTopupType === 'skins') hint.innerText = 'Вы будете перенаправлены на шлюз приема скинов через Waxpeer.';
             else if (selectedTopupType === 'p2puz') hint.innerText = amount > 0 ? `К оплате: ${Math.round(amount * 175).toLocaleString()} сум` : 'Курс: 1 ₽ = 175 сум';
             else if (selectedTopupType === 'p2pru') hint.innerText = amount > 0 ? `К оплате: ${amount} ₽ на карту РФ` : 'Перевод на карту РФ';
             else hint.innerText = 'Сумма зачислится после оплаты.';
         }
 
         async function processTopUp() {
-            // Обработка запроса на оплату скинами
             if (selectedTopupType === 'skins') {
-                let currency = 'Skins';
-                const res = await fetch('/api/billing/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId, amount: 0, currency }) });
+                const res = await fetch('/api/waxpeer/deposit-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tgId: myTgId }) });
                 const data = await res.json();
-                if (data.success) { 
+                if (data.success && data.url) { 
                     closeModal('modal-topup'); 
-                    alert('Счет (ссылка на трейд-бота) отправлен в личные сообщения!'); 
-                    Telegram.WebApp.close(); 
-                } else alert(data.error);
+                    Telegram.WebApp.openLink(data.url); 
+                } else alert('Не удалось создать ссылку для депозита.');
                 return;
             }
 
