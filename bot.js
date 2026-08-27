@@ -12,7 +12,7 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
 const DMARKET_PUBLIC_KEY = process.env.DMARKET_PUBLIC_KEY || '';
 
-const USD_TO_RUB = 95; // Курс доллара к рублю (можно настроить)
+const USD_TO_RUB = 95;
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -279,6 +279,13 @@ app.post('/api/steam/inventory', async (req, res) => {
     res.json({ success: false, error: 'Не удалось загрузить инвентарь.' });
 });
 
+app.get('/api/steam/price', async (req, res) => {
+    let skinName = req.query.name;
+    if (!skinName) return res.json({ success: true, price: 150 });
+    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
+    res.json({ success: true, price: 150 });
+});
+
 /* =========================================
    API: P2P МАРКЕТПЛЕЙС
 ========================================= */
@@ -334,12 +341,11 @@ app.post('/api/deals/buy', async (req, res) => {
 });
 
 /* =========================================
-   API: ИНТЕГРАЦИЯ DMARKET (РЫНОК + СКИДКИ + 6% МАРЖА)
+   API: DMARKET РЫНОК ЧЕРЕЗ ПРОКСИ-АГЕНТА
 ========================================= */
 app.get('/api/shop/items', async (req, res) => {
     try {
-        // Запрос к публичному API DMarket для CS2 (gameId = a8db)
-        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', {
+        let dmarketConfig = {
             params: {
                 gameId: 'a8db',
                 limit: 40,
@@ -348,16 +354,20 @@ app.get('/api/shop/items', async (req, res) => {
                 currency: 'USD'
             },
             headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
-            timeout: 8000
-        });
+            timeout: 10000
+        };
+
+        if (PROXY_URL) {
+            dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+        }
+
+        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', dmarketConfig);
 
         if (dmarketRes.data && dmarketRes.data.objects) {
             const items = dmarketRes.data.objects.map(obj => {
                 const priceUsd = obj.price ? (obj.price.USD / 100) : 0;
-                // Наценка 6% и перевод в рубли
                 const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
                 
-                // Вычисление скидки, если она есть на DMarket
                 let discount = null;
                 if (obj.discount) {
                     discount = `${obj.discount}%`;
@@ -378,7 +388,7 @@ app.get('/api/shop/items', async (req, res) => {
         }
         res.json({ success: true, items: [] });
     } catch (e) {
-        console.error('⚠️ Ошибка загрузки рынка DMarket:', e.message);
+        console.error('⚠️ Ошибка загрузки рынка DMarket через прокси:', e.message);
         res.json({ success: false, error: 'Не удалось загрузить каталог DMarket' });
     }
 });
@@ -472,28 +482,6 @@ app.post('/api/billing/invoice', async (req, res) => {
     } catch (e) { res.json({ success: false, error: 'Ошибка создания счета.' }); }
 });
 
-app.post('/api/crypto/webhook', async (req, res) => {
-    const update = req.body;
-    if (update && (update.update_type === 'invoice_paid' || update.payload)) {
-        const invoice = update.payload || update;
-        const payloadStr = invoice.payload;
-        if (payloadStr && payloadStr.startsWith('topup_')) {
-            const parts = payloadStr.split('_');
-            const tgId = parts[1], rubles = parseFloat(parts[2]);
-            if (tgId && !isNaN(rubles)) {
-                const user = getOrCreateUser(tgId);
-                user.balance += rubles;
-                saveData();
-                try { await bot.sendMessage(tgId, `✅ Оплата через CryptoBot прошла успешно! Баланс Skin Hub пополнен на ${Math.round(rubles)} ₽.`); } catch (e) {}
-                if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                    try { await bot.sendMessage(ADMIN_CHAT_ID, `💎 Успешное пополнение CryptoBot!\n👤 ID: \`${tgId}\`\n💰 Зачислено: ${Math.round(rubles)} ₽`, { parse_mode: 'Markdown' }); } catch(e){}
-                }
-            }
-        }
-    }
-    res.status(200).send('OK');
-});
-
 app.post('/api/billing/withdraw', async (req, res) => {
     const { tgId, amount, recipientAccount, username, method } = req.body;
     const user = getOrCreateUser(tgId, username);
@@ -553,9 +541,7 @@ bot.on('message', async (msg) => {
 
         await bot.sendMessage(msg.chat.id, '🟧⬛️ Добро пожаловать в **Skin Hub**!\n\nТоргуй скинами, покупай топ дроп и участвуй в розыгрышах прямо в Telegram.', {
             parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [[{ text: '🚀 Открыть Skin Hub', web_app: { url: WEBAPP_URL } }]]
-            }
+            reply_markup: { inline_keyboard: [[{ text: '🚀 Открыть Skin Hub', web_app: { url: WEBAPP_URL } }]] }
         });
         return;
     }
