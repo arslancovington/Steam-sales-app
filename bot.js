@@ -170,7 +170,7 @@ setInterval(async () => {
 }, 15000);
 
 /* =========================================
-   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM
+   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM (WAXPEER)
 ========================================= */
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
@@ -241,25 +241,31 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
+// Загрузка инвентаря через Waxpeer API для обхода блокировок Steam на Render
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
+    if (!steamId) return res.json({ success: false, error: 'Не указан SteamID или Trade URL' });
+
     try {
-        if (steamId) {
-            const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, { 
-                headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 
-            });
-            if (invRes?.data?.success && invRes.data.assets?.length > 0) {
-                return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
-            }
+        const waxRes = await axios.post(`https://api.waxpeer.com/v2/merchant/steam-inventory`, {
+            api: WAXPEER_API_KEY,
+            steam_id: steamId
+        }, { timeout: 12000 });
+
+        if (waxRes.data && waxRes.data.success && waxRes.data.items) {
+            const items = waxRes.data.items.map(i => ({
+                assetid: String(i.item_id || i.assetid),
+                name: i.name || i.market_hash_name,
+                icon_url: i.image || i.icon_url
+            }));
+            return res.json({ success: true, items, descriptions: [] });
         }
-    } catch (e) {}
-    // Заглушка, если профиль скрыт
-    res.json({
-        success: true,
-        items: [{ assetid: "demo_1", classid: "101", instanceid: "0" }],
-        descriptions: [{ classid: "101", instanceid: "0", name: "AWP | Asiimov (Прямо с завода)", market_hash_name: "AWP | Asiimov (Прямо с завода)", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" }]
-    });
+    } catch (e) {
+        console.error('⚠️ Ошибка Waxpeer инвентаря:', e.message);
+    }
+
+    res.json({ success: false, error: 'Не удалось загрузить инвентарь через Waxpeer. Убедитесь, что ваш профиль и инвентарь в Steam открыты.' });
 });
 
 app.get('/api/steam/price', async (req, res) => {
@@ -498,7 +504,7 @@ app.post('/api/waxpeer/webhook', async (req, res) => {
 });
 
 /* =========================================
-   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ
+   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ (Админ + Розыгрыши)
 ========================================= */
 bot.on('pre_checkout_query', async (query) => {
     try { await bot.answerPreCheckoutQuery(query.id, true); } catch (e) {}
