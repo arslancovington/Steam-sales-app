@@ -3,12 +3,14 @@ const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const WAXPEER_API_KEY = process.env.WAXPEER_API_KEY || 'YOUR_WAXPEER_API_KEY';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
+const PROXY_URL = process.env.PROXY_URL || ''; // Ссылка на прокси (например: http://user:pass@ip:port)
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -170,7 +172,7 @@ setInterval(async () => {
 }, 15000);
 
 /* =========================================
-   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM (WAXPEER)
+   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM (ЧЕРЕЗ АГЕНТА)
 ========================================= */
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
@@ -241,31 +243,36 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Загрузка инвентаря через Waxpeer API для обхода блокировок Steam на Render
+// Загрузка инвентаря Steam через прокси-агента для обхода блокировок Render
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
     if (!steamId) return res.json({ success: false, error: 'Не указан SteamID или Trade URL' });
 
     try {
-        const waxRes = await axios.post(`https://api.waxpeer.com/v2/merchant/steam-inventory`, {
-            api: WAXPEER_API_KEY,
-            steam_id: steamId
-        }, { timeout: 12000 });
+        let axiosConfig = {
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer': `https://steamcommunity.com/profiles/${steamId}/inventory/`
+            },
+            timeout: 10000
+        };
 
-        if (waxRes.data && waxRes.data.success && waxRes.data.items) {
-            const items = waxRes.data.items.map(i => ({
-                assetid: String(i.item_id || i.assetid),
-                name: i.name || i.market_hash_name,
-                icon_url: i.image || i.icon_url
-            }));
-            return res.json({ success: true, items, descriptions: [] });
+        if (PROXY_URL) {
+            axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+        }
+
+        const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, axiosConfig);
+        
+        if (invRes?.data?.success && invRes.data.assets?.length > 0) {
+            return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
         }
     } catch (e) {
-        console.error('⚠️ Ошибка Waxpeer инвентаря:', e.message);
+        console.error('⚠️ Ошибка запроса инвентаря Steam через агента:', e.message);
     }
 
-    res.json({ success: false, error: 'Не удалось загрузить инвентарь через Waxpeer. Убедитесь, что ваш профиль и инвентарь в Steam открыты.' });
+    res.json({ success: false, error: 'Не удалось загрузить инвентарь. Проверьте правильность Trade URL и убедитесь, что профиль и инвентарь CS2 открыты в Steam.' });
 });
 
 app.get('/api/steam/price', async (req, res) => {
