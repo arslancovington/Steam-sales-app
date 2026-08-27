@@ -10,7 +10,7 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const WAXPEER_API_KEY = process.env.WAXPEER_API_KEY || 'YOUR_WAXPEER_API_KEY';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
-const PROXY_URL = process.env.PROXY_URL || ''; // Ссылка на прокси (например: http://user:pass@ip:port)
+const PROXY_URL = process.env.PROXY_URL || '';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -78,6 +78,17 @@ function extractSteamIdFromTradeUrl(url) {
         try { return (BigInt(partnerMatch[1]) + 76561197960265728n).toString(); } catch (e) { return null; }
     }
     return null;
+}
+
+// Проверка рабочего времени магазина (с 9:00 до 23:00 по МСК)
+function isShopOpen() {
+    try {
+        const now = new Date();
+        const mskHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow', hour: 'numeric', hour12: false }));
+        return mskHour >= 9 && mskHour < 23;
+    } catch (e) {
+        return true; // Если не удалось определить часовой пояс, разрешаем по умолчанию
+    }
 }
 
 // Универсальная проверка прав администратора
@@ -172,7 +183,7 @@ setInterval(async () => {
 }, 15000);
 
 /* =========================================
-   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM (ЧЕРЕЗ АГЕНТА)
+   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM
 ========================================= */
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
@@ -243,7 +254,6 @@ app.post('/api/giveaways/join', async (req, res) => {
     res.json({ success: true });
 });
 
-// Загрузка инвентаря Steam через прокси-агента для обхода блокировок Render
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
     if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
@@ -295,7 +305,7 @@ app.post('/api/market/add', (req, res) => {
         user.balance -= 245;
     }
     item.price = parseFloat(item.price);
-    item.buyerPrice = Math.round(item.price * 1.04); // Комиссия площадки 4%
+    item.buyerPrice = Math.round(item.price * 1.04);
     item._id = Date.now().toString();
     marketItems.push(item);
     saveData();
@@ -337,68 +347,77 @@ app.post('/api/deals/buy', async (req, res) => {
 });
 
 /* =========================================
-   API: МАГАЗИН SKIN HUB (Waxpeer + 6% Profit)
+   API: МАГАЗИН SKIN HUB (С наценкой 7% и ручной выдачей)
 ========================================= */
 const shopItems = [
-    { id: 's1', name: 'AK-47 | Redline (FT)', basePrice: 1500, waxpeerName: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's2', name: 'AWP | Asiimov (FT)', basePrice: 6500, waxpeerName: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's3', name: 'Deagle | Printstream (FT)', basePrice: 4200, waxpeerName: 'Desert Eagle | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
-    { id: 's4', name: 'M4A1-S | Cyrex (FN)', basePrice: 2100, waxpeerName: 'M4A1-S | Cyrex (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' }
+    { id: 's1', name: 'AK-47 | Redline (FT)', basePrice: 1500, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's2', name: 'AWP | Asiimov (FT)', basePrice: 6500, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's3', name: 'Deagle | Printstream (FT)', basePrice: 4200, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's4', name: 'M4A1-S | Cyrex (FN)', basePrice: 2100, image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' }
 ];
 
 app.get('/api/shop/items', (req, res) => {
+    // Наценка 7% на базовую цену
     const itemsWithMarkup = shopItems.map(item => ({
-        id: item.id, name: item.name, image: item.image, price: Math.round(item.basePrice * 1.06)
+        id: item.id, 
+        name: item.name, 
+        image: item.image, 
+        price: Math.round(item.basePrice * 1.07)
     }));
     res.json({ success: true, items: itemsWithMarkup });
 });
 
 app.post('/api/shop/buy', async (req, res) => {
     const { tgId, itemId } = req.body;
+    
+    // Проверка рабочего времени (с 9:00 до 23:00 по МСК)
+    if (!isShopOpen()) {
+        return res.json({ success: false, error: 'Магазин работает с 09:00 до 23:00 по МСК. Оформите заказ в рабочие часы!' });
+    }
+
     const user = getOrCreateUser(tgId);
     const item = shopItems.find(i => i.id === itemId);
 
     if (!item) return res.json({ success: false, error: 'Товар не найден' });
-    const finalPrice = Math.round(item.basePrice * 1.06);
+    const finalPrice = Math.round(item.basePrice * 1.07);
 
     if (user.balance < finalPrice) return res.json({ success: false, error: 'Недостаточно средств на балансе Skin Hub' });
     if (!user.tradeUrl) return res.json({ success: false, error: 'Укажите ваш Trade URL в профиле!' });
 
-    const tradeTokenMatch = user.tradeUrl.match(/token=([a-zA-Z0-9-_]+)/);
-    const partnerMatch = user.tradeUrl.match(/partner=(\d+)/);
-    if (!tradeTokenMatch || !partnerMatch) return res.json({ success: false, error: 'Неверный формат Trade URL' });
-
+    // Списываем баланс у пользователя
     user.balance -= finalPrice;
     saveData();
 
     try {
-        const searchRes = await axios.get(`https://api.waxpeer.com/v1/search-items-by-name?api=${WAXPEER_API_KEY}&names=${encodeURIComponent(item.waxpeerName)}`);
-        if (!searchRes.data.success || searchRes.data.items.length === 0) throw new Error('Скина нет в наличии у поставщиков');
+        // Уведомление пользователю
+        try { 
+            await bot.sendMessage(tgId, `🛍 **Заказ оформлен!**\nСкин *${item.name}* успешно куплен за ${finalPrice} ₽.\nАдминистратор уже получил заявку и отправляет вам обмен в Steam.`); 
+        } catch(e) {}
 
-        const bestItem = searchRes.data.items[0]; 
-        const buyRes = await axios.post(`https://api.waxpeer.com/v1/buy-item-with-id?api=${WAXPEER_API_KEY}`, {
-            item_id: bestItem.item_id,
-            partner: partnerMatch[1],
-            token: tradeTokenMatch[1]
-        });
-
-        if (!buyRes.data.success) throw new Error('Ошибка выкупа предмета');
-
-        try { await bot.sendMessage(tgId, `🛍 **Покупка успешна!**\nСкин *${item.name}* оплачен в Skin Hub.\nОжидайте трейд в Steam в течение 5 минут.`, { parse_mode: 'Markdown' }); } catch(e){}
+        // Уведомление администратору с требуемыми полями
         if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            try { await bot.sendMessage(ADMIN_CHAT_ID, `🔥 **Новая покупка в Магазине!**\nИгрок \`${tgId}\` купил ${item.name} за ${finalPrice} ₽.\nАвто-закупка Waxpeer успешна.`, { parse_mode: 'Markdown' }); } catch(e){}
+            await bot.sendMessage(ADMIN_CHAT_ID, 
+                `🔥 **Новая покупка в Магазине!**\n\n` +
+                `👤 Ник: @${user.username || 'Игрок'}\n` +
+                `🆔 Айди: \`${user.tgId}\`\n` +
+                `🏷 Название предмета: *${item.name}*\n` +
+                `💰 Сумма предмета: ${finalPrice} ₽\n` +
+                `🔗 Трейд ссылка покупателя:\n\`${user.tradeUrl}\``, 
+                { parse_mode: 'Markdown' }
+            );
         }
 
         res.json({ success: true, newBalance: user.balance });
     } catch (error) {
+        // В случае системной сбои возвращаем средства назад
         user.balance += finalPrice;
         saveData();
-        res.json({ success: false, error: error.message || 'Ошибка. Средства возвращены.' });
+        res.json({ success: false, error: 'Произошла ошибка при оформлении. Средства возвращены на баланс.' });
     }
 });
 
 /* =========================================
-   API: ФИНАНСЫ (Пополнения, Выводы, Waxpeer)
+   API: ФИНАНСЫ (Пополнения, Выводы)
 ========================================= */
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
@@ -484,32 +503,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-app.post('/api/waxpeer/deposit-link', async (req, res) => {
-    const { tgId } = req.body;
-    const depositUrl = `https://waxpeer.com/deposit?api=${WAXPEER_API_KEY}&custom_id=${tgId}`;
-    res.json({ success: true, url: depositUrl });
-});
-
-app.post('/api/waxpeer/webhook', async (req, res) => {
-    const update = req.body;
-    if (update && update.state === 'completed') {
-        const tgId = update.custom_id; 
-        const skinPriceUsd = update.price / 1000; 
-        const rubles = Math.round(skinPriceUsd * 90); 
-
-        if (tgId && rubles > 0) {
-            const user = getOrCreateUser(tgId);
-            user.balance += rubles;
-            saveData();
-            try { await bot.sendMessage(tgId, `🎉 **Депозит скином прошел успешно!**\nТвой баланс Skin Hub пополнен на **${rubles} ₽**.`, { parse_mode: 'Markdown' }); } catch (e) {}
-            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                try { await bot.sendMessage(ADMIN_CHAT_ID, `🔫 **Депозит скинами (Waxpeer)!**\n👤 ID: \`${tgId}\`\n💰 Зачислено: ${rubles} ₽`, { parse_mode: 'Markdown' }); } catch(e){}
-            }
-        }
-    }
-    res.status(200).send('OK');
-});
-
 /* =========================================
    ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ (Админ + Розыгрыши)
 ========================================= */
@@ -555,7 +548,6 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Глобальная рассылка
     if (text.startsWith('/broadcast')) {
         if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const broadcastText = text.replace('/broadcast', '').trim();
@@ -577,7 +569,6 @@ bot.on('message', async (msg) => {
         await bot.sendMessage(msg.chat.id, `📢 **Рассылка завершена!**\n✅ Доставлено: ${successCount}\n❌ Ошибок: ${failCount}`, { parse_mode: 'Markdown' });
     }
 
-    // Удаление розыгрыша
     if (text.startsWith('/delgiveaway')) {
         if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const activeGiveaways = giveaways.filter(g => !g.ended);
@@ -586,7 +577,6 @@ bot.on('message', async (msg) => {
         return await bot.sendMessage(msg.chat.id, '📋 Выберите розыгрыш для удаления:', { reply_markup: { inline_keyboard: buttons } });
     }
 
-    // Создание розыгрыша
     if (text.startsWith('/newgiveaway')) {
         if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const lines = text.split('\n');
