@@ -7,6 +7,7 @@ const axios = require('axios');
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
+const WAXPEER_API_KEY = process.env.WAXPEER_API_KEY || 'YOUR_WAXPEER_API_KEY';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -77,6 +78,7 @@ function extractSteamIdFromTradeUrl(url) {
     return null;
 }
 
+// Универсальная проверка прав администратора
 function isAdmin(msg) {
     const userId = String(msg.from ? msg.from.id : '');
     const chatId = String(msg.chat.id);
@@ -87,7 +89,7 @@ function isAdmin(msg) {
 /* =========================================
    ФОНОВЫЕ ПРОЦЕССЫ (БИТВЫ И РОЗЫГРЫШИ)
 ========================================= */
-const BATTLE_COLORS = ['#00ffff', '#7cfc00', '#bf00ff', '#ff0055', '#ffaa00', '#00ffaa'];
+const BATTLE_COLORS = ['#FF9900', '#ffffff', '#ffaa33', '#cc7a00', '#ffc266', '#e68a00'];
 let battleState = resetBattleState();
 
 function resetBattleState() {
@@ -97,6 +99,7 @@ function resetBattleState() {
 setInterval(async () => {
     const now = Date.now();
     
+    // Логика Королевской битвы
     if (battleState.status === 'countdown' && now >= battleState.startTime) {
         battleState.status = 'rolling';
         battleState.rollEndTime = now + 13000; 
@@ -113,12 +116,13 @@ setInterval(async () => {
             if (winner) {
                 winner.balance += battleState.winnerPrize;
                 saveData();
-                try { await bot.sendMessage(battleState.winnerTgId, `🏆 Поздравляем! Вы выиграли Королевскую битву и получили куш: ${battleState.winnerPrize} ₽!`); } catch (e) {}
+                try { await bot.sendMessage(battleState.winnerTgId, `🏆 Поздравляем! Вы выиграли Королевскую битву и получили куш: ${battleState.winnerPrize} ₽ на баланс Skin Hub!`); } catch (e) {}
             }
         }
         setTimeout(() => { battleState = resetBattleState(); }, 7000);
     }
 
+    // Логика Розыгрышей
     let giveawaysUpdated = false;
     giveaways.forEach(g => {
         if (!g.ended && g.endTime && now >= g.endTime) {
@@ -134,7 +138,7 @@ setInterval(async () => {
                 g.winnerTradeUrl = winnerUser ? (winnerUser.tradeUrl || 'Не указан') : 'Не указан';
 
                 try {
-                    bot.sendMessage(winnerId, `🎉 Поздравляем! Вы выиграли в розыгрыше предмета: *${g.title}*!\nАдминистратор скоро свяжется с вами для передачи скина.`, { parse_mode: 'Markdown' });
+                    bot.sendMessage(winnerId, `🎉 Поздравляем! Вы выиграли в розыгрыше предмета: *${g.title}*!\nАдминистратор Skin Hub скоро свяжется с вами для передачи скина.`, { parse_mode: 'Markdown' });
                 } catch (e) {}
 
                 if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
@@ -166,8 +170,24 @@ setInterval(async () => {
 }, 15000);
 
 /* =========================================
-   API МАРКЕТПЛЕЙСА И СДЕЛОК
+   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM
 ========================================= */
+app.get('/api/user/profile', (req, res) => {
+    const { tgId, tgUser, photoUrl } = req.query;
+    if (!tgId) return res.json({ success: false });
+    res.json({ success: true, ...getOrCreateUser(tgId, tgUser, photoUrl) });
+});
+
+app.post('/api/user/save', (req, res) => {
+    const { tgId, tradeUrl } = req.body;
+    const user = getOrCreateUser(tgId);
+    user.tradeUrl = tradeUrl || '';
+    const steamId = extractSteamIdFromTradeUrl(tradeUrl);
+    if (steamId) user.steamId = steamId;
+    saveData();
+    res.json({ success: true, steamId: user.steamId });
+});
+
 app.get('/api/battle/state', (req, res) => res.json({ success: true, state: battleState, serverTime: Date.now() }));
 
 app.post('/api/battle/bet', (req, res) => {
@@ -197,22 +217,61 @@ app.post('/api/battle/bet', (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-app.get('/api/user/profile', (req, res) => {
-    const { tgId, tgUser, photoUrl } = req.query;
-    if (!tgId) return res.json({ success: false });
-    res.json({ success: true, ...getOrCreateUser(tgId, tgUser, photoUrl) });
-});
+app.get('/api/giveaways/list', (req, res) => res.json({ success: true, giveaways }));
 
-app.post('/api/user/save', (req, res) => {
-    const { tgId, tradeUrl } = req.body;
-    const user = getOrCreateUser(tgId);
-    user.tradeUrl = tradeUrl || '';
-    const steamId = extractSteamIdFromTradeUrl(tradeUrl);
-    if (steamId) user.steamId = steamId;
+app.post('/api/giveaways/join', async (req, res) => {
+    const { tgId, giveawayId } = req.body;
+    const giveaway = giveaways.find(g => g._id === giveawayId);
+    if (!giveaway) return res.json({ success: false, error: 'Розыгрыш не найден' });
+    if (giveaway.ended) return res.json({ success: false, error: 'Розыгрыш уже завершен' });
+    if (giveaway.participants.includes(String(tgId))) return res.json({ success: false, error: 'Вы уже участвуете!' });
+
+    if (giveaway.sponsorUsername) {
+        try {
+            const member = await bot.getChatMember(giveaway.sponsorUsername, tgId);
+            if (!['creator', 'administrator', 'member'].includes(member.status)) {
+                return res.json({ success: false, error: `Подпишитесь на канал: ${giveaway.sponsor}` });
+            }
+        } catch (e) {}
+    }
+
+    giveaway.participants.push(String(tgId));
+    giveaway.participantsCount = giveaway.participants.length;
     saveData();
-    res.json({ success: true, steamId: user.steamId });
+    res.json({ success: true });
 });
 
+app.post('/api/steam/inventory', async (req, res) => {
+    let { steamId, tgId } = req.body;
+    if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
+    try {
+        if (steamId) {
+            const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, { 
+                headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 
+            });
+            if (invRes?.data?.success && invRes.data.assets?.length > 0) {
+                return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
+            }
+        }
+    } catch (e) {}
+    // Заглушка, если профиль скрыт
+    res.json({
+        success: true,
+        items: [{ assetid: "demo_1", classid: "101", instanceid: "0" }],
+        descriptions: [{ classid: "101", instanceid: "0", name: "AWP | Asiimov (Прямо с завода)", market_hash_name: "AWP | Asiimov (Прямо с завода)", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" }]
+    });
+});
+
+app.get('/api/steam/price', async (req, res) => {
+    let skinName = req.query.name;
+    if (!skinName) return res.json({ success: true, price: 150 });
+    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
+    res.json({ success: true, price: 150 });
+});
+
+/* =========================================
+   API: P2P МАРКЕТПЛЕЙС
+========================================= */
 app.get('/api/market/items', (req, res) => res.json({ success: true, items: marketItems }));
 
 app.post('/api/market/add', (req, res) => {
@@ -223,7 +282,7 @@ app.post('/api/market/add', (req, res) => {
         user.balance -= 245;
     }
     item.price = parseFloat(item.price);
-    item.buyerPrice = Math.round(item.price * 1.04);
+    item.buyerPrice = Math.round(item.price * 1.04); // Комиссия площадки 4%
     item._id = Date.now().toString();
     marketItems.push(item);
     saveData();
@@ -255,86 +314,78 @@ app.post('/api/deals/buy', async (req, res) => {
     marketItems.splice(itemIndex, 1);
     saveData();
 
-    try { await bot.sendMessage(item.tgId, `🎉 Ваш предмет "${item.name}" был куплен за ${item.price} ₽! Средства зачислены.`); } catch (e) {}
+    try { await bot.sendMessage(item.tgId, `🎉 Ваш лот P2P "${item.name}" куплен за ${item.price} ₽! Средства зачислены.`); } catch (e) {}
 
     if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-        try {
-            await bot.sendMessage(ADMIN_CHAT_ID, `🛍 Успешная сделка на маркете!\n\n🏷 Предмет: *${item.name}*\n💰 Цена продавцу: ${item.price} ₽\n👤 Продавец ID: \`${item.tgId}\`\n👤 Покупатель ID: \`${buyerTgId}\``, { parse_mode: 'Markdown' });
-        } catch (e) {}
+        try { await bot.sendMessage(ADMIN_CHAT_ID, `🛍 Успешная P2P сделка на маркете Skin Hub!\n\n🏷 Предмет: *${item.name}*\n💰 Цена продавцу: ${item.price} ₽\n👤 Продавец: \`${item.tgId}\`\n👤 Покупатель: \`${buyerTgId}\``, { parse_mode: 'Markdown' }); } catch (e) {}
     }
 
     res.json({ success: true, newBalance: buyer.balance });
 });
 
 /* =========================================
-   РОЗЫГРЫШИ И СТИМ API
+   API: МАГАЗИН SKIN HUB (Waxpeer + 6% Profit)
 ========================================= */
-app.get('/api/giveaways/list', (req, res) => res.json({ success: true, giveaways }));
+const shopItems = [
+    { id: 's1', name: 'AK-47 | Redline (FT)', basePrice: 1500, waxpeerName: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's2', name: 'AWP | Asiimov (FT)', basePrice: 6500, waxpeerName: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's3', name: 'Deagle | Printstream (FT)', basePrice: 4200, waxpeerName: 'Desert Eagle | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' },
+    { id: 's4', name: 'M4A1-S | Cyrex (FN)', basePrice: 2100, waxpeerName: 'M4A1-S | Cyrex (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f' }
+];
 
-app.post('/api/giveaways/join', async (req, res) => {
-    const { tgId, giveawayId } = req.body;
-    const giveaway = giveaways.find(g => g._id === giveawayId);
-    if (!giveaway) return res.json({ success: false, error: 'Розыгрыш не найден' });
-    if (giveaway.ended) return res.json({ success: false, error: 'Розыгрыш уже завершен' });
-    if (giveaway.participants.includes(String(tgId))) return res.json({ success: false, error: 'Вы уже участвуете!' });
+app.get('/api/shop/items', (req, res) => {
+    const itemsWithMarkup = shopItems.map(item => ({
+        id: item.id, name: item.name, image: item.image, price: Math.round(item.basePrice * 1.06)
+    }));
+    res.json({ success: true, items: itemsWithMarkup });
+});
 
-    if (giveaway.sponsorUsername) {
-        try {
-            const member = await bot.getChatMember(giveaway.sponsorUsername, tgId);
-            if (!['creator', 'administrator', 'member'].includes(member.status)) {
-                return res.json({ success: false, error: `Подпишитесь на канал: ${giveaway.sponsor}` });
-            }
-        } catch (e) {}
-    }
+app.post('/api/shop/buy', async (req, res) => {
+    const { tgId, itemId } = req.body;
+    const user = getOrCreateUser(tgId);
+    const item = shopItems.find(i => i.id === itemId);
 
-    giveaway.participants.push(String(tgId));
-    giveaway.participantsCount = giveaway.participants.length;
+    if (!item) return res.json({ success: false, error: 'Товар не найден' });
+    const finalPrice = Math.round(item.basePrice * 1.06);
+
+    if (user.balance < finalPrice) return res.json({ success: false, error: 'Недостаточно средств на балансе Skin Hub' });
+    if (!user.tradeUrl) return res.json({ success: false, error: 'Укажите ваш Trade URL в профиле!' });
+
+    const tradeTokenMatch = user.tradeUrl.match(/token=([a-zA-Z0-9-_]+)/);
+    const partnerMatch = user.tradeUrl.match(/partner=(\d+)/);
+    if (!tradeTokenMatch || !partnerMatch) return res.json({ success: false, error: 'Неверный формат Trade URL' });
+
+    user.balance -= finalPrice;
     saveData();
-    res.json({ success: true });
-});
 
-app.post('/api/steam/inventory', async (req, res) => {
-    let { steamId, tgId } = req.body;
-    if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
-    
     try {
-        if (steamId) {
-            const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, { 
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }, 
-                timeout: 5000 
-            });
-            if (invRes?.data?.success && invRes.data.assets?.length > 0) {
-                return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
-            }
+        const searchRes = await axios.get(`https://api.waxpeer.com/v1/search-items-by-name?api=${WAXPEER_API_KEY}&names=${encodeURIComponent(item.waxpeerName)}`);
+        if (!searchRes.data.success || searchRes.data.items.length === 0) throw new Error('Скина нет в наличии у поставщиков');
+
+        const bestItem = searchRes.data.items[0]; 
+        const buyRes = await axios.post(`https://api.waxpeer.com/v1/buy-item-with-id?api=${WAXPEER_API_KEY}`, {
+            item_id: bestItem.item_id,
+            partner: partnerMatch[1],
+            token: tradeTokenMatch[1]
+        });
+
+        if (!buyRes.data.success) throw new Error('Ошибка выкупа предмета');
+
+        try { await bot.sendMessage(tgId, `🛍 **Покупка успешна!**\nСкин *${item.name}* оплачен в Skin Hub.\nОжидайте трейд в Steam в течение 5 минут.`, { parse_mode: 'Markdown' }); } catch(e){}
+        if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+            try { await bot.sendMessage(ADMIN_CHAT_ID, `🔥 **Новая покупка в Магазине!**\nИгрок \`${tgId}\` купил ${item.name} за ${finalPrice} ₽.\nАвто-закупка Waxpeer успешна.`, { parse_mode: 'Markdown' }); } catch(e){}
         }
-    } catch (e) {}
 
-    res.json({
-        success: true,
-        items: [
-            { assetid: "demo_1", classid: "101", instanceid: "0" },
-            { assetid: "demo_2", classid: "102", instanceid: "0" },
-            { assetid: "demo_3", classid: "103", instanceid: "0" },
-            { assetid: "demo_4", classid: "104", instanceid: "0" }
-        ],
-        descriptions: [
-            { classid: "101", instanceid: "0", name: "AWP | Asiimov (Прямо с завода)", market_hash_name: "AWP | Asiimov (Прямо с завода)", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" },
-            { classid: "102", instanceid: "0", name: "AK-47 | Красная линия (После полевых)", market_hash_name: "AK-47 | Красная линия (После полевых)", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" },
-            { classid: "103", instanceid: "0", name: "M4A4 | Император (Немного поношенное)", market_hash_name: "M4A4 | Император (Немного поношенное)", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" },
-            { classid: "104", instanceid: "0", name: "Desert Eagle | Поток информации", market_hash_name: "Desert Eagle | Поток информации", icon_url: "-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f" }
-        ]
-    });
-});
-
-app.get('/api/steam/price', async (req, res) => {
-    let skinName = req.query.name;
-    if (!skinName) return res.json({ success: true, price: 150 });
-    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
-    res.json({ success: true, price: 150 });
+        res.json({ success: true, newBalance: user.balance });
+    } catch (error) {
+        user.balance += finalPrice;
+        saveData();
+        res.json({ success: false, error: error.message || 'Ошибка. Средства возвращены.' });
+    }
 });
 
 /* =========================================
-   ПЛАТЕЖИ, ВЫВОДЫ И ВЕБХУК
+   API: ФИНАНСЫ (Пополнения, Выводы, Waxpeer)
 ========================================= */
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
@@ -355,7 +406,7 @@ app.post('/api/billing/invoice', async (req, res) => {
             });
 
             if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                await bot.sendMessage(ADMIN_CHAT_ID, `💳 Запрос пополнения (${currency})!\n👤 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n🏦 Карта: \`${activeCard.number}\``, {
+                await bot.sendMessage(ADMIN_CHAT_ID, `💳 Запрос пополнения Skin Hub (${currency})!\n👤 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽\n🏦 Карта: \`${activeCard.number}\``, {
                     parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Подтвердить', callback_data: `p2p_confirm_pay_${tgId}_${amount}` }, { text: '❌ Отклонить', callback_data: `p2p_cancel_${tgId}_${amount}` }]] }
                 });
             }
@@ -364,9 +415,8 @@ app.post('/api/billing/invoice', async (req, res) => {
             if (CRYPTO_BOT_TOKEN) {
                 try {
                     const cryptoRes = await axios.post('https://pay.crypt.bot/api/createInvoice', {
-                        asset: 'USDT',
-                        amount: amount.toString(),
-                        description: `Пополнение баланса на ${Math.round(rubles)} ₽`,
+                        asset: 'USDT', amount: amount.toString(),
+                        description: `Пополнение баланса Skin Hub на ${Math.round(rubles)} ₽`,
                         payload: `topup_${tgId}_${Math.round(rubles)}`
                     }, { headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN } });
                     if (cryptoRes.data?.ok) payUrl = cryptoRes.data.result.pay_url;
@@ -385,15 +435,14 @@ app.post('/api/crypto/webhook', async (req, res) => {
         const payloadStr = invoice.payload;
         if (payloadStr && payloadStr.startsWith('topup_')) {
             const parts = payloadStr.split('_');
-            const tgId = parts[1];
-            const rubles = parseFloat(parts[2]);
+            const tgId = parts[1], rubles = parseFloat(parts[2]);
             if (tgId && !isNaN(rubles)) {
                 const user = getOrCreateUser(tgId);
                 user.balance += rubles;
                 saveData();
-                try { await bot.sendMessage(tgId, `✅ Оплата через CryptoBot прошла успешно! Баланс пополнен на ${Math.round(rubles)} ₽.`); } catch (e) {}
+                try { await bot.sendMessage(tgId, `✅ Оплата через CryptoBot прошла успешно! Баланс Skin Hub пополнен на ${Math.round(rubles)} ₽.`); } catch (e) {}
                 if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                    try { await bot.sendMessage(ADMIN_CHAT_ID, `💎 Успешное пополнение через CryptoBot!\n👤 ID: \`${tgId}\`\n💰 Сумма: ${Math.round(rubles)} ₽`, { parse_mode: 'Markdown' }); } catch (e) {}
+                    try { await bot.sendMessage(ADMIN_CHAT_ID, `💎 Успешное пополнение CryptoBot!\n👤 ID: \`${tgId}\`\n💰 Зачислено: ${Math.round(rubles)} ₽`, { parse_mode: 'Markdown' }); } catch(e){}
                 }
             }
         }
@@ -422,6 +471,32 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
+app.post('/api/waxpeer/deposit-link', async (req, res) => {
+    const { tgId } = req.body;
+    const depositUrl = `https://waxpeer.com/deposit?api=${WAXPEER_API_KEY}&custom_id=${tgId}`;
+    res.json({ success: true, url: depositUrl });
+});
+
+app.post('/api/waxpeer/webhook', async (req, res) => {
+    const update = req.body;
+    if (update && update.state === 'completed') {
+        const tgId = update.custom_id; 
+        const skinPriceUsd = update.price / 1000; 
+        const rubles = Math.round(skinPriceUsd * 90); 
+
+        if (tgId && rubles > 0) {
+            const user = getOrCreateUser(tgId);
+            user.balance += rubles;
+            saveData();
+            try { await bot.sendMessage(tgId, `🎉 **Депозит скином прошел успешно!**\nТвой баланс Skin Hub пополнен на **${rubles} ₽**.`, { parse_mode: 'Markdown' }); } catch (e) {}
+            if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
+                try { await bot.sendMessage(ADMIN_CHAT_ID, `🔫 **Депозит скинами (Waxpeer)!**\n👤 ID: \`${tgId}\`\n💰 Зачислено: ${rubles} ₽`, { parse_mode: 'Markdown' }); } catch(e){}
+            }
+        }
+    }
+    res.status(200).send('OK');
+});
+
 /* =========================================
    ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ
 ========================================= */
@@ -431,10 +506,7 @@ bot.on('pre_checkout_query', async (query) => {
 
 bot.on('message', async (msg) => {
     if (msg.chat && msg.chat.type !== 'private') {
-        if (!chats.includes(msg.chat.id)) {
-            chats.push(msg.chat.id);
-            saveData();
-        }
+        if (!chats.includes(msg.chat.id)) { chats.push(msg.chat.id); saveData(); }
     }
 
     if (msg.successful_payment) {
@@ -445,10 +517,9 @@ bot.on('message', async (msg) => {
             const user = getOrCreateUser(tgId);
             user.balance += rubles;
             saveData();
-            await bot.sendMessage(tgId, `✅ Оплата через Telegram Stars прошла успешно! Баланс пополнен на ${Math.round(rubles)} ₽.`);
-            
+            await bot.sendMessage(tgId, `✅ Оплата через Telegram Stars прошла успешно! Баланс Skin Hub пополнен на ${Math.round(rubles)} ₽.`);
             if (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                await bot.sendMessage(ADMIN_CHAT_ID, `⭐ Успешное пополнение Stars!\n👤 ID: \`${tgId}\`\n💰 Сумма: ${Math.round(rubles)} ₽`, { parse_mode: 'Markdown' });
+                await bot.sendMessage(ADMIN_CHAT_ID, `⭐ Успешное пополнение Stars!\n👤 ID: \`${tgId}\`\n💰 Зачислено: ${Math.round(rubles)} ₽`, { parse_mode: 'Markdown' });
             }
         }
         return;
@@ -462,75 +533,49 @@ bot.on('message', async (msg) => {
         const username = msg.from ? (msg.from.username || msg.from.first_name) : 'Игрок';
         getOrCreateUser(userId, username, msg.from?.photo_url);
 
-        await bot.sendMessage(msg.chat.id, '🎮 Добро пожаловать в **P2P Skin Sales**!\n\nТоргуйте скинами, участвуйте в битвах и розыгрышах прямо в Telegram.', {
+        await bot.sendMessage(msg.chat.id, '🟧⬛️ Добро пожаловать в **Skin Hub**!\n\nТоргуй скинами, покупай топ дроп и участвуй в розыгрышах прямо в Telegram.', {
             parse_mode: 'Markdown',
             reply_markup: {
-                inline_keyboard: [[{ text: '🚀 Открыть Маркетплейс', web_app: { url: WEBAPP_URL } }]]
+                inline_keyboard: [[{ text: '🚀 Открыть Skin Hub', web_app: { url: WEBAPP_URL } }]]
             }
         });
         return;
     }
 
-    // Команда глобальной рассылки /broadcast (только в каналы/чаты, где бот администратор)
+    // Глобальная рассылка
     if (text.startsWith('/broadcast')) {
-        if (!isAdmin(msg)) {
-            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
-        }
-
+        if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const broadcastText = text.replace('/broadcast', '').trim();
-        if (!broadcastText) {
-            return await bot.sendMessage(msg.chat.id, '❌ Введите текст для рассылки.\nПример:\n`/broadcast Важное сообщение!`', { parse_mode: 'Markdown' });
-        }
+        if (!broadcastText) return await bot.sendMessage(msg.chat.id, '❌ Введите текст.');
 
-        await bot.sendMessage(msg.chat.id, '⏳ Проверяю права и начинаю рассылку в каналы...');
-
-        let successCount = 0;
-        let failCount = 0;
-
+        let successCount = 0, failCount = 0;
         for (const chatId of chats) {
             if (!chatId || chatId === 'undefined' || chatId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
-                if (!botUserId) {
-                    const me = await bot.getMe();
-                    botUserId = me.id;
-                }
+                if (!botUserId) { const me = await bot.getMe(); botUserId = me.id; }
                 const member = await bot.getChatMember(chatId, botUserId);
                 if (['creator', 'administrator'].includes(member.status)) {
                     await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown' });
                     successCount++;
                     await new Promise(resolve => setTimeout(resolve, 50));
-                } else {
-                    failCount++;
-                }
-            } catch (err) {
-                failCount++;
-            }
+                } else failCount++;
+            } catch (err) { failCount++; }
         }
-
-        await bot.sendMessage(msg.chat.id, `📢 **Рассылка по каналам завершена!**\n\n✅ Успешно доставлено: ${successCount}\n❌ Пропущено/ошибок (нет прав админа): ${failCount}`, { parse_mode: 'Markdown' });
-        return;
+        await bot.sendMessage(msg.chat.id, `📢 **Рассылка завершена!**\n✅ Доставлено: ${successCount}\n❌ Ошибок: ${failCount}`, { parse_mode: 'Markdown' });
     }
 
+    // Удаление розыгрыша
     if (text.startsWith('/delgiveaway')) {
-        if (!isAdmin(msg)) {
-            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
-        }
-
+        if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const activeGiveaways = giveaways.filter(g => !g.ended);
-        if (activeGiveaways.length === 0) {
-            return await bot.sendMessage(msg.chat.id, '❌ Нет активных розыгрышей для удаления.');
-        }
+        if (activeGiveaways.length === 0) return await bot.sendMessage(msg.chat.id, '❌ Нет активных розыгрышей для удаления.');
         const buttons = activeGiveaways.map(g => [{ text: `🗑 Удалить: ${g.title}`, callback_data: `del_gw_${g._id}` }]);
-        return await bot.sendMessage(msg.chat.id, '📋 Выберите розыгрыш для удаления:', {
-            reply_markup: { inline_keyboard: buttons }
-        });
+        return await bot.sendMessage(msg.chat.id, '📋 Выберите розыгрыш для удаления:', { reply_markup: { inline_keyboard: buttons } });
     }
 
+    // Создание розыгрыша
     if (text.startsWith('/newgiveaway')) {
-        if (!isAdmin(msg)) {
-            return await bot.sendMessage(msg.chat.id, '❌ У вас нет прав для выполнения этой команды.');
-        }
-
+        if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
         const lines = text.split('\n');
         let title = '', sponsor = '', timerLine = '';
         lines.forEach(l => {
@@ -539,9 +584,7 @@ bot.on('message', async (msg) => {
             if (l.toLowerCase().startsWith('timer:') || l.toLowerCase().startsWith('date:')) timerLine = l.replace(/^(timer|date):/i, '').trim();
         });
         
-        if (!title || !sponsor) {
-            return await bot.sendMessage(msg.chat.id, '❌ Неверный формат!\nПример:\n`/newgiveaway\nPrize: AWP | Asiimov\nSponsor: @channel\nTimer: 30.08.2026 18:00`', { parse_mode: 'Markdown' });
-        }
+        if (!title || !sponsor) return await bot.sendMessage(msg.chat.id, '❌ Неверный формат!\nПример:\n`/newgiveaway\nPrize: AWP | Asiimov\nSponsor: @channel\nTimer: 30.08.2026 18:00`', { parse_mode: 'Markdown' });
 
         let endTime = Date.now() + 24 * 60 * 60 * 1000;
         let timerText = timerLine || '24 часа';
@@ -564,41 +607,23 @@ bot.on('message', async (msg) => {
 
         let sponsorUsername = sponsor.startsWith('@') ? sponsor : '@' + sponsor;
         giveaways.push({
-            _id: Date.now().toString(),
-            title,
-            sponsor,
-            sponsorUsername,
-            timerText,
-            endTime,
-            ended: false,
-            winnerTgId: null,
-            winnerUsername: null,
-            winnerTradeUrl: null,
+            _id: Date.now().toString(), title, sponsor, sponsorUsername, timerText, endTime,
+            ended: false, winnerTgId: null, winnerUsername: null, winnerTradeUrl: null,
             image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
-            participantsCount: 0,
-            participants: []
+            participantsCount: 0, participants: []
         });
         saveData();
         
         const dateStr = new Date(endTime).toLocaleString('ru-RU');
-        
         await bot.sendMessage(msg.chat.id, `✅ Розыгрыш "${title}" запущен!\n⏰ Окончание: *${dateStr}*`, { parse_mode: 'Markdown' });
 
-        // Автоматическая рассылка нового розыгрыша только в те каналы/чаты, где бот администратор
-        const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
-        const broadcastKeyboard = {
-            inline_keyboard: [
-                [{ text: '🚀 Участвовать в розыгрыше', web_app: { url: WEBAPP_URL } }]
-            ]
-        };
+        const broadcastText = `🎁 **НОВЫЙ РОЗЫГРЫШ В SKIN HUB!**\n\n🏆 Приз: *${title}*\n📢 Спонсор: ${sponsor}\n⏰ Итоги: *${dateStr}*\n\nПереходите в приложение, чтобы принять участие!`;
+        const broadcastKeyboard = { inline_keyboard: [[{ text: '🚀 Участвовать в розыгрыше', web_app: { url: WEBAPP_URL } }]] };
 
         for (const chatId of chats) {
             if (!chatId || chatId === 'undefined' || chatId === 'YOUR_ADMIN_CHAT_ID') continue;
             try {
-                if (!botUserId) {
-                    const me = await bot.getMe();
-                    botUserId = me.id;
-                }
+                if (!botUserId) { const me = await bot.getMe(); botUserId = me.id; }
                 const member = await bot.getChatMember(chatId, botUserId);
                 if (['creator', 'administrator'].includes(member.status)) {
                     await bot.sendMessage(chatId, broadcastText, { parse_mode: 'Markdown', reply_markup: broadcastKeyboard });
@@ -637,7 +662,7 @@ bot.on('callback_query', async (query) => {
         await bot.editMessageText(`✅ Вывод ${amount} ₽ для ${tgId} выполнен.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
     } else if (data.startsWith('p2p_cancel_')) {
         const tgId = parts[2], amount = parts[3];
-        await bot.sendMessage(tgId, `❌ Ваша операция на сумму ${amount} ₽ отклонена/отменена администратором.`);
+        await bot.sendMessage(tgId, `❌ Ваша операция на сумму ${amount} ₽ отклонена администратором.`);
         await bot.editMessageText(`❌ Заявка/платеж отменены.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
     } else if (data.startsWith('user_paid_')) {
         const tgId = parts[2], amount = parts[3];
