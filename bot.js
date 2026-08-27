@@ -37,15 +37,33 @@ if (!fs.existsSync(dataDir)) {
 
 const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
-const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
+const shopCacheFile = fs.existsSync(dataDir) ? path.join(dataDir, 'shopCache.json') : path.join(__dirname, 'shopCache.json');
 
 let db = { users: {}, marketItems: [], giveaways: [], chats: [] };
 let cards = [];
-let pricesCache = {}; 
+let cachedShopItems = [];
 
 if (fs.existsSync(dbFile)) { try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} }
 if (fs.existsSync(cardsFile)) { try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} }
-if (fs.existsSync(pricesFile)) { try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) {} }
+
+const FALLBACK_SHOP_ITEMS = [
+    { id: 'dm_1', name: '★ Karambit | Doppler (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 85000, discount: '-12%' },
+    { id: 'dm_2', name: '★ Butterfly Knife | Fade (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 145000, discount: '-8%' },
+    { id: 'dm_3', name: '★ M9 Bayonet | Lore (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 98000, discount: '-15%' },
+    { id: 'dm_4', name: '★ Skeleton Knife | Slaughter (Minimal Wear)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 64000, discount: '-10%' },
+    { id: 'dm_5', name: '★ Sport Gloves | Vice (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 180000, discount: '-5%' },
+    { id: 'dm_6', name: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 8900, discount: '-20%' },
+    { id: 'dm_7', name: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 1250, discount: '-15%' },
+    { id: 'dm_8', name: 'Desert Eagle | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 5400, discount: '-10%' },
+    { id: 'dm_9', name: 'USP-S | Kill Confirmed (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 14200, discount: '-25%' },
+    { id: 'dm_10', name: 'M4A1-S | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 16500, discount: '-12%' }
+];
+
+if (fs.existsSync(shopCacheFile)) {
+    try { cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8')); } catch (e) { cachedShopItems = FALLBACK_SHOP_ITEMS; }
+} else {
+    cachedShopItems = FALLBACK_SHOP_ITEMS;
+}
 
 let users = db.users || {};
 let marketItems = db.marketItems || [];
@@ -57,6 +75,40 @@ let cardIndexUz = 0;
 function saveData() { 
     try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats }, null, 2)); } catch (e) {} 
 }
+
+// Функция фонового обновления каталога DMarket (раз в сутки)
+async function refreshShopCacheFromDMarket() {
+    try {
+        let dmarketConfig = {
+            params: { gameId: 'a8db', limit: 60, orderBy: 'best_discount', orderDir: 'desc', currency: 'USD' },
+            headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
+            timeout: 10000
+        };
+        if (PROXY_URL) dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+
+        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', dmarketConfig);
+        if (dmarketRes.data && dmarketRes.data.objects && dmarketRes.data.objects.length > 0) {
+            const items = dmarketRes.data.objects.map(obj => {
+                const priceUsd = obj.price ? (obj.price.USD / 100) : 0;
+                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
+                let discount = obj.discount ? `${obj.discount}%` : (obj.extra?.discount ? `${obj.extra.discount}%` : null);
+                return { id: obj.itemId || obj.gameId, name: obj.title, image: obj.image, price: priceRub, discount };
+            }).filter(i => i.price > 0);
+
+            if (items.length > 0) {
+                cachedShopItems = items;
+                fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
+                console.log('✅ Каталог магазина DMarket успешно обновлен и закэширован.');
+            }
+        }
+    } catch (e) {
+        console.log('⚠️ Не удалось обновить DMarket с сети (используется локальный кэш).');
+    }
+}
+
+// Запускаем обновление сразу при старте и далее каждые 24 часа
+refreshShopCacheFromDMarket();
+setInterval(refreshShopCacheFromDMarket, 24 * 60 * 60 * 1000);
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
     const now = Date.now();
@@ -99,9 +151,6 @@ function isAdmin(msg) {
     return userId === adminId || chatId === adminId;
 }
 
-/* =========================================
-   ФОНОВЫЕ ПРОЦЕССЫ (БИТВЫ И РОЗЫГРЫШИ)
-========================================= */
 const BATTLE_COLORS = ['#FF9900', '#ffffff', '#ffaa33', '#cc7a00', '#ffc266', '#e68a00'];
 let battleState = resetBattleState();
 
@@ -178,9 +227,6 @@ setInterval(async () => {
     if (giveawaysUpdated) saveData();
 }, 15000);
 
-/* =========================================
-   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM
-========================================= */
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
     if (!tgId) return res.json({ success: false });
@@ -279,16 +325,6 @@ app.post('/api/steam/inventory', async (req, res) => {
     res.json({ success: false, error: 'Не удалось загрузить инвентарь.' });
 });
 
-app.get('/api/steam/price', async (req, res) => {
-    let skinName = req.query.name;
-    if (!skinName) return res.json({ success: true, price: 150 });
-    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
-    res.json({ success: true, price: 150 });
-});
-
-/* =========================================
-   API: P2P МАРКЕТПЛЕЙС
-========================================= */
 app.get('/api/market/items', (req, res) => res.json({ success: true, items: marketItems }));
 
 app.post('/api/market/add', (req, res) => {
@@ -341,56 +377,11 @@ app.post('/api/deals/buy', async (req, res) => {
 });
 
 /* =========================================
-   API: DMARKET РЫНОК ЧЕРЕЗ ПРОКСИ-АГЕНТА
+   API: ВЫДАЧА ИЗ ЗАКЭШИРОВАННОГО КАТАЛОГА
 ========================================= */
-app.get('/api/shop/items', async (req, res) => {
-    try {
-        let dmarketConfig = {
-            params: {
-                gameId: 'a8db',
-                limit: 40,
-                orderBy: 'best_discount',
-                orderDir: 'desc',
-                currency: 'USD'
-            },
-            headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
-            timeout: 10000
-        };
-
-        if (PROXY_URL) {
-            dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
-        }
-
-        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', dmarketConfig);
-
-        if (dmarketRes.data && dmarketRes.data.objects) {
-            const items = dmarketRes.data.objects.map(obj => {
-                const priceUsd = obj.price ? (obj.price.USD / 100) : 0;
-                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
-                
-                let discount = null;
-                if (obj.discount) {
-                    discount = `${obj.discount}%`;
-                } else if (obj.extra && obj.extra.discount) {
-                    discount = `${obj.extra.discount}%`;
-                }
-
-                return {
-                    id: obj.itemId || obj.gameId,
-                    name: obj.title,
-                    image: obj.image,
-                    price: priceRub,
-                    discount: discount
-                };
-            }).filter(i => i.price > 0);
-
-            return res.json({ success: true, items });
-        }
-        res.json({ success: true, items: [] });
-    } catch (e) {
-        console.error('⚠️ Ошибка загрузки рынка DMarket через прокси:', e.message);
-        res.json({ success: false, error: 'Не удалось загрузить каталог DMarket' });
-    }
+app.get('/api/shop/items', (req, res) => {
+    const items = cachedShopItems.length > 0 ? cachedShopItems : FALLBACK_SHOP_ITEMS;
+    res.json({ success: true, items });
 });
 
 app.post('/api/shop/buy', async (req, res) => {
@@ -438,9 +429,6 @@ app.post('/api/shop/buy', async (req, res) => {
     }
 });
 
-/* =========================================
-   API: ФИНАНСЫ (Пополнения, Выводы)
-========================================= */
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     try {
@@ -503,9 +491,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-/* =========================================
-   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ
-========================================= */
 bot.on('pre_checkout_query', async (query) => {
     try { await bot.answerPreCheckoutQuery(query.id, true); } catch (e) {}
 });
