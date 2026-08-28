@@ -2,6 +2,7 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -10,7 +11,10 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
+
+// Ваши ключи DMarket
 const DMARKET_PUBLIC_KEY = process.env.DMARKET_PUBLIC_KEY || '';
+const DMARKET_SECRET_KEY = process.env.DMARKET_SECRET_KEY || '';
 
 const USD_TO_RUB = 95;
 
@@ -46,14 +50,8 @@ let cachedShopItems = [];
 if (fs.existsSync(dbFile)) { try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} }
 if (fs.existsSync(cardsFile)) { try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} }
 
-// Загружаем сохраненный кэш реальных товаров DMarket при старте
 if (fs.existsSync(shopCacheFile)) {
-    try {
-        const fileData = fs.readFileSync(shopCacheFile, 'utf8');
-        cachedShopItems = JSON.parse(fileData);
-    } catch (e) {
-        cachedShopItems = [];
-    }
+    try { cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8')); } catch (e) { cachedShopItems = []; }
 }
 
 function saveData() { 
@@ -61,19 +59,48 @@ function saveData() {
 }
 
 /* =======================================================
-   РЕАЛЬНЫЙ ПАРСИНГ И КЭШИРОВАНИЕ ДАННЫХ С DMARKET API
+   ГЕНЕРАЦИЯ ПОДПИСИ ED25519 ДЛЯ DMARKET API
 ======================================================= */
+function generateDMarketSignature(method, pathUrl, bodyString, timestamp, secretKeyHex) {
+    try {
+        const privateKeyBuffer = Buffer.from(secretKeyHex, 'hex');
+        let derKey;
+        if (privateKeyBuffer.length === 32) {
+            const prefix = Buffer.from('302e02010030050603657004220420', 'hex');
+            derKey = Buffer.concat([prefix, privateKeyBuffer]);
+        } else if (privateKeyBuffer.length === 64) {
+            const prefix = Buffer.from('302e02010030050603657004220420', 'hex');
+            derKey = Buffer.concat([prefix, privateKeyBuffer.slice(0, 32)]);
+        } else {
+            derKey = privateKeyBuffer;
+        }
+        
+        const privateKey = crypto.createPrivateKey({ key: derKey, format: 'der', type: 'pkcs8' });
+        const message = Buffer.from(method + pathUrl + bodyString + timestamp, 'utf8');
+        const signature = crypto.sign(null, message, privateKey);
+        return signature.toString('hex');
+    } catch (e) {
+        console.error('Ошибка генерации подписи DMarket:', e.message);
+        return '';
+    }
+}
+
 async function fetchRealDmarketItems() {
     try {
+        const apiPath = '/exchange/v1/market/items?gameId=a8db&limit=100&orderBy=best_discount&orderDir=desc&currency=USD';
+        const method = 'GET';
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const signature = DMARKET_SECRET_KEY ? generateDMarketSignature(method, apiPath, '', timestamp, DMARKET_SECRET_KEY) : '';
+
+        let headers = {};
+        if (DMARKET_PUBLIC_KEY) {
+            headers['X-Api-Key'] = DMARKET_PUBLIC_KEY;
+            headers['X-Sign-Date'] = timestamp;
+            headers['X-Request-Sign'] = signature;
+        }
+
         let dmarketConfig = {
-            params: { 
-                gameId: 'a8db', // CS2
-                limit: 100, 
-                orderBy: 'best_discount', 
-                orderDir: 'desc', 
-                currency: 'USD' 
-            },
-            headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
+            headers,
             timeout: 12000
         };
 
@@ -81,12 +108,12 @@ async function fetchRealDmarketItems() {
             dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
         }
 
-        const response = await axios.get('https://api.dmarket.com/exchange/v1/market/items', dmarketConfig);
+        const response = await axios.get(`https://api.dmarket.com${apiPath}`, dmarketConfig);
 
         if (response && response.data && Array.isArray(response.data.objects) && response.data.objects.length > 0) {
             const realItems = response.data.objects.map(obj => {
                 const priceUsd = obj.price && obj.price.USD ? (obj.price.USD / 100) : 0;
-                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06); // Перевод в рубли + небольшая комиссия маркетплейса
+                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
                 
                 let discount = null;
                 if (obj.discount) {
@@ -107,15 +134,14 @@ async function fetchRealDmarketItems() {
             if (realItems.length > 0) {
                 cachedShopItems = realItems;
                 fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
-                console.log(`[DMarket] Успешно обновлено реальных товаров: ${realItems.length}`);
+                console.log(`[DMarket] Успешно загружено реальных товаров с подписью: ${realItems.length}`);
             }
         }
     } catch (error) {
-        console.error('[DMarket API Warning]: Не удалось обновить товары с DMarket. Используется сохраненный кэш.', error.message);
+        console.error('[DMarket API Warning]: Ошибка запроса.', error.response?.status, error.message);
     }
 }
 
-// Запускаем при старте и ставим интервал обновления ровно 1 час
 fetchRealDmarketItems();
 setInterval(fetchRealDmarketItems, 60 * 60 * 1000);
 
@@ -387,7 +413,6 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-// Отдаем реальные товары DMarket
 app.get('/api/shop/items', (req, res) => {
     res.json({ success: true, items: cachedShopItems });
 });
@@ -670,7 +695,7 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
