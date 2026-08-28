@@ -2,7 +2,6 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -11,9 +10,7 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || 'YOUR_ADMIN_CHAT_ID';
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
-
 const DMARKET_PUBLIC_KEY = process.env.DMARKET_PUBLIC_KEY || '';
-const DMARKET_SECRET_KEY = process.env.DMARKET_SECRET_KEY || '';
 
 const USD_TO_RUB = 95;
 
@@ -30,12 +27,7 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
-    const indexPath = path.join(__dirname, 'index.html');
-    if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(404).send('Файл index.html не найден в корне проекта!');
-    }
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 const dataDir = '/data';
@@ -45,98 +37,26 @@ if (!fs.existsSync(dataDir)) {
 
 const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : path.join(__dirname, 'database.json');
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
-const shopCacheFile = fs.existsSync(dataDir) ? path.join(dataDir, 'shopCache.json') : path.join(__dirname, 'shopCache.json');
+const pricesFile = fs.existsSync(dataDir) ? path.join(dataDir, 'pricesCache.json') : path.join(__dirname, 'pricesCache.json');
 
 let db = { users: {}, marketItems: [], giveaways: [], chats: [] };
 let cards = [];
-let cachedShopItems = [];
+let pricesCache = {}; 
 
 if (fs.existsSync(dbFile)) { try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} }
 if (fs.existsSync(cardsFile)) { try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} }
+if (fs.existsSync(pricesFile)) { try { pricesCache = JSON.parse(fs.readFileSync(pricesFile, 'utf8')); } catch (e) {} }
 
-if (fs.existsSync(shopCacheFile)) {
-    try { cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8')); } catch (e) { cachedShopItems = []; }
-}
+let users = db.users || {};
+let marketItems = db.marketItems || [];
+let giveaways = db.giveaways || [];
+let chats = db.chats || [];
+let cardIndexRu = 0;
+let cardIndexUz = 0;
 
 function saveData() { 
     try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats }, null, 2)); } catch (e) {} 
 }
-
-/* =======================================================
-   РЕАЛЬНАЯ ПОДПИСЬ И ЗАПРОС К DMARKET API (БЕЗ ЗАГЛУШЕК)
-======================================================= */
-function generateDMarketSignature(method, pathUrl, bodyString, timestamp, secretKeyHex) {
-    try {
-        if (!secretKeyHex) return '';
-        const cleanKey = secretKeyHex.trim();
-        const privateKeyBuffer = Buffer.from(cleanKey, 'hex');
-        if (privateKeyBuffer.length < 32) return '';
-
-        const seed = privateKeyBuffer.length >= 64 ? privateKeyBuffer.slice(0, 32) : privateKeyBuffer;
-        const derPrefix = Buffer.from('302e02010030050603657004220420', 'hex');
-        const derKey = Buffer.concat([derPrefix, seed]);
-        
-        const privateKey = crypto.createPrivateKey({ key: derKey, format: 'der', type: 'pkcs8' });
-        const message = Buffer.from(method + pathUrl + bodyString + timestamp, 'utf8');
-        const signature = crypto.sign(null, message, privateKey);
-        return signature.toString('hex');
-    } catch (e) {
-        console.error('❌ Ошибка генерации подписи Ed25519:', e.message);
-        return '';
-    }
-}
-
-async function fetchRealDmarketItems() {
-    try {
-        const apiPath = '/marketplace-api/v1/market-items?gameId=a8db&limit=50&orderBy=best_discount&orderDir=desc&currency=USD';
-        const method = 'GET';
-        const timestamp = Math.floor(Date.now() / 1000).toString();
-        const signature = DMARKET_SECRET_KEY ? generateDMarketSignature(method, apiPath, '', timestamp, DMARKET_SECRET_KEY) : '';
-
-        let headers = {};
-        if (DMARKET_PUBLIC_KEY) {
-            headers['X-Api-Key'] = DMARKET_PUBLIC_KEY;
-            headers['X-Sign-Date'] = timestamp;
-            if (signature) {
-                headers['X-Request-Sign'] = `dmar ed25519 ${signature}`;
-            }
-        }
-
-        let axiosConfig = { headers, timeout: 12000 };
-        if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
-
-        const response = await axios.get(`https://api.dmarket.com${apiPath}`, axiosConfig);
-
-        if (response && response.data && Array.isArray(response.data.objects) && response.data.objects.length > 0) {
-            const realItems = response.data.objects.map(obj => {
-                const priceUsd = obj.price && obj.price.USD ? (obj.price.USD / 100) : 0;
-                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
-                let discount = obj.discount ? `${obj.discount}%` : (obj.extra?.discount ? `${obj.extra.discount}%` : null);
-
-                return {
-                    id: obj.itemId || obj.gameId || String(Math.random()),
-                    name: obj.title || 'CS2 Item',
-                    image: obj.image || '',
-                    price: priceRub,
-                    discount: discount
-                };
-            }).filter(i => i.price > 0 && i.image);
-
-            if (realItems.length > 0) {
-                cachedShopItems = realItems;
-                fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
-                console.log(`[DMarket] Успешно загружено реальных товаров: ${realItems.length}`);
-            }
-        }
-    } catch (error) {
-        console.error('[DMarket API Error]: Не удалось загрузить товары.', error.response?.status, error.response?.data || error.message);
-    }
-}
-
-fetchRealDmarketItems();
-setInterval(fetchRealDmarketItems, 60 * 60 * 1000);
-
-/* ======================================================= */
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
     const now = Date.now();
@@ -179,6 +99,9 @@ function isAdmin(msg) {
     return userId === adminId || chatId === adminId;
 }
 
+/* =========================================
+   ФОНОВЫЕ ПРОЦЕССЫ (БИТВЫ И РОЗЫГРЫШИ)
+========================================= */
 const BATTLE_COLORS = ['#FF9900', '#ffffff', '#ffaa33', '#cc7a00', '#ffc266', '#e68a00'];
 let battleState = resetBattleState();
 
@@ -255,6 +178,9 @@ setInterval(async () => {
     if (giveawaysUpdated) saveData();
 }, 15000);
 
+/* =========================================
+   API: ПРОФИЛЬ, БИТВЫ, РОЗЫГРЫШИ, STEAM
+========================================= */
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
     if (!tgId) return res.json({ success: false });
@@ -339,9 +265,12 @@ app.post('/api/steam/inventory', async (req, res) => {
             timeout: 10000
         };
 
-        if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+        if (PROXY_URL) {
+            axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+        }
 
         const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, axiosConfig);
+        
         if (invRes?.data?.success && invRes.data.assets?.length > 0) {
             return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
         }
@@ -350,6 +279,16 @@ app.post('/api/steam/inventory', async (req, res) => {
     res.json({ success: false, error: 'Не удалось загрузить инвентарь.' });
 });
 
+app.get('/api/steam/price', async (req, res) => {
+    let skinName = req.query.name;
+    if (!skinName) return res.json({ success: true, price: 150 });
+    if (pricesCache[skinName]) return res.json({ success: true, price: pricesCache[skinName].price });
+    res.json({ success: true, price: 150 });
+});
+
+/* =========================================
+   API: P2P МАРКЕТПЛЕЙС
+========================================= */
 app.get('/api/market/items', (req, res) => res.json({ success: true, items: marketItems }));
 
 app.post('/api/market/add', (req, res) => {
@@ -401,9 +340,57 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-// Отдаем реальные товары из кэша DMarket без заглушек
-app.get('/api/shop/items', (req, res) => {
-    res.json({ success: true, items: cachedShopItems });
+/* =========================================
+   API: DMARKET РЫНОК ЧЕРЕЗ ПРОКСИ-АГЕНТА
+========================================= */
+app.get('/api/shop/items', async (req, res) => {
+    try {
+        let dmarketConfig = {
+            params: {
+                gameId: 'a8db',
+                limit: 40,
+                orderBy: 'best_discount',
+                orderDir: 'desc',
+                currency: 'USD'
+            },
+            headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
+            timeout: 10000
+        };
+
+        if (PROXY_URL) {
+            dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+        }
+
+        const dmarketRes = await axios.get('https://api.dmarket.com/exchange/v1/market/items', dmarketConfig);
+
+        if (dmarketRes.data && dmarketRes.data.objects) {
+            const items = dmarketRes.data.objects.map(obj => {
+                const priceUsd = obj.price ? (obj.price.USD / 100) : 0;
+                const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
+                
+                let discount = null;
+                if (obj.discount) {
+                    discount = `${obj.discount}%`;
+                } else if (obj.extra && obj.extra.discount) {
+                    discount = `${obj.extra.discount}%`;
+                }
+
+                return {
+                    id: obj.itemId || obj.gameId,
+                    name: obj.title,
+                    image: obj.image,
+                    price: priceRub,
+                    discount: discount
+                };
+            }).filter(i => i.price > 0);
+
+            return res.json({ success: true, items });
+        }
+        res.json({ success: true, items: [] });
+    } catch (e) {
+        console.error('⚠️ Ошибка загрузки рынка DMarket через прокси:', e.message);
+        res.json({ success: false, error: 'Не удалось загрузить каталог DMarket' });
+    }
 });
 
 app.post('/api/shop/buy', async (req, res) => {
@@ -451,6 +438,9 @@ app.post('/api/shop/buy', async (req, res) => {
     }
 });
 
+/* =========================================
+   API: ФИНАНСЫ (Пополнения, Выводы)
+========================================= */
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     try {
@@ -513,6 +503,9 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
+/* =========================================
+   ТЕЛЕГРАМ СОБЫТИЯ И КОМАНДЫ
+========================================= */
 bot.on('pre_checkout_query', async (query) => {
     try { await bot.answerPreCheckoutQuery(query.id, true); } catch (e) {}
 });
@@ -617,7 +610,7 @@ bot.on('message', async (msg) => {
         giveaways.push({
             _id: Date.now().toString(), title, sponsor, sponsorUsername, timerText, endTime,
             ended: false, winnerTgId: null, winnerUsername: null, winnerTradeUrl: null,
-            image: 'https://community.cloudflare.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEedQBfErzrDv2k0kRMu3gT_9hu3gxi/360fx360f',
+            image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
             participantsCount: 0, participants: []
         });
         saveData();
@@ -684,7 +677,5 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
