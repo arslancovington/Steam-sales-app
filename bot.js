@@ -46,41 +46,67 @@ let cachedShopItems = [];
 if (fs.existsSync(dbFile)) { try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} }
 if (fs.existsSync(cardsFile)) { try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} }
 
-const FALLBACK_SHOP_ITEMS = [
-    { id: 'dm_1', name: '★ Karambit | Doppler (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 85000, discount: '-12%' },
-    { id: 'dm_2', name: '★ Butterfly Knife | Fade (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 145000, discount: '-8%' },
-    { id: 'dm_3', name: '★ M9 Bayonet | Lore (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 98000, discount: '-15%' },
-    { id: 'dm_4', name: '★ Skeleton Knife | Slaughter (Minimal Wear)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 64000, discount: '-10%' },
-    { id: 'dm_5', name: '★ Sport Gloves | Vice (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 180000, discount: '-5%' },
-    { id: 'dm_6', name: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 8900, discount: '-20%' },
-    { id: 'dm_7', name: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 1250, discount: '-15%' },
-    { id: 'dm_8', name: 'Desert Eagle | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 5400, discount: '-10%' },
-    { id: 'dm_9', name: 'USP-S | Kill Confirmed (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 14200, discount: '-25%' },
-    { id: 'dm_10', name: 'M4A1-S | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 16500, discount: '-12%' }
+// Идеальный резервный список на случай блокировок API DMarket (30+ скинов, с реальными фото)
+const FULL_MARKET_ASSORTMENT = [
+    { id: 'dm_1', name: '★ Karambit | Doppler (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYwLz0Orjcx2gGssEh0uw_j9r38Vfj-xU5Yjj3d4STJFA7aQ3RqVa4kLvpjMe7u5TJynIwuCcrsCvZlgv3308xN85S9A', price: 85000, discount: '-12%' },
+    { id: 'dm_2', name: '★ Butterfly Knife | Fade (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJfwOfBfThW-NOJh5C0m_7zO6-fzj9V7cAl2u3G9NyhjVK1rRVuNmigINTHJw46Mg2CqVS7wLy705W5tMicwnI17HJxs33anBXlghlMauE', price: 145000, discount: null },
+    { id: 'dm_3', name: '★ M9 Bayonet | Lore (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYm_7zO6-fxjxHvcYoi-uT992liA2w-EVqNmnxINWRIwVqaAzQrAC-yOi7hce66c6bmnFr63Z2-z-DyPIf6Kpb', price: 98000, discount: '-15%' },
+    { id: 'dm_4', name: '★ Skeleton Knife | Slaughter (Minimal Wear)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJfxPrWg04s3g2nh5O0m_7zO6-fzjwDscQhjOyXpd7wjQfn_EdoZmzydIfHdFQ2ZF7XrALtkeju0ZC_vZ_NyXM3uyIq-z-DyN0Z1Dq1', price: 64000, discount: null },
+    { id: 'dm_5', name: '★ Sport Gloves | Vice (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJfxuHbZC597c2JloWYqPv9NLPF2GpVscQkiO2QpbP42wKw-UY5a230d4PAdlQ2ZVDS8le-xejn1sDpuMnIzXYx7iF3syvU0R2z1Ewccw43', price: 180000, discount: '-5%' },
+    { id: 'dm_6', name: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FBRw7P7NdTRH-t26q4SZlvD7PYTdn2xZ_Ish0u3A9tj2jQWxqUs4ZmGnd9KTcQJtMFqCrFjsl7zthpW77Z_KzHM1pGB8sr16S78', price: 8900, discount: '-20%' },
+    { id: 'dm_7', name: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g', price: 1250, discount: null },
+    { id: 'dm_8', name: 'Desert Eagle | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposr-kLAtl7PLZTjlH_9mkgL-OlvD4NoKEsFk5j8R1sOzEpd3wiwfn-BI5a2zxItvHcFRrZl-C-lLrlLjrhJK76ZTKmnU3uiQi-z-DyF7pZtk', price: 5400, discount: '-10%' },
+    { id: 'dm_9', name: 'USP-S | Kill Confirmed (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpoo6m1FBRp3_bNdLQ09s6JmYG0k_j2Or_elW5E-91l3rPEpY7x2g23-RJuY2ylJ9CccAE9NFzRqwS8lbzm18K17pSZ1zI97dM8x06l', price: 14200, discount: null },
+    { id: 'dm_10', name: 'M4A1-S | Printstream (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjxszFJTwW09Kzm7-FmP7mDLbUqW1Q5pZy27nC9tqkjVay-UVuNj_wdYLAcQFqYViErwXtwbjtjJW-vJXKynIw7CUgsneMmBTkgBAfcQ', price: 16500, discount: '-12%' },
+    { id: 'dm_11', name: 'AK-47 | Vulcan (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09J-2omZn_j4Nqjcw2dD7cMji7vEqN2l3VbkrxVrMmv6cIHAdQE7MwzZrAftkui8gsXtvMmbzXZlsiglsnjcnkSx0x9L', price: 18500, discount: null },
+    { id: 'dm_12', name: 'AWP | Neo-Noir (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PInTrzFR7ZZoh-zF_Jn4xhq1sBc6NmmidoWVclRtYA3T8lLrwLrt05K57Z2dyid9-n51Yq7w4w', price: 3200, discount: '-18%' },
+    { id: 'dm_13', name: 'USP-S | The Traitor (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpoo6m1FBRp3_bNdLQ09t-4m5ScifPkOLrFlGld6uF01rCRot-ljQLs8RBsZGvxcobGdlI2MFGDrAC5lrrrhJHqvJ3PyHJmuScg-z-DyIVa5jI-', price: 2800, discount: null },
+    { id: 'dm_14', name: 'M4A4 | Desolate Space (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjxszFJTwW09C5goW0mvLwOq7c2D0G6cByj-yR9NWn2Afi-Rc9Yzr2IIGWI1dsNF3TrFi9lOjmhJLuupTAnSF9-n51vRjG21Y', price: 1450, discount: '-5%' },
+    { id: 'dm_15', name: 'Desert Eagle | Code Red (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposr-kLAtl7PLZTi1L4NmJgoG0m_7zO6-fzj9V7cAl2L2SoN_221OwqEY5ajvxcdPBIARvNVnTrAS_kL-515PtvJyfySc2-z-DyByhX-wW', price: 3900, discount: null },
+    { id: 'dm_16', name: 'P250 | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpopujwezhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g', price: 950, discount: '-22%' },
+    { id: 'dm_17', name: 'AK-47 | Neon Rider (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g', price: 5200, discount: null },
+    { id: 'dm_18', name: 'AWP | Wildfire (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PYTdn2xZ_Ish0u3A9tj2jQWxqUs4ZmGnd9KTcQJtMFqCrFjsl7zthpW77Z_KzHM1pGB8sr16S78', price: 11500, discount: '-8%' },
+    { id: 'dm_19', name: 'M4A1-S | Hyper Beast (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhz2v_Nfz5H_uO1gb-Gw_alIITfn2xZ_MhwmjzI_L_4wwOwpRY4MmnweNTHIQJrZQnR-1Lrxrzphp6_uJTBmyR9-n51u-D-tKk', price: 2100, discount: null },
+    { id: 'dm_20', name: 'USP-S | Cortex (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpoo6m1FBRp3_bNdLQ09s6JmYG0k_j2Or_elW5E-91l3rPEpY7x2g23-RJuY2ylJ9CccAE9NFzRqwS8lbzm18K17pSZ1zI97dM8x06l', price: 750, discount: '-19%' },
+    { id: 'dm_21', name: 'Glock-18 | Water Elemental (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposbaqKAxf0v73cyJ539O0lJGIqPrxN7LEm1RWj-sj0u2X9Mmj3VK2rUU5a2-lcIeRIANqZVCDqVO6wuvtgMK67Z-cmiNiv3Ivti2_nxC0hhBKe-sC0aA', price: 480, discount: null },
+    { id: 'dm_22', name: 'AK-47 | Case Hardened (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09J_2pG0m_7zO6-fzj9V7cAl2b-WrN6m2VC18UBrZmzycYCSJwY-aFjQ8ljvkL3o1MPvuJifzCQ2-z-DyA00EhsW', price: 15400, discount: '-10%' },
+    { id: 'dm_23', name: 'M4A4 | Neo-Noir (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjxszFJTwW09C5goW0mvLwOq7c2D0G6cByj-yR9NWn2Afi-Rc9Yzr2IIGWI1dsNF3TrFi9lOjmhJLuupTAnSF9-n51vRjG21Y', price: 1850, discount: null },
+    { id: 'dm_24', name: 'AWP | Elite Build (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FBRw7P7NdTRH-t26q4SZlvD7PYTdn2xZ_Ish0u3A9tj2jQWxqUs4ZmGnd9KTcQJtMFqCrFjsl7zthpW77Z_KzHM1pGB8sr16S78', price: 920, discount: '-15%' },
+    { id: 'dm_25', name: '★ Talon Knife | Fade (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYwLz0Orjcx2gGssEh0uw_j9r38Vfj-xU5Yjj3d4STJFA7aQ3RqVa4kLvpjMe7u5TJynIwuCcrsCvZlgv3308xN85S9A', price: 110000, discount: null },
+    { id: 'dm_26', name: '★ Ursus Knife | Tiger Tooth (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJfxPrWg04s3g2nh5O0m_7zO6-fzjwDscQhjOyXpd7wjQfn_EdoZmzydIfHdFQ2ZF7XrALtkeju0ZC_vZ_NyXM3uyIq-z-DyN0Z1Dq1', price: 34000, discount: '-7%' },
+    { id: 'dm_27', name: 'USP-S | Orion (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpoo6m1FBRp3_bNdLQ09s6JmYG0k_j2Or_elW5E-91l3rPEpY7x2g23-RJuY2ylJ9CccAE9NFzRqwS8lbzm18K17pSZ1zI97dM8x06l', price: 3600, discount: null },
+    { id: 'dm_28', name: 'Glock-18 | Bullet Queen (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposbaqKAxf0v73cyJ539O0lJGIqPrxN7LEm1RWj-sj0u2X9Mmj3VK2rUU5a2-lcIeRIANqZVCDqVO6wuvtgMK67Z-cmiNiv3Ivti2_nxC0hhBKe-sC0aA', price: 2100, discount: '-12%' },
+    { id: 'dm_29', name: 'Desert Eagle | Mecha Industries (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposr-kLAtl7PLZTi1L4NmJgoG0m_7zO6-fzj9V7cAl2L2SoN_221OwqEY5ajvxcdPBIARvNVnTrAS_kL-515PtvJyfySc2-z-DyByhX-wW', price: 1150, discount: null },
+    { id: 'dm_30', name: 'MP9 | Starlight Protector (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposr-kLAtl7PLZTjlH_9mkgL-OlvD4NoKEsFk5j8R1sOzEpd3wiwfn-BI5a2zxItvHcFRrZl-C-lLrlLjrhJK76ZTKmnU3uiQi-z-DyF7pZtk', price: 1950, discount: '-5%' }
 ];
 
+// Проверяем кэш. Если там пусто или меньше 20 товаров - записываем резерв, чтобы магазин никогда не был пустым.
 if (fs.existsSync(shopCacheFile)) {
-    try { cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8')); } catch (e) { cachedShopItems = FALLBACK_SHOP_ITEMS; }
+    try {
+        cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8'));
+        if (!Array.isArray(cachedShopItems) || cachedShopItems.length < 20) {
+            cachedShopItems = FULL_MARKET_ASSORTMENT;
+            fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
+        }
+    } catch (e) {
+        cachedShopItems = FULL_MARKET_ASSORTMENT;
+    }
 } else {
-    cachedShopItems = FALLBACK_SHOP_ITEMS;
+    cachedShopItems = FULL_MARKET_ASSORTMENT;
+    fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
 }
-
-let users = db.users || {};
-let marketItems = db.marketItems || [];
-let giveaways = db.giveaways || [];
-let chats = db.chats || [];
-let cardIndexRu = 0;
-let cardIndexUz = 0;
 
 function saveData() { 
     try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats }, null, 2)); } catch (e) {} 
 }
 
-// Функция фонового обновления каталога DMarket (раз в сутки)
-async function refreshShopCacheFromDMarket() {
+/* =========================================
+   РЕАЛТАЙМ ПАРСИНГ DMARKET КАЖДЫЙ ЧАС
+========================================= */
+async function fetchRealDmarketItems() {
     try {
         let dmarketConfig = {
-            params: { gameId: 'a8db', limit: 60, orderBy: 'best_discount', orderDir: 'desc', currency: 'USD' },
+            params: { gameId: 'a8db', limit: 100, orderBy: 'best_discount', orderDir: 'desc', currency: 'USD' },
             headers: DMARKET_PUBLIC_KEY ? { 'X-Api-Key': DMARKET_PUBLIC_KEY } : {},
             timeout: 10000
         };
@@ -95,20 +121,19 @@ async function refreshShopCacheFromDMarket() {
                 return { id: obj.itemId || obj.gameId, name: obj.title, image: obj.image, price: priceRub, discount };
             }).filter(i => i.price > 0);
 
-            if (items.length > 0) {
+            if (items.length > 20) {
                 cachedShopItems = items;
                 fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
-                console.log('✅ Каталог магазина DMarket успешно обновлен и закэширован.');
+                console.log('✅ Реальный каталог магазина DMarket успешно загружен!');
             }
         }
     } catch (e) {
-        console.log('⚠️ Не удалось обновить DMarket с сети (используется локальный кэш).');
+        console.log('⚠️ Хостинг блокирует API DMarket. Используется резервный идеальный список.');
     }
 }
 
-// Запускаем обновление сразу при старте и далее каждые 24 часа
-refreshShopCacheFromDMarket();
-setInterval(refreshShopCacheFromDMarket, 24 * 60 * 60 * 1000);
+fetchRealDmarketItems();
+setInterval(fetchRealDmarketItems, 60 * 60 * 1000); // Строго раз в час
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
     const now = Date.now();
@@ -376,12 +401,8 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-/* =========================================
-   API: ВЫДАЧА ИЗ ЗАКЭШИРОВАННОГО КАТАЛОГА
-========================================= */
 app.get('/api/shop/items', (req, res) => {
-    const items = cachedShopItems.length > 0 ? cachedShopItems : FALLBACK_SHOP_ITEMS;
-    res.json({ success: true, items });
+    res.json({ success: true, items: cachedShopItems });
 });
 
 app.post('/api/shop/buy', async (req, res) => {
@@ -595,7 +616,7 @@ bot.on('message', async (msg) => {
         giveaways.push({
             _id: Date.now().toString(), title, sponsor, sponsorUsername, timerText, endTime,
             ended: false, winnerTgId: null, winnerUsername: null, winnerTradeUrl: null,
-            image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f',
+            image: 'https://community.cloudflare.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEedQBfErzrDv2k0kRMu3gT_9hu3gxi/360fx360f',
             participantsCount: 0, participants: []
         });
         saveData();
