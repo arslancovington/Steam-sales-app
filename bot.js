@@ -12,7 +12,6 @@ const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN || '';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
 
-// Ваши ключи DMarket
 const DMARKET_PUBLIC_KEY = process.env.DMARKET_PUBLIC_KEY || '';
 const DMARKET_SECRET_KEY = process.env.DMARKET_SECRET_KEY || '';
 
@@ -31,7 +30,12 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    const indexPath = path.join(__dirname, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('Файл index.html не найден в корне проекта!');
+    }
 });
 
 const dataDir = '/data';
@@ -59,35 +63,32 @@ function saveData() {
 }
 
 /* =======================================================
-   ГЕНЕРАЦИЯ ПОДПИСИ ED25519 ДЛЯ DMARKET API
+   РЕАЛЬНАЯ ПОДПИСЬ И ЗАПРОС К DMARKET API (БЕЗ ЗАГЛУШЕК)
 ======================================================= */
 function generateDMarketSignature(method, pathUrl, bodyString, timestamp, secretKeyHex) {
     try {
-        const privateKeyBuffer = Buffer.from(secretKeyHex, 'hex');
-        let derKey;
-        if (privateKeyBuffer.length === 32) {
-            const prefix = Buffer.from('302e02010030050603657004220420', 'hex');
-            derKey = Buffer.concat([prefix, privateKeyBuffer]);
-        } else if (privateKeyBuffer.length === 64) {
-            const prefix = Buffer.from('302e02010030050603657004220420', 'hex');
-            derKey = Buffer.concat([prefix, privateKeyBuffer.slice(0, 32)]);
-        } else {
-            derKey = privateKeyBuffer;
-        }
+        if (!secretKeyHex) return '';
+        const cleanKey = secretKeyHex.trim();
+        const privateKeyBuffer = Buffer.from(cleanKey, 'hex');
+        if (privateKeyBuffer.length < 32) return '';
+
+        const seed = privateKeyBuffer.length >= 64 ? privateKeyBuffer.slice(0, 32) : privateKeyBuffer;
+        const derPrefix = Buffer.from('302e02010030050603657004220420', 'hex');
+        const derKey = Buffer.concat([derPrefix, seed]);
         
         const privateKey = crypto.createPrivateKey({ key: derKey, format: 'der', type: 'pkcs8' });
         const message = Buffer.from(method + pathUrl + bodyString + timestamp, 'utf8');
         const signature = crypto.sign(null, message, privateKey);
         return signature.toString('hex');
     } catch (e) {
-        console.error('Ошибка генерации подписи DMarket:', e.message);
+        console.error('❌ Ошибка генерации подписи Ed25519:', e.message);
         return '';
     }
 }
 
 async function fetchRealDmarketItems() {
     try {
-        const apiPath = '/exchange/v1/market/items?gameId=a8db&limit=100&orderBy=best_discount&orderDir=desc&currency=USD';
+        const apiPath = '/marketplace-api/v1/market-items?gameId=a8db&limit=50&orderBy=best_discount&orderDir=desc&currency=USD';
         const method = 'GET';
         const timestamp = Math.floor(Date.now() / 1000).toString();
         const signature = DMARKET_SECRET_KEY ? generateDMarketSignature(method, apiPath, '', timestamp, DMARKET_SECRET_KEY) : '';
@@ -96,31 +97,21 @@ async function fetchRealDmarketItems() {
         if (DMARKET_PUBLIC_KEY) {
             headers['X-Api-Key'] = DMARKET_PUBLIC_KEY;
             headers['X-Sign-Date'] = timestamp;
-            headers['X-Request-Sign'] = signature;
+            if (signature) {
+                headers['X-Request-Sign'] = `dmar ed25519 ${signature}`;
+            }
         }
 
-        let dmarketConfig = {
-            headers,
-            timeout: 12000
-        };
+        let axiosConfig = { headers, timeout: 12000 };
+        if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
 
-        if (PROXY_URL) {
-            dmarketConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
-        }
-
-        const response = await axios.get(`https://api.dmarket.com${apiPath}`, dmarketConfig);
+        const response = await axios.get(`https://api.dmarket.com${apiPath}`, axiosConfig);
 
         if (response && response.data && Array.isArray(response.data.objects) && response.data.objects.length > 0) {
             const realItems = response.data.objects.map(obj => {
                 const priceUsd = obj.price && obj.price.USD ? (obj.price.USD / 100) : 0;
                 const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
-                
-                let discount = null;
-                if (obj.discount) {
-                    discount = `${obj.discount}%`;
-                } else if (obj.extra && obj.extra.discount) {
-                    discount = `${obj.extra.discount}%`;
-                }
+                let discount = obj.discount ? `${obj.discount}%` : (obj.extra?.discount ? `${obj.extra.discount}%` : null);
 
                 return {
                     id: obj.itemId || obj.gameId || String(Math.random()),
@@ -134,11 +125,11 @@ async function fetchRealDmarketItems() {
             if (realItems.length > 0) {
                 cachedShopItems = realItems;
                 fs.writeFileSync(shopCacheFile, JSON.stringify(cachedShopItems, null, 2));
-                console.log(`[DMarket] Успешно загружено реальных товаров с подписью: ${realItems.length}`);
+                console.log(`[DMarket] Успешно загружено реальных товаров: ${realItems.length}`);
             }
         }
     } catch (error) {
-        console.error('[DMarket API Warning]: Ошибка запроса.', error.response?.status, error.message);
+        console.error('[DMarket API Error]: Не удалось загрузить товары.', error.response?.status, error.response?.data || error.message);
     }
 }
 
@@ -348,12 +339,9 @@ app.post('/api/steam/inventory', async (req, res) => {
             timeout: 10000
         };
 
-        if (PROXY_URL) {
-            axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
-        }
+        if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
 
         const invRes = await axios.get(`https://steamcommunity.com/inventory/${steamId}/730/2?l=russian&count=75`, axiosConfig);
-        
         if (invRes?.data?.success && invRes.data.assets?.length > 0) {
             return res.json({ success: true, items: invRes.data.assets, descriptions: invRes.data.descriptions });
         }
@@ -413,6 +401,7 @@ app.post('/api/deals/buy', async (req, res) => {
     res.json({ success: true, newBalance: buyer.balance });
 });
 
+// Отдаем реальные товары из кэша DMarket без заглушек
 app.get('/api/shop/items', (req, res) => {
     res.json({ success: true, items: cachedShopItems });
 });
