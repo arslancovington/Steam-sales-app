@@ -5,7 +5,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
-// Защита от падений сервера
+// Защита от падений сервера (предотвращение 502 ошибок на Render)
 process.on('uncaughtException', (err) => console.error('⚠️ [CRITICAL] Uncaught Exception:', err.message));
 process.on('unhandledRejection', (reason) => console.error('⚠️ [CRITICAL] Unhandled Rejection:', reason));
 
@@ -51,8 +51,11 @@ let chats = [];
 let shopCatalog = []; 
 let cards = [];
 
+// Базовый каталог-страховка
 const DEFAULT_CATALOG = [
-    { id: '1', name: '★ Karambit | Doppler (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYwLz0Orjcx2gGssEh0uw_j9r38Vfj-xU5Yjj3d4STJFA7aQ3RqVa4kLvpjMe7u5TJynIwuCcrsCvZlgv3308xN85S9A/360fx360f', price: 85000, discount: '-12%' }
+    { id: '1', name: '★ Karambit | Doppler (Factory New)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYwLz0Orjcx2gGssEh0uw_j9r38Vfj-xU5Yjj3d4STJFA7aQ3RqVa4kLvpjMe7u5TJynIwuCcrsCvZlgv3308xN85S9A/360fx360f', price: 85000, discount: '-12%' },
+    { id: '2', name: 'AWP | Asiimov (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FBRw7P7NdTRH-t26q4SZlvD7PYTdn2xZ_Ish0u3A9tj2jQWxqUs4ZmGnd9KTcQJtMFqCrFjsl7zthpW77Z_KzHM1pGB8sr16S78/360fx360f', price: 8900, discount: '-20%' },
+    { id: '3', name: 'AK-47 | Redline (Field-Tested)', image: 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV092lnYmOhcj5Nr_Yg2ZU7PFohO_J9o-j2Vfk8hVtNjjwJ9ORfVFvY1-G_wO7x-_u1sS5uJ6ayXswuSM8pGGKYW964g/360fx360f', price: 1250, discount: null }
 ];
 
 if (fs.existsSync(dbFile)) { 
@@ -116,7 +119,7 @@ function isAdmin(msg) {
     return userId === adminId || chatId === adminId;
 }
 
-// Королевская битва и розыгрыши (фоновый интервал)
+// Королевская битва и розыгрыши
 const BATTLE_COLORS = ['#FF9900', '#ffffff', '#ffaa33', '#cc7a00', '#ffc266', '#e68a00'];
 let battleState = { id: Date.now().toString(), status: 'waiting', participants: [], bank: 0, startTime: null, rollEndTime: null, winnerTgId: null, winnerPrize: 0 };
 
@@ -138,7 +141,7 @@ setInterval(async () => {
             if (winner) {
                 winner.balance += battleState.winnerPrize;
                 saveData();
-                try { await bot.sendMessage(battleState.winnerTgId, `🏆 Поздравляем! Вы выиграли Королевскую битву и получили куш: ${battleState.winnerPrize} ₽ на баланс Skin Hub!`); } catch (e) {}
+                try { await bot.sendMessage(battleState.winnerTgId, `🏆 Поздравляем! Вы выиграли Королевскую битву: ${battleState.winnerPrize} ₽`); } catch (e) {}
             }
         }
         setTimeout(() => { battleState = { id: Date.now().toString(), status: 'waiting', participants: [], bank: 0, startTime: null, rollEndTime: null, winnerTgId: null, winnerPrize: 0 }; }, 7000);
@@ -156,7 +159,7 @@ setInterval(async () => {
                 g.winnerTradeUrl = winnerUser ? (winnerUser.tradeUrl || 'Не указан') : 'Не указан';
                 try { bot.sendMessage(winnerId, `🎉 Вы выиграли в розыгрыше: *${g.title}*!`, { parse_mode: 'Markdown' }); } catch (e) {}
                 if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                    try { bot.sendMessage(ADMIN_CHAT_ID, `🎁 Розыгрыш завершен!\n🏆 Приз: *${g.title}*\n👤 Победитель: @${g.winnerUsername} (ID: \`${winnerId}\`)\n🔗 Трейд: \`${g.winnerTradeUrl}\``, { parse_mode: 'Markdown' }); } catch (e) {}
+                    try { bot.sendMessage(ADMIN_CHAT_ID, `🎁 Розыгрыш завершен!\n🏆 Приз: *${g.title}*\n👤 Победитель: @${g.winnerUsername}`, { parse_mode: 'Markdown' }); } catch (e) {}
                 }
             }
         }
@@ -164,7 +167,7 @@ setInterval(async () => {
     if (giveawaysUpdated) saveData();
 }, 15000);
 
-// API эндпоинты для WebApp
+// API эндпоинты
 app.get('/api/user/profile', (req, res) => {
     const { tgId, tgUser, photoUrl } = req.query;
     if (!tgId) return res.json({ success: false });
@@ -232,10 +235,7 @@ app.post('/api/steam/inventory', async (req, res) => {
 
     try {
         let axiosConfig = {
-            headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept-Language': 'ru-RU,ru;q=0.9',
-            },
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language': 'ru-RU,ru;q=0.9' },
             timeout: 10000
         };
         if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
@@ -290,11 +290,10 @@ app.post('/api/deals/buy', async (req, res) => {
     marketItems.splice(itemIndex, 1);
     saveData();
 
-    try { await bot.sendMessage(item.tgId, `🎉 Ваш лот P2P "${item.name}" куплен за ${item.price} ₽!`); } catch (e) {}
+    try { await bot.sendMessage(item.tgId, `🎉 Ваш лот P2P "${item.name}" куплен!`); } catch (e) {}
     res.json({ success: true, newBalance: buyer.balance });
 });
 
-// Магазин (каталог с парсером)
 app.get('/api/shop/items', (req, res) => res.json({ success: true, items: shopCatalog }));
 
 app.post('/api/shop/buy', async (req, res) => {
@@ -323,7 +322,6 @@ app.post('/api/shop/buy', async (req, res) => {
     }
 });
 
-// Пополнения и вывод
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
     try {
@@ -384,7 +382,6 @@ app.post('/api/billing/withdraw', async (req, res) => {
     }
 });
 
-// Обработка команд Telegram бота и парсера
 bot.on('message', async (msg) => {
     const text = msg.text || '';
     if (!text) return;
@@ -402,10 +399,10 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // --- ПАРСЕР СКИНОВ ОТ 1000 РУБЛЕЙ ---
+    // Улучшенный универсальный парсер без ошибок типов
     if (text.toLowerCase() === '/parser') {
         if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
-        await bot.sendMessage(msg.chat.id, '⏳ Подключаюсь к базе Steam... Загружаю каталог скинов (это займет 10-15 секунд).');
+        await bot.sendMessage(msg.chat.id, '⏳ Подключаюсь к каталогу... Загружаю скины (около 10 секунд).');
 
         try {
             const response = await axios.get('https://csgobackpack.net/api/GetItemsList/v2/?no_details=true', { timeout: 30000 });
@@ -418,10 +415,23 @@ bot.on('message', async (msg) => {
 
             for (const key in items) {
                 const item = items[key];
-                if (!item || !item.price) continue; 
+                if (!item) continue; 
 
-                const priceUsd = item.price['7_days']?.average || item.price['30_days']?.average || item.price['all_time']?.average || 0;
-                const priceRub = Math.round(priceUsd * USD_TO_RUB);
+                let priceUsd = 0;
+                const rawPrice = item.price;
+                if (typeof rawPrice === 'number') {
+                    priceUsd = rawPrice;
+                } else if (typeof rawPrice === 'string') {
+                    priceUsd = parseFloat(rawPrice) || 0;
+                } else if (rawPrice && typeof rawPrice === 'object') {
+                    priceUsd = rawPrice['7_days']?.average || 
+                               rawPrice['30_days']?.average || 
+                               rawPrice['all_time']?.average || 
+                               Object.values(rawPrice)[0]?.average || 
+                               Object.values(rawPrice)[0] || 0;
+                }
+
+                const priceRub = Math.round(Number(priceUsd) * USD_TO_RUB);
 
                 const isWeaponOrKnife = !key.includes('Sticker') && !key.includes('Case') &&
                                         !key.includes('Key') && !key.includes('Capsule') &&
@@ -442,9 +452,11 @@ bot.on('message', async (msg) => {
 
             parsedCatalog.sort((a, b) => b.price - a.price);
             
-            if (parsedCatalog.length === 0) return await bot.sendMessage(msg.chat.id, '❌ Не найдено товаров после фильтрации.');
+            if (parsedCatalog.length === 0) {
+                return await bot.sendMessage(msg.chat.id, '❌ Не найдено товаров после фильтрации. Попробуйте позже.');
+            }
 
-            shopCatalog = parsedCatalog.slice(0, 300); // Топ-300 тяжелых скинов
+            shopCatalog = parsedCatalog.slice(0, 300);
             saveData();
 
             await bot.sendMessage(msg.chat.id, `✅ **Каталог успешно обновлен!**\nЗагружено **${shopCatalog.length}** премиум-скинов (от 1000 ₽ до ${shopCatalog[0].price} ₽).`, { parse_mode: 'Markdown' });
