@@ -11,7 +11,7 @@ process.on('uncaughtException', (err) => {
     console.error('⚠️ [CRITICAL] Uncaught Exception:', err.message);
 });
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ [CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('⚠️ [CRITICAL] Unhandled Rejection:', reason);
 });
 
 const TOKEN = process.env.BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN';
@@ -55,12 +55,29 @@ const dbFile = fs.existsSync(dataDir) ? path.join(dataDir, 'database.json') : pa
 const cardsFile = fs.existsSync(dataDir) ? path.join(dataDir, 'cards.json') : path.join(__dirname, 'cards.json');
 const shopCacheFile = fs.existsSync(dataDir) ? path.join(dataDir, 'shopCache.json') : path.join(__dirname, 'shopCache.json');
 
-let db = { users: {}, marketItems: [], giveaways: [], chats: [] };
+// ИСПРАВЛЕНИЕ: Глобальные переменные вынесены правильно
+let users = {};
+let marketItems = [];
+let giveaways = [];
+let chats = [];
 let cards = [];
 let cachedShopItems = [];
 
-if (fs.existsSync(dbFile)) { try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch (e) {} }
-if (fs.existsSync(cardsFile)) { try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} }
+if (fs.existsSync(dbFile)) { 
+    try { 
+        const db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); 
+        if (db.users) users = db.users;
+        if (db.marketItems) marketItems = db.marketItems;
+        if (db.giveaways) giveaways = db.giveaways;
+        if (db.chats) chats = db.chats;
+    } catch (e) {} 
+}
+
+if (fs.existsSync(cardsFile)) { 
+    try { 
+        cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); 
+    } catch (e) {} 
+}
 
 if (fs.existsSync(shopCacheFile)) {
     try { cachedShopItems = JSON.parse(fs.readFileSync(shopCacheFile, 'utf8')); } catch (e) { cachedShopItems = []; }
@@ -78,7 +95,7 @@ function generateDMarketSignature(method, pathUrl, bodyString, timestamp, secret
         if (!secretKeyHex) return '';
         const cleanKey = secretKeyHex.trim();
         const privateKeyBuffer = Buffer.from(cleanKey, 'hex');
-        if (privateKeyBuffer.length < 32) return '';
+        if (privateKeyBuffer.length < 32) throw new Error('Ключ слишком короткий');
 
         const seed = privateKeyBuffer.length >= 64 ? privateKeyBuffer.slice(0, 32) : privateKeyBuffer;
         const derPrefix = Buffer.from('302e02010030050603657004220420', 'hex');
@@ -101,7 +118,8 @@ async function fetchRealDmarketItems() {
             return;
         }
 
-        const apiPath = '/marketplace-api/v1/market-items?gameId=a8db&limit=50&orderBy=best_discount&orderDir=desc&currency=USD';
+        // Используем наиболее стабильный эндпоинт агрегатора
+        const apiPath = '/price-aggregator/v1/prices?gameId=a8db&limit=50';
         const method = 'GET';
         const timestamp = Math.floor(Date.now() / 1000).toString();
         const signature = generateDMarketSignature(method, apiPath, '', timestamp, DMARKET_SECRET_KEY);
@@ -119,18 +137,17 @@ async function fetchRealDmarketItems() {
 
         const response = await axios.get(`https://api.dmarket.com${apiPath}`, axiosConfig);
 
-        if (response && response.data && Array.isArray(response.data.objects) && response.data.objects.length > 0) {
+        if (response && response.data && response.data.objects) {
             const realItems = response.data.objects.map(obj => {
-                const priceUsd = obj.price && obj.price.USD ? (obj.price.USD / 100) : 0;
+                const priceUsd = obj.price?.USD ? (obj.price.USD / 100) : 0;
                 const priceRub = Math.round(priceUsd * USD_TO_RUB * 1.06);
-                let discount = obj.discount ? `${obj.discount}%` : (obj.extra?.discount ? `${obj.extra.discount}%` : null);
 
                 return {
-                    id: obj.itemId || obj.gameId || String(Math.random()),
+                    id: obj.itemId || String(Math.random()),
                     name: obj.title || 'CS2 Item',
                     image: obj.image || '',
                     price: priceRub,
-                    discount: discount
+                    discount: null
                 };
             }).filter(i => i.price > 0 && i.image);
 
@@ -145,7 +162,6 @@ async function fetchRealDmarketItems() {
     }
 }
 
-// Запускаем через 3 секунды после старта, чтобы сервер успел поднять порт
 setTimeout(fetchRealDmarketItems, 3000);
 setInterval(fetchRealDmarketItems, 60 * 60 * 1000);
 
