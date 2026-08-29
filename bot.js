@@ -48,7 +48,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 let users = {};
-let marketItems = []; // Исправлено: теперь это корректно массив
+let marketItems = [];
 let giveaways = [];
 let chats = [];
 let shopCatalog = []; 
@@ -98,14 +98,6 @@ function extractSteamIdFromTradeUrl(url) {
         try { return (BigInt(partnerMatch[1]) + 76561197960265728n).toString(); } catch (e) { return null; }
     }
     return null;
-}
-
-function isShopOpen() {
-    try {
-        const now = new Date();
-        const mskHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow', hour: 'numeric', hour12: false }));
-        return mskHour >= 9 && mskHour < 23;
-    } catch (e) { return true; }
 }
 
 function isAdmin(msg) {
@@ -292,21 +284,26 @@ app.post('/api/deals/buy', async (req, res) => {
 
 app.get('/api/shop/items', (req, res) => res.json({ success: true, items: shopCatalog }));
 
+// Покупка в магазине (время работы теперь 24/7, проверка по времени удалена)
 app.post('/api/shop/buy', async (req, res) => {
     const { tgId, itemId, itemName, itemPrice } = req.body;
-    if (!isShopOpen()) return res.json({ success: false, error: 'Магазин работает с 09:00 до 23:00 по МСК.' });
-
     const user = getOrCreateUser(tgId);
     const finalPrice = parseFloat(itemPrice);
 
-    if (isNaN(finalPrice) || user.balance < finalPrice) return res.json({ success: false, error: 'Недостаточно средств' });
-    if (!user.tradeUrl) return res.json({ success: false, error: 'Укажите Trade URL в профиле!' });
+    if (isNaN(finalPrice) || user.balance < finalPrice) {
+        return res.json({ success: false, error: 'Недостаточно средств' });
+    }
+    
+    // Проверка на наличие tradeUrl (если нужно, можно смягчить, но лучше оставить для отправки трейда)
+    if (!user.tradeUrl) {
+        return res.json({ success: false, error: 'Укажите Trade URL в профиле!' });
+    }
 
     user.balance -= finalPrice;
     saveData();
 
     try {
-        await bot.sendMessage(tgId, `🛍 **Заказ оформлен!** Скин *${itemName || 'Предмет'}* куплен за ${finalPrice} ₽.`);
+        await bot.sendMessage(tgId, `🛍 **Заказ оформлен!** Скин *${itemName || 'Предмет'}* успешно куплен за ${finalPrice} ₽.`);
         if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             await bot.sendMessage(ADMIN_CHAT_ID, `🔥 **Покупка в Магазине!**\n👤 ID: \`${user.tgId}\`\n🏷 Товар: *${itemName}*\n💰 Сумма: ${finalPrice} ₽\n🔗 Трейд:\n\`${user.tradeUrl}\``, { parse_mode: 'Markdown' });
         }
@@ -314,7 +311,7 @@ app.post('/api/shop/buy', async (req, res) => {
     } catch (error) {
         user.balance += finalPrice;
         saveData();
-        res.json({ success: false, error: 'Ошибка оформления.' });
+        res.json({ success: false, error: 'Ошибка оформления заказа.' });
     }
 });
 
@@ -419,10 +416,11 @@ bot.on('message', async (msg) => {
                     return await bot.sendMessage(chatId, '❌ Неверный формат в описании!\nИспользуйте: `/add Название скина | Цена в $`', { parse_mode: 'Markdown' });
                 }
 
-                const name = parts[0];
-                const priceUsd = parseFloat(parts[1]);
+                const priceUsdStr = parts[parts.length - 1].replace('$', '').trim();
+                const priceUsd = parseFloat(priceUsdStr);
+                const name = parts.slice(0, parts.length - 1).join(' | ');
 
-                if (isNaN(priceUsd)) return await bot.sendMessage(chatId, '❌ Ошибка: цена в долларах должна быть числом.');
+                if (isNaN(priceUsd)) return await bot.sendMessage(chatId, '❌ Ошибка: цена в долларах должна быть числом.', { parse_mode: 'Markdown' });
 
                 const priceRub = Math.round(priceUsd * USD_TO_RUB);
 
@@ -466,10 +464,11 @@ bot.on('message', async (msg) => {
             return await bot.sendMessage(chatId, '❌ Неверный формат!\nИспользуйте: `/add Название скина | Цена в $`', { parse_mode: 'Markdown' });
         }
 
-        const name = parts[0];
-        const priceUsd = parseFloat(parts[1]);
+        const priceUsdStr = parts[parts.length - 1].replace('$', '').trim();
+        const priceUsd = parseFloat(priceUsdStr);
+        const name = parts.slice(0, parts.length - 1).join(' | ');
 
-        if (isNaN(priceUsd)) return await bot.sendMessage(chatId, '❌ Ошибка: цена в долларах должна быть числом.');
+        if (isNaN(priceUsd)) return await bot.sendMessage(chatId, '❌ Ошибка: цена в долларах должна быть числом.', { parse_mode: 'Markdown' });
 
         let imageUrl = 'https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf2-r3ZzRSyN2xlZaYwLz0Orjcx2gGssEh0uw_j9r38Vfj-xU5Yjj3d4STJFA7aQ3RqVa4kLvpjMe7u5TJynIwuCcrsCvZlgv3308xN85S9A/360fx360f';
         if (pendingAddItems[userId] && pendingAddItems[userId].imageUrl) {
@@ -586,7 +585,7 @@ bot.on('callback_query', async (query) => {
     } else if (data.startsWith('p2p_cancel_')) {
         const tgId = parts[2], amount = parts[3];
         await bot.sendMessage(tgId, `❌ Операция на сумму ${amount} ₽ отклонена.`);
-        await bot.editMessageText(`✅ Отменено.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+        await bot.editMessageText(`❌ Отменено.`, { chat_id: query.message.chat.id, message_id: query.message.message_id });
     } else if (data.startsWith('user_paid_')) {
         const tgId = parts[2], amount = parts[3];
         if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
