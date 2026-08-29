@@ -5,7 +5,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
-// Защита от падений сервера (предотвращение 502 ошибок на Render)
+// Глобальная защита от падений сервера (предотвращение 502 ошибок)
 process.on('uncaughtException', (err) => console.error('⚠️ [CRITICAL] Uncaught Exception:', err.message));
 process.on('unhandledRejection', (reason) => console.error('⚠️ [CRITICAL] Unhandled Rejection:', reason));
 
@@ -16,6 +16,7 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'https://your-app.onrender.com';
 const PROXY_URL = process.env.PROXY_URL || '';
 
 const USD_TO_RUB = 95;
+const MARGIN = 1.04; // Наценка 4%
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -76,8 +77,12 @@ if (fs.existsSync(cardsFile)) {
     try { cards = JSON.parse(fs.readFileSync(cardsFile, 'utf8')).map(c => ({ ...c, type: c.type || 'UZ' })); } catch (e) {} 
 }
 
+// Исправлено: теперь сохраняет и карты, предотвращая их потерю
 function saveData() { 
-    try { fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats, shopCatalog }, null, 2)); } catch (e) {} 
+    try { 
+        fs.writeFileSync(dbFile, JSON.stringify({ users, marketItems, giveaways, chats, shopCatalog }, null, 2)); 
+        fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2));
+    } catch (e) {} 
 }
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
@@ -399,51 +404,63 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Улучшенный универсальный парсер без ошибок типов
+    // --- ПАРСЕР С ЛИС-СКИНС С УЧЕТОМ ЗАЩИТЫ CLOUDFLARE И НАЦЕНКОЙ 4% ---
     if (text.toLowerCase() === '/parser') {
         if (!isAdmin(msg)) return await bot.sendMessage(msg.chat.id, '❌ Нет прав.');
-        await bot.sendMessage(msg.chat.id, '⏳ Подключаюсь к каталогу... Загружаю скины (около 10 секунд).');
+        await bot.sendMessage(msg.chat.id, '⏳ Подключаюсь к базе Лис-Скинс... Загружаю каталог (около 10 секунд).');
 
         try {
-            const response = await axios.get('https://csgobackpack.net/api/GetItemsList/v2/?no_details=true', { timeout: 30000 });
-            const items = response.data?.items_list;
+            // Добавлены заголовки User-Agent, чтобы обойти блокировку Cloudflare (403)
+            let axiosConfig = {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json'
+                },
+                timeout: 30000
+            };
+            if (PROXY_URL) axiosConfig.httpsAgent = new HttpsProxyAgent(PROXY_URL);
+
+            const response = await axios.get('https://lis-skins.ru/api/prices/', axiosConfig);
+            const items = response.data;
             
-            if (!items) return await bot.sendMessage(msg.chat.id, '❌ Ошибка: API не вернуло список товаров.');
+            if (!items) return await bot.sendMessage(msg.chat.id, '❌ Ошибка: API Лис-Скинс не вернуло данные.');
 
             let parsedCatalog = [];
             let idCounter = 1;
 
-            for (const key in items) {
-                const item = items[key];
-                if (!item) continue; 
+            const itemsArray = Array.isArray(items) ? items : Object.entries(items).map(([name, data]) => ({ name, ...data }));
 
-                let priceUsd = 0;
-                const rawPrice = item.price;
-                if (typeof rawPrice === 'number') {
-                    priceUsd = rawPrice;
-                } else if (typeof rawPrice === 'string') {
-                    priceUsd = parseFloat(rawPrice) || 0;
-                } else if (rawPrice && typeof rawPrice === 'object') {
-                    priceUsd = rawPrice['7_days']?.average || 
-                               rawPrice['30_days']?.average || 
-                               rawPrice['all_time']?.average || 
-                               Object.values(rawPrice)[0]?.average || 
-                               Object.values(rawPrice)[0] || 0;
+            for (const item of itemsArray) {
+                if (!item) continue;
+
+                const name = item.name || item.market_name || '';
+                const rawPrice = item.price || item.value || item.RUB || item.usd || 0;
+                let priceRub = 0;
+
+                if (typeof rawPrice === 'object') {
+                    priceRub = (rawPrice.RUB || (rawPrice.USD ? rawPrice.USD * USD_TO_RUB : 0));
+                } else {
+                    const parsedNum = parseFloat(rawPrice) || 0;
+                    priceRub = parsedNum < 500 ? parsedNum * USD_TO_RUB : parsedNum;
                 }
 
-                const priceRub = Math.round(Number(priceUsd) * USD_TO_RUB);
+                // Применяем маржу 4%
+                priceRub = Math.round(priceRub * MARGIN);
 
-                const isWeaponOrKnife = !key.includes('Sticker') && !key.includes('Case') &&
-                                        !key.includes('Key') && !key.includes('Capsule') &&
-                                        !key.includes('Patch') && !key.includes('Graffiti') &&
-                                        !key.includes('Package') && !key.includes('Pin') &&
-                                        !key.includes('Music Kit') && !key.includes('Sealed Graffiti');
+                const isWeaponOrKnife = !name.includes('Sticker') && !name.includes('Case') &&
+                                        !name.includes('Key') && !name.includes('Capsule') &&
+                                        !name.includes('Patch') && !name.includes('Graffiti') &&
+                                        !name.includes('Package') && !name.includes('Pin') &&
+                                        !name.includes('Music Kit') && !name.includes('Sealed Graffiti');
 
-                if (priceRub >= 1000 && item.icon_url && isWeaponOrKnife) {
+                if (priceRub >= 1000 && isWeaponOrKnife) {
+                    const icon = item.icon || item.image || item.icon_url || '';
+                    const imageUrl = icon.startsWith('http') ? icon : `https://community.cloudflare.steamstatic.com/economy/image/${icon}/360fx360f`;
+
                     parsedCatalog.push({
-                        id: `p_${idCounter++}`,
-                        name: item.name || key,
-                        image: `https://community.cloudflare.steamstatic.com/economy/image/${item.icon_url}/360fx360f`,
+                        id: `lis_${idCounter++}`,
+                        name: name,
+                        image: imageUrl || DEFAULT_CATALOG[0].image,
                         price: priceRub,
                         discount: null
                     });
@@ -453,15 +470,15 @@ bot.on('message', async (msg) => {
             parsedCatalog.sort((a, b) => b.price - a.price);
             
             if (parsedCatalog.length === 0) {
-                return await bot.sendMessage(msg.chat.id, '❌ Не найдено товаров после фильтрации. Попробуйте позже.');
+                return await bot.sendMessage(msg.chat.id, '❌ Не найдено товаров после фильтрации от Лис-Скинс.');
             }
 
-            shopCatalog = parsedCatalog.slice(0, 300);
+            shopCatalog = parsedCatalog.slice(0, 300); // Топ-300 скинов
             saveData();
 
-            await bot.sendMessage(msg.chat.id, `✅ **Каталог успешно обновлен!**\nЗагружено **${shopCatalog.length}** премиум-скинов (от 1000 ₽ до ${shopCatalog[0].price} ₽).`, { parse_mode: 'Markdown' });
+            await bot.sendMessage(msg.chat.id, `✅ **Каталог успешно обновлен с Лис-Скинс (+4% маржа)!**\nЗагружено **${shopCatalog.length}** премиум-скинов (от 1000 ₽ до ${shopCatalog[0].price} ₽).`, { parse_mode: 'Markdown' });
         } catch (e) {
-            await bot.sendMessage(msg.chat.id, `❌ Ошибка парсинга: ${e.message}`);
+            await bot.sendMessage(msg.chat.id, `❌ Ошибка парсинга Лис-Скинс: ${e.message}`);
         }
         return;
     }
