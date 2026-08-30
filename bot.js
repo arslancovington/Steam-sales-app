@@ -77,16 +77,17 @@ function saveData() {
 }
 
 function getOrCreateUser(tgId, username = 'Игрок', photoUrl = null) {
+    const stringTgId = String(tgId);
     const now = Date.now();
-    if (!users[tgId]) {
-        users[tgId] = { tgId, username: username || 'Игрок', photoUrl, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '', steamId: '', lastActive: now };
+    if (!users[stringTgId]) {
+        users[stringTgId] = { tgId: stringTgId, username: username || 'Игрок', photoUrl, balance: 0, rating: 5.0, completedDeals: 0, tradeUrl: '', steamId: '', lastActive: now };
     } else {
-        users[tgId].lastActive = now;
-        if (username && username !== 'Игрок') users[tgId].username = username;
-        if (photoUrl) users[tgId].photoUrl = photoUrl;
+        users[stringTgId].lastActive = now;
+        if (username && username !== 'Игрок') users[stringTgId].username = username;
+        if (photoUrl) users[stringTgId].photoUrl = photoUrl;
     }
     saveData();
-    return users[tgId];
+    return users[stringTgId];
 }
 
 function extractSteamIdFromTradeUrl(url) {
@@ -190,7 +191,7 @@ app.post('/api/battle/bet', (req, res) => {
     if (existing) existing.bet += bet;
     else {
         const color = BATTLE_COLORS[battleState.participants.length % BATTLE_COLORS.length];
-        battleState.participants.push({ tgId, username, avatar: photoUrl || '🧑‍🚀', bet, color });
+        battleState.participants.push({ tgId: String(tgId), username, avatar: photoUrl || '🧑‍🚀', bet, color });
     }
     battleState.bank += bet;
 
@@ -205,12 +206,13 @@ app.get('/api/giveaways/list', (req, res) => res.json({ success: true, giveaways
 
 app.post('/api/giveaways/join', async (req, res) => {
     const { tgId, giveawayId } = req.body;
+    const stringTgId = String(tgId);
     const giveaway = giveaways.find(g => g._id === giveawayId);
     if (!giveaway) return res.json({ success: false, error: 'Розыгрыш не найден' });
     if (giveaway.ended) return res.json({ success: false, error: 'Розыгрыш уже завершен' });
-    if (giveaway.participants.includes(String(tgId))) return res.json({ success: false, error: 'Вы уже участвуете!' });
+    if (giveaway.participants.includes(stringTgId)) return res.json({ success: false, error: 'Вы уже участвуете!' });
 
-    giveaway.participants.push(String(tgId));
+    giveaway.participants.push(stringTgId);
     giveaway.participantsCount = giveaway.participants.length;
     saveData();
     res.json({ success: true });
@@ -218,7 +220,8 @@ app.post('/api/giveaways/join', async (req, res) => {
 
 app.post('/api/steam/inventory', async (req, res) => {
     let { steamId, tgId } = req.body;
-    if (!steamId && tgId && users[tgId]) steamId = users[tgId].steamId;
+    const stringTgId = String(tgId);
+    if (!steamId && stringTgId && users[stringTgId]) steamId = users[stringTgId].steamId;
     if (!steamId) return res.json({ success: false, error: 'Не указан SteamID или Trade URL' });
 
     try {
@@ -262,12 +265,13 @@ app.post('/api/market/cancel', (req, res) => {
 
 app.post('/api/deals/buy', async (req, res) => {
     const { itemId, buyerTgId } = req.body;
-    const buyer = getOrCreateUser(buyerTgId);
+    const stringBuyerTgId = String(buyerTgId);
+    const buyer = getOrCreateUser(stringBuyerTgId);
     const itemIndex = marketItems.findIndex(i => i._id === itemId);
     if (itemIndex === -1) return res.json({ success: false, error: 'Предмет не найден' });
     
     const item = marketItems[itemIndex];
-    if (String(item.tgId) === String(buyerTgId)) return res.json({ success: false, error: 'Нельзя купить свой лот' });
+    if (String(item.tgId) === stringBuyerTgId) return res.json({ success: false, error: 'Нельзя купить свой лот' });
     if (buyer.balance < item.buyerPrice) return res.json({ success: false, error: 'Недостаточно средств' });
 
     buyer.balance -= item.buyerPrice;
@@ -284,32 +288,40 @@ app.post('/api/deals/buy', async (req, res) => {
 
 app.get('/api/shop/items', (req, res) => res.json({ success: true, items: shopCatalog }));
 
-// Покупка в магазине (время работы теперь 24/7, проверка по времени удалена)
+// Покупка в магазине с проверкой цены по базе и удалением купленного товара из каталога
 app.post('/api/shop/buy', async (req, res) => {
-    const { tgId, itemId, itemName, itemPrice } = req.body;
-    const user = getOrCreateUser(tgId);
-    const finalPrice = parseFloat(itemPrice);
+    const { tgId, itemId } = req.body;
+    const stringTgId = String(tgId);
+    const user = getOrCreateUser(stringTgId);
+
+    const itemIndex = shopCatalog.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+        return res.json({ success: false, error: 'Товар не найден или уже куплен' });
+    }
+
+    const item = shopCatalog[itemIndex];
+    const finalPrice = parseFloat(item.price);
 
     if (isNaN(finalPrice) || user.balance < finalPrice) {
         return res.json({ success: false, error: 'Недостаточно средств' });
     }
-    
-    // Проверка на наличие tradeUrl (если нужно, можно смягчить, но лучше оставить для отправки трейда)
-    if (!user.tradeUrl) {
-        return res.json({ success: false, error: 'Укажите Trade URL в профиле!' });
-    }
 
     user.balance -= finalPrice;
+    
+    // Удаляем товар из каталога, чтобы избежать повторных покупок
+    shopCatalog.splice(itemIndex, 1);
     saveData();
 
     try {
-        await bot.sendMessage(tgId, `🛍 **Заказ оформлен!** Скин *${itemName || 'Предмет'}* успешно куплен за ${finalPrice} ₽.`);
+        await bot.sendMessage(stringTgId, `🛍 **Заказ оформлен!** Скин *${item.name}* успешно куплен за ${finalPrice} ₽.`);
         if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-            await bot.sendMessage(ADMIN_CHAT_ID, `🔥 **Покупка в Магазине!**\n👤 ID: \`${user.tgId}\`\n🏷 Товар: *${itemName}*\n💰 Сумма: ${finalPrice} ₽\n🔗 Трейд:\n\`${user.tradeUrl}\``, { parse_mode: 'Markdown' });
+            await bot.sendMessage(ADMIN_CHAT_ID, `🔥 **Покупка в Магазине!**\n👤 ID: \`${user.tgId}\`\n🏷 Товар: *${item.name}*\n💰 Сумма: ${finalPrice} ₽\n🔗 Трейд:\n\`${user.tradeUrl || 'Не указан'}\``, { parse_mode: 'Markdown' });
         }
         res.json({ success: true, newBalance: user.balance });
     } catch (error) {
+        // Откат при сбое отправки уведомления в Telegram
         user.balance += finalPrice;
+        shopCatalog.splice(itemIndex, 0, item);
         saveData();
         res.json({ success: false, error: 'Ошибка оформления заказа.' });
     }
@@ -317,6 +329,7 @@ app.post('/api/shop/buy', async (req, res) => {
 
 app.post('/api/billing/invoice', async (req, res) => {
     const { tgId, amount, currency } = req.body;
+    const stringTgId = String(tgId);
     try {
         let rubles = currency === 'USDT' ? amount * 80 : (currency === 'Stars' ? amount * 1.5 : amount);
 
@@ -329,12 +342,12 @@ app.post('/api/billing/invoice', async (req, res) => {
             let activeCard = filteredCards[0];
             const sumText = isRu ? `${amount} ₽` : `${Math.round(amount * 175).toLocaleString()} сум (${amount} ₽)`;
 
-            await bot.sendMessage(tgId, `💳 Реквизиты для оплаты ${currency}\nСумма: **${sumText}**\nКарта (${activeCard.holder}):\n\`${activeCard.number}\``, {
-                parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${tgId}_${amount}` }]] }
+            await bot.sendMessage(stringTgId, `💳 Реквизиты для оплаты ${currency}\nСумма: **${sumText}**\nКарта (${activeCard.holder}):\n\`${activeCard.number}\``, {
+                parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Я оплатил(-а)', callback_data: `user_paid_${stringTgId}_${amount}` }]] }
             });
 
             if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
-                await bot.sendMessage(ADMIN_CHAT_ID, `💳 Запрос пополнения (${currency})!\n👤 ID: \`${tgId}\`\n💰 Сумма: ${amount} ₽`, { parse_mode: 'Markdown' });
+                await bot.sendMessage(ADMIN_CHAT_ID, `💳 Запрос пополнения (${currency})!\n👤 ID: \`${stringTgId}\`\n💰 Сумма: ${amount} ₽`, { parse_mode: 'Markdown' });
             }
         } else if (currency === 'USDT') {
             let payUrl = 'https://t.me/CryptoBot';
@@ -343,12 +356,12 @@ app.post('/api/billing/invoice', async (req, res) => {
                     const cryptoRes = await axios.post('https://pay.crypt.bot/api/createInvoice', {
                         asset: 'USDT', amount: amount.toString(),
                         description: `Пополнение баланса на ${Math.round(rubles)} ₽`,
-                        payload: `topup_${tgId}_${Math.round(rubles)}`
+                        payload: `topup_${stringTgId}_${Math.round(rubles)}`
                     }, { headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN } });
                     if (cryptoRes.data?.ok) payUrl = cryptoRes.data.result.pay_url;
                 } catch (err) {}
             }
-            await bot.sendMessage(tgId, `🧾 Счет на пополнение\n\nСумма: ${amount} USDT`, { reply_markup: { inline_keyboard: [[{ text: '💎 Оплатить в CryptoBot', url: payUrl }]] } });
+            await bot.sendMessage(stringTgId, `🧾 Счет на пополнение\n\nСумма: ${amount} USDT`, { reply_markup: { inline_keyboard: [[{ text: '💎 Оплатить в CryptoBot', url: payUrl }]] } });
         }
         res.json({ success: true });
     } catch (e) { res.json({ success: false, error: 'Ошибка создания счета.' }); }
@@ -364,7 +377,7 @@ app.post('/api/billing/withdraw', async (req, res) => {
     try {
         if (ADMIN_CHAT_ID !== 'YOUR_ADMIN_CHAT_ID') {
             await bot.sendMessage(ADMIN_CHAT_ID, `💸 Заявка на вывод (${method})!\n👤 @${username || tgId}\n💰 Сумма: ${amount} ₽\n💳 Реф: \`${recipientAccount}\``, {
-                parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Подтвердить', callback_data: `p2p_withdraw_done_${tgId}_${amount}` }, { text: '❌ Отменить', callback_data: `p2p_cancel_${tgId}_${amount}` }]] }
+                parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Подтвердить', callback_data: `p2p_withdraw_done_${user.tgId}_${amount}` }, { text: '❌ Отменить', callback_data: `p2p_cancel_${user.tgId}_${amount}` }]] }
             });
         }
         res.json({ success: true, newBalance: user.balance });
@@ -393,17 +406,25 @@ bot.on('message', async (msg) => {
             const fileName = `item_${Date.now()}${path.extname(filePath) || '.jpg'}`;
             const localPath = path.join(uploadsDir, fileName);
 
-            const writer = fs.createWriteStream(localPath);
             const response = await axios({
                 url: fileUrl,
                 method: 'GET',
                 responseType: 'stream'
             });
+
+            const writer = fs.createWriteStream(localPath);
             response.data.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on('finish', resolve);
-                writer.on('error', reject);
+                writer.on('error', (err) => {
+                    writer.close();
+                    reject(err);
+                });
+                response.data.on('error', (err) => {
+                    writer.close();
+                    reject(err);
+                });
             });
 
             const permanentImageUrl = `${WEBAPP_URL}/uploads/${fileName}`;
